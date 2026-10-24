@@ -1,0 +1,14 @@
+{
+  "name": "certpath",
+  "private": true,
+  "description": "CertPath monorepo scripts: run the API, learner app and backoffice together",
+  "scripts": {
+    "setup": "npm --prefix api ci && npm --prefix admin ci && npm --prefix mobile ci",
+    "dev": "concurrently --names api,admin,mobile --prefix-colors magenta,cyan,green --kill-others-on-fail \"npm --prefix api run dev\" \"npm --prefix admin run dev\" \"npm --prefix mobile run web\"",
+    "test": "npm --prefix api test",
+    "typecheck": "npm --prefix api run typecheck && npm --prefix admin run typecheck && cd mobile && npx tsc --noEmit"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

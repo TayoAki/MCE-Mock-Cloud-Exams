@@ -6,21 +6,23 @@ Only accounts with the `reviewer` or `admin` role can use it. Learner accounts s
 
 ## Run it
 
+Or run everything from the repo root with `npm run dev` (see the root README, which also covers GitHub Codespaces).
+
 ```bash
 # 1. Start the API (in-memory MongoDB replica set, seeded) from ../api
 cd ../api && npm install && npm run dev        # http://localhost:4000/v1
 
 # 2. Start the backoffice
 cd ../admin && npm install
-cp .env.example .env                           # optional; defaults to http://localhost:4000/v1
 npm run dev                                    # http://localhost:5173
 ```
 
-Sign in with the development seed account `admin@certpath.dev` / `certpath-admin`. The API's `CORS_ORIGINS` must include the backoffice origin (the default does).
+Sign in with the development seed account `admin@certpath.dev` / `certpath-admin`. In development the backoffice calls `/v1` on its own origin and Vite proxies it to the API, so there is no CORS setup and it works unchanged in GitHub Codespaces.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `VITE_API_URL` | `http://localhost:4000/v1` | API base URL including `/v1` |
+| `VITE_API_URL` | `/v1` (proxied) | API base URL including `/v1`; set it for production builds served without the proxy |
+| `API_PROXY_TARGET` | `http://127.0.0.1:4000` | Where the dev/preview proxy sends `/v1` |
 
 `npm run build` typechecks and writes a static bundle to `dist/`. Serve it from any static host with a fallback to `index.html` for client-side routes.
 

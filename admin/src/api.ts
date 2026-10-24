@@ -1,4 +1,5 @@
-const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:4000/v1';
+// Same-origin by default: the Vite dev and preview servers proxy /v1 to the API.
+const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || '/v1';
 const TOKEN_KEY = 'certpath.admin.token';
 const USER_KEY = 'certpath.admin.user';
 

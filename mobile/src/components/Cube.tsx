@@ -8,7 +8,7 @@ export function Cube({ size = 96, mood = 'happy' }: { size?: number; mood?: 'hap
   const mouth =
     mood === 'thinking' ? 'M44 68 L56 66' : mood === 'proud' ? 'M41 64 Q50 74 59 64' : 'M42 65 Q50 71 58 65';
   return (
-    <Svg width={size} height={size} viewBox="0 0 100 100" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <Svg width={size} height={size} viewBox="0 0 100 100" aria-hidden>
       <G>
         <Line x1="18" y1="58" x2="6" y2="50" stroke="#4D37CE" strokeWidth="4" strokeLinecap="round" />
         <Line x1="82" y1="58" x2={mood === 'proud' ? '94' : '94'} y2={mood === 'proud' ? '40' : '50'} stroke="#4D37CE" strokeWidth="4" strokeLinecap="round" />

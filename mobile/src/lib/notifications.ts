@@ -8,10 +8,6 @@ import { patch, post } from './api';
  * permission leaves the app fully usable; the preference just stays off.
  */
 export async function enableReminders(localTime = '21:00'): Promise<'enabled' | 'denied' | 'unavailable'> {
-  if (Platform.OS === 'web') {
-    await patch('/me/preferences', { reminders_enabled: true, daily_local_time: localTime });
-    return 'unavailable';
-  }
   const current = await Notifications.getPermissionsAsync();
   const granted = current.granted || (await Notifications.requestPermissionsAsync()).granted;
   if (!granted) return 'denied';

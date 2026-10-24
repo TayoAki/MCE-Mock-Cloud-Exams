@@ -9,7 +9,7 @@ export type IconName = ComponentProps<typeof Ionicons>['name'];
 
 export function Icon({ name, size = 20, color = colors.ink }: { name: IconName; size?: number; color?: ComponentProps<typeof Ionicons>['color'] }) {
   // Icons are decorative; the surrounding control carries the accessible name.
-  return <Ionicons name={name} size={size} color={color} aria-hidden importantForAccessibility="no" />;
+  return <Ionicons name={name} size={size} color={color} aria-hidden />;
 }
 
 /** Page shell: safe-area padding, scrolling content and an optional pinned footer. */

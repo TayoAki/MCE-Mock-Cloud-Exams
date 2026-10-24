@@ -16,10 +16,23 @@ This repository implements the CertPath v2 replan in `docs/plan/` (product, jour
 Node 22+. No database to install: the API's dev mode starts an in-memory MongoDB replica set and seeds it.
 
 ```bash
-cd api && npm install && npm run dev        # http://localhost:4000/v1
-cd mobile && npm install && npx expo start  # i / a / w, or scan the QR code with Expo Go
-cd admin && npm install && npm run dev      # http://localhost:5173
+npm ci && npm run setup   # installs api/, admin/ and mobile/
+npm run dev               # API :4000, learner app (web) :8081, backoffice :5173
 ```
+
+Open **http://localhost:8081** for the learner app and **http://localhost:5173** for the backoffice. In development both call `/v1` on their own origin, and their dev servers proxy it to the API, so there is no CORS or URL setup. The first load of the learner app bundles it and takes up to about 30 seconds. `npm test` runs the API suite, and `npm run typecheck` checks all three apps.
+
+To run the native app on a simulator or phone, run the API and Expo separately: `npm --prefix api run dev`, then `cd mobile && npx expo start` (press `i` or `a`, or scan the QR code).
+
+### GitHub Codespaces
+
+1. Create a codespace on this branch. The dev container (`.devcontainer/`, Node 22) runs `npm ci && npm run setup`, which takes a few minutes.
+2. In the terminal, run `npm run dev` and wait for `[api] CertPath API on http://localhost:4000/v1` and `[mobile] Waiting on http://localhost:8081`.
+3. In the **Ports** tab, open **8081** (learner app) and **5173** (backoffice). Ports can stay private: all API calls go through those two dev servers.
+
+A 4-core machine bundles noticeably faster than the default 2-core one. The in-memory database resets whenever the API restarts, including when you edit API code; sign in again or start a new guest.
+
+For a phone in a codespace, stop `npm run dev`, run `npm --prefix api run dev` in one terminal and `cd mobile && npx expo start --tunnel` in another, then scan the QR code. The app reaches the API through the tunnel and Metro's proxy, but this path hasn't been tested. Expo Go must support SDK 57; if the store version only supports a newer SDK, use the web app or a development build.
 
 Seeded logins (development only):
 

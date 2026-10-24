@@ -15,7 +15,9 @@ npm install
 npx expo start                             # press i / a / w, or scan the QR code
 ```
 
-The app finds the API on port 4000 of the machine running Metro, so simulators and phones on the same network work without configuration. Override it with `EXPO_PUBLIC_API_URL` (see `.env.example`). On web, add the web origin to the API's `CORS_ORIGINS` (the API default includes `http://localhost:8081`).
+Or run everything from the repo root with `npm run dev` (see the root README, which also covers GitHub Codespaces).
+
+In development the app sends API calls to Metro itself (`/v1` on the dev server), and `metro.config.js` proxies them to `API_PROXY_TARGET` (default `http://127.0.0.1:4000`). Web, simulators, phones on the same network, `--tunnel` and Codespaces therefore need nothing beyond Metro. Production builds use `EXPO_PUBLIC_API_URL` (see `.env.example`).
 
 Expo Go runs everything except push reminders. Those need a development build (`npx expo run:ios` / `npx expo run:android`, or EAS) and an EAS project ID; without one, turning reminders on still saves the preference.
 
