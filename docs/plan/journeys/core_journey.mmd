@@ -1,0 +1,13 @@
+flowchart TD
+    A["Select a supported exam"] --> B["Set a realistic daily goal"]
+    B --> C["Start a five-question lesson"]
+    C --> D["Answer and read feedback"]
+    D --> E{"Need another explanation?"}
+    E -->|Yes| F["Contextual helper with sources"]
+    E -->|No| G["Complete the session"]
+    F --> G
+    G --> H["Earn activity credit and schedule review"]
+    H --> I["Return to a fresh scenario"]
+    I --> J["Take a full mock and focus on gaps"]
+    J --> K["Record exam outcome and graduate or retry"]
+

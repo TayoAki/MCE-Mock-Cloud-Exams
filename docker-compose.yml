@@ -1,0 +1,36 @@
+# Local stack: a single-node MongoDB replica set (transactions require one) and the API.
+#   docker compose up -d mongo && (cd api && MONGODB_URI=mongodb://localhost:27017/certpath?replicaSet=rs0 npm run seed)
+#   docker compose up api
+services:
+  mongo:
+    image: mongo:8.0
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # Initiates the replica set on first start, then reports healthy once it has a primary.
+      test: ["CMD", "mongosh", "--quiet", "--eval", "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] }).ok }"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  api:
+    build: ./api
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      MONGODB_URI: mongodb://mongo:27017/certpath?replicaSet=rs0&directConnection=true
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (openssl rand -hex 32)}
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8081
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      STORE_SANDBOX: "false"
+    ports:
+      - "4000:4000"
+
+volumes:
+  mongo-data:

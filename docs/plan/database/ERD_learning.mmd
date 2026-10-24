@@ -1,0 +1,18 @@
+erDiagram
+    user_profiles ||--o{ enrollments : enrolls
+    exam_versions ||--o{ enrollments : pins
+    enrollments ||--o{ lesson_progress : records
+    enrollments ||--o{ practice_sessions : starts
+    practice_sessions ||--o{ session_items : assigns
+    question_versions ||--o{ session_items : snapshots
+    session_items ||--o| attempts : accepts
+    attempts ||--o{ attempt_choices : selects
+    question_options ||--o{ attempt_choices : validates
+    user_profiles ||--o{ question_exposures : sees
+    question_families ||--o{ question_exposures : tracks
+    enrollments ||--o{ objective_progress : measures
+    objectives ||--o{ objective_progress : aggregates
+    enrollments ||--o{ review_queue : schedules
+    objectives ||--o{ review_queue : revisits
+    enrollments ||--o{ exam_outcomes : records
+

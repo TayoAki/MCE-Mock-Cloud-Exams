@@ -1,0 +1,16 @@
+erDiagram
+    exams ||--o{ exam_versions : versions
+    exam_versions ||--o{ domains : outlines
+    domains ||--o{ objectives : maps
+    exam_versions ||--o{ units : organizes
+    units ||--o{ lessons : contains
+    lessons ||--o{ lesson_objectives : targets
+    objectives ||--o{ lesson_objectives : covered_by
+    objectives ||--o{ question_families : tests
+    question_families ||--o{ question_versions : revises
+    question_versions ||--o{ question_options : offers
+    question_versions ||--o| question_explanations : explains
+    question_options ||--o| correct_options : keys
+    lessons ||--o{ lesson_question_pool : draws_from
+    question_families ||--o{ lesson_question_pool : eligible
+
