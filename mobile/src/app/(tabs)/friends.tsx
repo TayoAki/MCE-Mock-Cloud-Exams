@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Share, Text, TextInput, View } from 'react-native';
+import { Platform, Share, Text, TextInput, View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { Cube } from '@/components/Cube';
 import { Banner, Body, Button, Card, ErrorState, Eyebrow, LoadingState, Pill, Screen, Small, Title } from '@/components/ui';
@@ -32,6 +32,7 @@ export default function Friends() {
   const [target, setTarget] = useState(4);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
 
   async function create() {
     setBusy(true);
@@ -51,7 +52,12 @@ export default function Friends() {
     try {
       const res = await post<{ invite_url: string; expires_at: string }>(`/circles/${circleId}/invites`, {});
       trackEvent('circle_invite_requested');
-      await Share.share({ message: `Join my CertPath study circle: ${res.invite_url}` });
+      // On web the invite opens this app's /join route; native shares the certpath:// deep link.
+      const token = new URL(res.invite_url.replace(/^certpath:\/\//, 'https://x/')).searchParams.get('token') ?? '';
+      const link = Platform.OS === 'web' ? `${window.location.origin}/join?token=${encodeURIComponent(token)}` : res.invite_url;
+      setInviteLink(link);
+      // Not every browser has a share sheet; the link stays on screen either way.
+      await Share.share({ message: `Join my CertPath study circle: ${link}` }).catch(() => undefined);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not create an invite');
     }
@@ -109,6 +115,13 @@ export default function Friends() {
           </Card>
           <Small>{c.note} Weeks run Monday to Sunday in {c.timezone}.</Small>
           <Button label="Invite a friend" icon="share-outline" onPress={invite} />
+          {inviteLink ? (
+            <Banner tone="success" title="Invite link (expires in 7 days)">
+              <Text selectable className="text-ink text-[14px]">
+                {inviteLink}
+              </Text>
+            </Banner>
+          ) : null}
           <Button label="Leave circle" variant="ghost" onPress={leave} />
         </>
       ) : circles.data ? (
