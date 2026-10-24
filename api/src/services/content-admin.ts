@@ -13,6 +13,7 @@ import {
   QuestionKey,
   QuestionVersion,
   Unit,
+  User,
   type UserRecord,
 } from '../models/index.js';
 import { config } from '../config.js';
@@ -54,7 +55,7 @@ export async function updateExam(actor: Actor, examId: string, input: { status?:
   const exam = await Exam.findByIdAndUpdate(examId, { $set: input }, { returnDocument: 'after', runValidators: true }).lean();
   if (!exam) throw notFound('Exam');
   await audit(actor, 'exam_version', examId, 'exam_updated', '', input);
-  return exam;
+  return (await listExamsAdmin()).find((e) => e.id === examId)!;
 }
 
 export async function createVersion(
@@ -72,7 +73,7 @@ export async function createVersion(
     guideUrl: input.guide_url,
   });
   await audit(actor, 'exam_version', version._id, 'created');
-  return version.toObject();
+  return versionDetail(version._id);
 }
 
 async function draftVersion(versionId: string) {
@@ -131,6 +132,25 @@ export async function upsertObjective(
     await Objective.create({ examVersionId: versionId, ...fields });
   }
   await audit(actor, 'exam_version', versionId, 'objective_saved', '', fields);
+  return versionDetail(versionId);
+}
+
+export async function deleteDomain(actor: Actor, versionId: string, domainId: string) {
+  await draftVersion(versionId);
+  if (await Objective.exists({ domainId })) throw conflict('domain_in_use', 'Remove or move its objectives first');
+  const res = await Domain.deleteOne({ _id: domainId, examVersionId: versionId });
+  if (!res.deletedCount) throw notFound('Domain');
+  await audit(actor, 'exam_version', versionId, 'domain_deleted', '', { domain_id: domainId });
+  return versionDetail(versionId);
+}
+
+export async function deleteObjective(actor: Actor, versionId: string, objectiveId: string) {
+  await draftVersion(versionId);
+  if (await QuestionFamily.exists({ objectiveId })) throw conflict('objective_in_use', 'Questions are mapped to this objective');
+  if (await Lesson.exists({ objectiveIds: objectiveId })) throw conflict('objective_in_use', 'A lesson covers this objective');
+  const res = await Objective.deleteOne({ _id: objectiveId, examVersionId: versionId });
+  if (!res.deletedCount) throw notFound('Objective');
+  await audit(actor, 'exam_version', versionId, 'objective_deleted', '', { objective_id: objectiveId });
   return versionDetail(versionId);
 }
 
@@ -225,9 +245,9 @@ export async function versionReadiness(versionId: string) {
   }
   const checks = [
     { key: 'weights_total_100', blocking: true, ok: Math.abs(weightTotal - 100) < 1e-6, detail: `Domain weights total ${weightTotal}%` },
-    { key: 'domains_have_objectives', blocking: true, ok: domains.length > 0 && domainsWithoutObjectives.length === 0, detail: domainsWithoutObjectives.length ? `No objectives: ${domainsWithoutObjectives.map((d) => d.title).join(', ')}` : `${objectives.length} objectives mapped` },
-    { key: 'published_lesson', blocking: true, ok: lessons.length > 0 && emptyLessons.length === 0, detail: emptyLessons.length ? `Lessons without published questions: ${emptyLessons.map((l) => l.title).join(', ')}` : `${lessons.length} published lessons` },
-    { key: 'objective_coverage', blocking: false, ok: emptyObjectives.length === 0, detail: emptyObjectives.length ? `${emptyObjectives.length} objectives have no published questions` : 'Every objective has published questions' },
+    { key: 'domains_have_objectives', blocking: true, ok: domains.length > 0 && domainsWithoutObjectives.length === 0, detail: domainsWithoutObjectives.length ? `No objectives: ${domainsWithoutObjectives.map((d) => d.title).join(', ')}` : `${objectives.length} ${objectives.length === 1 ? 'objective' : 'objectives'} mapped` },
+    { key: 'published_lesson', blocking: true, ok: lessons.length > 0 && emptyLessons.length === 0, detail: emptyLessons.length ? `Lessons without published questions: ${emptyLessons.map((l) => l.title).join(', ')}` : `${lessons.length} published ${lessons.length === 1 ? 'lesson' : 'lessons'}` },
+    { key: 'objective_coverage', blocking: false, ok: emptyObjectives.length === 0, detail: emptyObjectives.length ? `${emptyObjectives.length} ${emptyObjectives.length === 1 ? 'objective has' : 'objectives have'} no published questions` : 'Every objective has published questions' },
     { key: 'full_mock_inventory', blocking: false, ok: mockShortfall.length === 0, detail: mockShortfall.length ? `Full mock short in: ${mockShortfall.map((s) => `${s.domain} ${s.available}/${s.required}`).join(', ')}` : `A ${version.questionCount}-question form can be assembled` },
   ];
   return { ready: checks.filter((c) => c.blocking).every((c) => c.ok), checks, published_questions: published.length };
@@ -312,9 +332,10 @@ interface QuestionInput {
   reviewed_notes?: string;
 }
 
-function toQuestionRow(q: { _id: string; familyId: string; revision: number; prompt: string; status: string; objectiveId: string; domainId: string; reviewedBy?: string | null; createdAt: Date; answerType: string }) {
+function toQuestionRow(q: { _id: string; familyId: string; examVersionId: string; revision: number; prompt: string; status: string; objectiveId: string; domainId: string; reviewedBy?: string | null; createdAt: Date; answerType: string }) {
   return {
     id: q._id,
+    exam_version_id: q.examVersionId,
     family_id: q.familyId,
     revision: q.revision,
     prompt: q.prompt,
@@ -360,6 +381,9 @@ export async function questionDetail(questionVersionId: string) {
       { $group: { _id: null, total: { $sum: 1 }, correct: { $sum: { $cond: ['$isCorrect', 1, 0] } } } },
     ]),
   ]);
+  const actors = new Map(
+    (await User.find({ _id: { $in: [...new Set(auditTrail.map((a) => a.actorId))] } }).select({ displayName: 1 }).lean()).map((u) => [u._id, u.displayName]),
+  );
   return {
     ...toQuestionRow(q),
     family_key: family?.familyKey ?? '',
@@ -374,7 +398,7 @@ export async function questionDetail(questionVersionId: string) {
     created_by: q.createdBy ?? null,
     published_at: q.publishedAt?.toISOString() ?? null,
     revisions: revisions.map((r) => ({ id: r._id, revision: r.revision, status: r.status, created_at: r.createdAt.toISOString() })),
-    audit: auditTrail.map((a) => ({ action: a.action, actor_id: a.actorId, note: a.note, recorded_at: a.recordedAt.toISOString() })),
+    audit: auditTrail.map((a) => ({ action: a.action, actor_id: a.actorId, actor: actors.get(a.actorId) ?? a.actorId, note: a.note, recorded_at: a.recordedAt.toISOString() })),
     issues: issues.map((i) => ({ id: i._id, reason: i.reason, note: i.note, status: i.status, created_at: i.createdAt.toISOString() })),
     attempts: { total: attemptStats[0]?.total ?? 0, correct: attemptStats[0]?.correct ?? 0 },
   };

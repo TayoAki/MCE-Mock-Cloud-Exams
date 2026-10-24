@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "CertPath",
+    "slug": "certpath",
+    "version": "0.3.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "certpath",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F7F6FB",
+    "ios": {
+      "bundleIdentifier": "dev.certpath.app",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "dev.certpath.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#6750EE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F7F6FB",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 96
+        }
+      ],
+      "expo-secure-store",
+      "expo-localization",
+      [
+        "expo-notifications",
+        {
+          "color": "#6750EE"
+        }
+      ]
+    ],
+    "experiments": {
+      "reactCompiler": true
+    }
+  }
+}

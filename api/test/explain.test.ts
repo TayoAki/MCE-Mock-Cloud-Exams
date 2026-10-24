@@ -66,7 +66,7 @@ describe('contextual AI explanations', () => {
     expect((await as(token).post('/explanations', { attempt_id: attemptId, style: 'short' }).expect(200)).body).toMatchObject({ origin: 'reviewed_fallback', text: rationale });
 
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
-    create.mockRejectedValueOnce(new Anthropic.RateLimitError());
+    create.mockRejectedValueOnce(new (Anthropic.RateLimitError as unknown as new () => Error)());
     expect((await as(token).post('/explanations', { attempt_id: attemptId, style: 'short' }).expect(200)).body.origin).toBe('reviewed_fallback');
 
     create.mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'UNAVAILABLE' }] });

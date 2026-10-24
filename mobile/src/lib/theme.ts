@@ -1,0 +1,20 @@
+/** JS copies of the design tokens for icons, SVG and native props that take colors. */
+export const colors = {
+  background: '#F7F6FB',
+  surface: '#FFFFFF',
+  ink: '#24243A',
+  muted: '#6F7085',
+  primary: '#6750EE',
+  primaryDark: '#4D37CE',
+  primaryTint: '#EEEAFE',
+  mint: '#DDF6EB',
+  success: '#137B60',
+  coral: '#E15D64',
+  coralDark: '#B8343C',
+  coralTint: '#FFF0EF',
+  streak: '#F5A623',
+  streakDark: '#A86500',
+  streakTint: '#FFF4E0',
+  border: '#E9E7F3',
+  locked: '#D9D7E3',
+} as const;

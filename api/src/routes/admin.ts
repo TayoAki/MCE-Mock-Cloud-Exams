@@ -71,6 +71,14 @@ adminRouter.post('/admin/exam-versions/:id/objectives', async (req, res) => {
   res.json(await content.upsertObjective(currentUser(req), idParam(req), body));
 });
 
+adminRouter.delete('/admin/exam-versions/:id/domains/:domainId', adminOnly, async (req, res) => {
+  res.json(await content.deleteDomain(currentUser(req), idParam(req), idParam(req, 'domainId')));
+});
+
+adminRouter.delete('/admin/exam-versions/:id/objectives/:objectiveId', adminOnly, async (req, res) => {
+  res.json(await content.deleteObjective(currentUser(req), idParam(req), idParam(req, 'objectiveId')));
+});
+
 adminRouter.post('/admin/exam-versions/:id/units', async (req, res) => {
   const body = parseBody(req, z.strictObject({ id: uuidParam.optional(), title: z.string().min(1).max(120), subtitle: z.string().max(200).optional(), sort_order: z.int().min(1) }));
   res.json(await content.upsertUnit(currentUser(req), idParam(req), body));
@@ -220,6 +228,18 @@ adminRouter.post('/admin/learners/:id/entitlements', adminOnly, async (req, res)
 adminRouter.post('/admin/entitlements/:id/revoke', adminOnly, async (req, res) => {
   const body = parseBody(req, z.strictObject({ note: z.string().min(1).max(500) }));
   res.json(await ops.revokeEntitlement(currentUser(req), idParam(req), body.note));
+});
+
+adminRouter.get('/admin/staff', async (_req, res) => {
+  res.json({ staff: await ops.listStaff() });
+});
+
+adminRouter.post('/admin/staff', adminOnly, async (req, res) => {
+  const body = parseBody(
+    req,
+    z.strictObject({ email: z.email().max(254), display_name: z.string().min(1).max(60), password: z.string().min(12).max(200), admin: z.boolean().default(false) }),
+  );
+  res.status(201).json(await ops.createStaff(currentUser(req), body));
 });
 
 adminRouter.get('/admin/outcomes', async (_req, res) => {

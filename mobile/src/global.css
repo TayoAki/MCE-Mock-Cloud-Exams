@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+@import 'uniwind';
+
+/* CertPath design tokens (docs/plan/design/design_tokens.json). */
+@theme {
+  --color-background: #f7f6fb;
+  --color-surface: #ffffff;
+  --color-ink: #24243a;
+  --color-muted: #6f7085;
+  --color-primary: #6750ee;
+  --color-primary-dark: #4d37ce;
+  --color-primary-tint: #eeeafe;
+  --color-mint: #ddf6eb;
+  --color-success: #137b60;
+  --color-coral: #e15d64;
+  --color-coral-dark: #b8343c;
+  --color-coral-tint: #fff0ef;
+  --color-streak: #f5a623;
+  --color-streak-dark: #a86500;
+  --color-streak-tint: #fff4e0;
+  --color-border: #e9e7f3;
+  --color-locked: #d9d7e3;
+}

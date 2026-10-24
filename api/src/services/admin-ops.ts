@@ -12,6 +12,7 @@ import {
   User,
   type UserRecord,
 } from '../models/index.js';
+import { hashPassword } from '../auth/passwords.js';
 import { track } from '../lib/analytics.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { uuid } from '../lib/ids.js';
@@ -126,7 +127,7 @@ export async function updateIssue(actor: Actor, issueId: string, input: { status
   ).lean();
   if (!issue) throw notFound('Issue');
   await audit(actor, 'issue_report', issueId, `status_${input.status}`, input.resolution ?? '');
-  return issue;
+  return (await listIssues()).find((i) => i.id === issueId)!;
 }
 
 export async function listLearners(q?: string) {
@@ -197,6 +198,31 @@ export async function revokeEntitlement(actor: Actor, entitlementId: string, not
   await audit(actor, 'entitlement', ent.userId, 'revoked', note, { entitlement_id: ent._id, feature: ent.featureKey });
   track('entitlement_changed', { userId: ent.userId, properties: { source: ent.source, change: 'revoked' } });
   return learnerDetail(ent.userId);
+}
+
+export async function listStaff() {
+  const staff = await User.find({ roles: { $in: ['reviewer', 'admin'] }, deletedAt: null, externalSubject: { $not: /^system:/ } })
+    .sort({ createdAt: 1 })
+    .lean<UserRecord[]>();
+  return staff.map((u) => ({ id: u._id, display_name: u.displayName, email: u.email ?? null, roles: u.roles, created_at: u.createdAt.toISOString() }));
+}
+
+/** Staff accounts are created by an admin, never self-registered. */
+export async function createStaff(actor: Actor, input: { email: string; display_name: string; password: string; admin: boolean }) {
+  const email = input.email.trim().toLowerCase();
+  if (await User.exists({ email })) throw conflict('email_taken', 'An account with this email already exists');
+  const id = uuid();
+  await User.create({
+    _id: id,
+    externalSubject: `local:${id}`,
+    email,
+    passwordHash: await hashPassword(input.password),
+    isGuest: false,
+    roles: input.admin ? ['admin', 'reviewer'] : ['reviewer'],
+    displayName: input.display_name.trim(),
+  });
+  await audit(actor, 'user', id, 'staff_created', '', { admin: input.admin });
+  return (await listStaff()).find((s) => s.id === id)!;
 }
 
 export async function listOutcomes() {

@@ -18,9 +18,32 @@ import {
 import { hashPassword } from '../auth/passwords.js';
 import type { Role } from '../models/index.js';
 import { uuid } from '../lib/ids.js';
-import { DOMAINS, REVIEW_NOTE, UNITS } from './bank.js';
+import { DOMAINS, REVIEW_NOTE, UNITS, type SeedQuestion } from './bank.js';
 
 const PILOT_SLUG = 'databricks-de-associate';
+/** The plan's five original sample items keep their published option order (A, B, B, A, D scores 3/5). */
+const PLAN_SAMPLE_FAMILIES = new Set(['retained-files', 'history-versus-data', 'vacuum-purpose', 'version-query', 'retention-settings']);
+
+/**
+ * Authored drafts list the correct answer first. Shuffle options with a seed
+ * derived from the family key so keys spread across A–D but stay stable across seeds.
+ */
+function arrange(item: SeedQuestion) {
+  const correct = new Set(Array.isArray(item.correct) ? item.correct : [item.correct]);
+  const tagged = item.options.map((text, i) => ({ text, correct: correct.has(String.fromCharCode(65 + i)) }));
+  if (!PLAN_SAMPLE_FAMILIES.has(item.family)) {
+    let seed = [...item.family].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+    const next = () => (seed = Math.imul(seed ^ (seed >>> 15), 2246822507) >>> 0) / 4294967296;
+    for (let i = tagged.length - 1; i > 0; i--) {
+      const j = Math.floor(next() * (i + 1));
+      [tagged[i], tagged[j]] = [tagged[j]!, tagged[i]!];
+    }
+  }
+  return {
+    options: tagged.map((t, k) => ({ key: String.fromCharCode(65 + k), text: t.text })),
+    correct: tagged.flatMap((t, k) => (t.correct ? [String.fromCharCode(65 + k)] : [])),
+  };
+}
 export const FIXTURE_REVIEWER_ID = '00000000-0000-4000-8000-00000000f1f0';
 
 export interface SeedOptions {
@@ -119,7 +142,7 @@ export async function seedDatabase(options: SeedOptions = {}) {
           if (!objective) throw new Error(`Unknown objective ${item.objective}`);
           lessonObjectives.add(objective.id);
           const family = await QuestionFamily.create({ examVersionId, objectiveId: objective.id, familyKey: item.family, createdBy: FIXTURE_REVIEWER_ID });
-          const correct = Array.isArray(item.correct) ? item.correct : [item.correct];
+          const { options, correct } = arrange(item);
           const qv = await QuestionVersion.create({
             familyId: family._id,
             examVersionId,
@@ -128,7 +151,7 @@ export async function seedDatabase(options: SeedOptions = {}) {
             revision: 1,
             prompt: item.prompt,
             answerType: correct.length > 1 ? 'multiple' : 'single',
-            options: item.options.map((text, k) => ({ key: String.fromCharCode(65 + k), text })),
+            options,
             sourceUrl: item.source,
             createdBy: FIXTURE_REVIEWER_ID,
             ...(publish ? { status: 'published', reviewedBy: FIXTURE_REVIEWER_ID, reviewedAt: now, publishedAt: now } : {}),

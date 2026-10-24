@@ -105,12 +105,31 @@ describe('content backoffice', () => {
     const version = await as(token)
       .post(`/admin/exams/${aws.id}/versions`, { version_label: 'draft-1', effective_from: '2027-01-01', question_count: 65, duration_minutes: 130, guide_url: 'https://aws.amazon.com/certification/' })
       .expect(201);
-    await as(token).post(`/admin/exam-versions/${version.body._id}/domains`, { code: 'd1', title: 'Domain one', weight_percent: 60, sort_order: 1 }).expect(200);
-    const blocked = await as(token).post(`/admin/exam-versions/${version.body._id}/publish`).expect(409);
+    await as(token).post(`/admin/exam-versions/${version.body.id}/domains`, { code: 'd1', title: 'Domain one', weight_percent: 60, sort_order: 1 }).expect(200);
+    const blocked = await as(token).post(`/admin/exam-versions/${version.body.id}/publish`).expect(409);
     expect(blocked.body.details.checks.find((c: { key: string }) => c.key === 'weights_total_100').ok).toBe(false);
+    const domainId = (await as(token).get(`/admin/exam-versions/${version.body.id}`).expect(200)).body.domains[0].id;
+    await as(token).delete(`/admin/exam-versions/${version.body.id}/domains/${domainId}`).expect(200);
+    const pilotDomain = (await as(token).get(`/admin/exam-versions/${await pilotVersionId()}`).expect(200)).body.domains[0].id;
+    // Published blueprints are immutable.
+    expect((await as(token).delete(`/admin/exam-versions/${await pilotVersionId()}/domains/${pilotDomain}`).expect(409)).body.code).toBe('version_locked');
     const pilot = await as(token).get(`/admin/exam-versions/${await pilotVersionId()}`).expect(200);
     expect(pilot.body.readiness.ready).toBe(true);
     expect(pilot.body.readiness.checks.find((c: { key: string }) => c.key === 'full_mock_inventory').ok).toBe(false);
+  });
+});
+
+describe('staff accounts', () => {
+  it('only admins create staff, and new reviewers can sign in to the backoffice', async () => {
+    const { token } = await admin();
+    const email = `reviewer-${id()}@example.com`;
+    const created = await as(token).post('/admin/staff', { email, display_name: 'Rae Reviewer', password: 'a strong password!' }).expect(201);
+    expect(created.body).toMatchObject({ email, roles: ['reviewer'] });
+    const reviewer = await as().post('/auth/login', { email, password: 'a strong password!' }).expect(200);
+    await as(reviewer.body.token).get('/admin/questions?exam_version_id=' + (await pilotVersionId())).expect(200);
+    await as(reviewer.body.token).post('/admin/staff', { email: `x-${id()}@example.com`, display_name: 'X', password: 'a strong password!' }).expect(403);
+    const staff = await as(token).get('/admin/staff').expect(200);
+    expect(staff.body.staff.map((s: { email: string }) => s.email)).toContain(email);
   });
 });
 
