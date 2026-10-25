@@ -5,6 +5,25 @@ const { withUniwindConfig } = require('uniwind/metro');
 const config = getDefaultConfig(__dirname);
 
 /**
+ * Proxy chains such as GitHub Codespaces' port forwarding can send a combined
+ * `x-forwarded-proto: https,https`. Expo builds the manifest's bundle URL from
+ * that header verbatim, which yields `https,https://…`: Expo Go can't load the
+ * app and Metro logs "Unable to resolve manifest assets". Keep only the first
+ * (client-facing) value. Expo's manifest handler runs before any middleware a
+ * project can add, so this has to happen when the dev server receives the request.
+ */
+const emitRequest = http.Server.prototype.emit;
+http.Server.prototype.emit = function (event, req, ...rest) {
+  if (event === 'request') {
+    const proto = req.headers['x-forwarded-proto'];
+    if (typeof proto === 'string' && proto.includes(',')) {
+      req.headers['x-forwarded-proto'] = proto.split(',')[0].trim();
+    }
+  }
+  return emitRequest.call(this, event, req, ...rest);
+};
+
+/**
  * Dev-only: forward /v1 requests to the local API, so the app (web, simulator,
  * phone or tunnel) only needs to reach Metro. This also makes GitHub Codespaces
  * work without making the API port public.
