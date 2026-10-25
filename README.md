@@ -9,7 +9,7 @@ This repository implements the CertPath v2 replan in `docs/plan/` (product, jour
 | [`api/`](api/README.md) | REST API for every client | Express 5, TypeScript, MongoDB (Mongoose 9), Passport JWT |
 | [`mobile/`](mobile/README.md) | Learner app for iOS and Android (also runs on web) | Expo SDK 58, Expo Router, React Native 0.88, Uniwind, TanStack Query |
 | [`admin/`](admin/README.md) | Content review and operations backoffice | Vite, React 19, React Router, TanStack Query, Tailwind v4 |
-| [`docs/`](docs/) | [`API.md`](docs/API.md) endpoint reference; `plan/` holds the original bundle | — |
+| [`docs/`](docs/) | [`API.md`](docs/API.md) endpoint reference, [`DEPLOY.md`](docs/DEPLOY.md) Railway hosting; `plan/` holds the original bundle | — |
 
 ## Quick start
 
