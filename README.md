@@ -7,13 +7,13 @@ This repository implements the CertPath v2 replan in `docs/plan/` (product, jour
 | Directory | What it is | Stack |
 |---|---|---|
 | [`api/`](api/README.md) | REST API for every client | Express 5, TypeScript, MongoDB (Mongoose 9), Passport JWT |
-| [`mobile/`](mobile/README.md) | Learner app for iOS and Android (also runs on web) | Expo SDK 57, Expo Router, React Native 0.86, Uniwind, TanStack Query |
+| [`mobile/`](mobile/README.md) | Learner app for iOS and Android (also runs on web) | Expo SDK 58, Expo Router, React Native 0.88, Uniwind, TanStack Query |
 | [`admin/`](admin/README.md) | Content review and operations backoffice | Vite, React 19, React Router, TanStack Query, Tailwind v4 |
 | [`docs/`](docs/) | [`API.md`](docs/API.md) endpoint reference; `plan/` holds the original bundle | — |
 
 ## Quick start
 
-Node 22+. No database to install: the API's dev mode starts an in-memory MongoDB replica set and seeds it.
+Node 22.13+. No database to install: the API's dev mode starts an in-memory MongoDB replica set and seeds it.
 
 ```bash
 npm ci && npm run setup   # installs api/, admin/ and mobile/
@@ -32,7 +32,14 @@ To run the native app on a simulator or phone, run the API and Expo separately: 
 
 A 4-core machine bundles noticeably faster than the default 2-core one. The in-memory database resets whenever the API restarts, including when you edit API code; sign in again or start a new guest.
 
-For a phone in a codespace, stop `npm run dev`, run `npm --prefix api run dev` in one terminal and `cd mobile && npx expo start --tunnel` in another, then scan the QR code. The app reaches the API through the tunnel and Metro's proxy, but this path hasn't been tested. Expo Go must support SDK 57; if the store version only supports a newer SDK, use the web app or a development build.
+To use **Expo Go on a phone** from a codespace, stop `npm run dev` (it holds port 8081), then:
+
+```bash
+npm --prefix api run dev                      # terminal 1
+cd mobile && npx expo start --tunnel --clear  # terminal 2
+```
+
+Scan the QR code with the iPhone Camera app (on Android, from inside Expo Go). The tunnel gives the phone a public URL for Metro, and the app's API calls go through the same tunnel to Metro's `/v1` proxy, so no ports need to be public. The app targets SDK 58, which is what the App Store and Play Store versions of Expo Go run. `@expo/ngrok` is a dev dependency, so the tunnel starts without a global install. Expo Go on a phone hasn't been tested from a codespace; the manifest and the iOS bundle were checked against the dev server.
 
 Seeded logins (development only):
 
@@ -80,7 +87,7 @@ The backoffice covers the plan's content workflow: draft → human review → pu
 ## Verification
 
 - **API:** 54 tests (vitest + supertest) against a real MongoDB replica set cover every F-criterion, ownership isolation, concurrent duplicate submissions and completions, mock expiry, entitlement gating, publication and retirement, deletion, reminders and circles. The typecheck and production build pass.
-- **Mobile:** typecheck, `expo lint` and `expo-doctor` (21/21) pass, and iOS, Android and web bundles export. A Playwright run of the web build against a live API covers onboarding, a full lesson, Plus gating, completion, practice, review, a sample mock with submit and answer review, progress, account upgrade, the preview, circles, settings and outcome. A second run blocks the network mid-answer, reloads the app, and confirms the same submission ID is retried. The run produced no unexpected errors.
+- **Mobile:** typecheck, `expo lint` and `expo-doctor` (20/20) pass, and iOS, Android and web bundles export. A Playwright run of the web build against a live API covers onboarding, a full lesson, Plus gating, completion, practice, review, a sample mock with submit and answer review, progress, account upgrade, the preview, circles, settings and outcome. A second run blocks the network mid-answer, reloads the app, and confirms the same submission ID is retried. The run produced no unexpected errors.
 - **Admin:** typecheck and build pass. A Playwright run against a live API covers login, every page, and a full create → review → publish, plus retire, issue resolution, access grants, outcome verification and staff creation.
 
 ## Not built yet

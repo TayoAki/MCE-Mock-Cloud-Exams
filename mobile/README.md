@@ -1,6 +1,6 @@
 # CertPath learner app
 
-The iOS and Android app for learners, also runnable on web for review. Expo SDK 57, Expo Router, React Native 0.86, TypeScript, Uniwind (Tailwind v4 for React Native) and TanStack Query. The React Compiler is on (SDK 57 template default).
+The iOS and Android app for learners, also runnable on web for review. Expo SDK 58, Expo Router, React Native 0.88, TypeScript, Uniwind (Tailwind v4 for React Native) and TanStack Query. The React Compiler is on.
 
 It implements screens S01–S13 from `docs/plan/design/PROTOTYPE_BRIEF.md` against the CertPath API. The server owns grading, deadlines, rewards, streaks and entitlements; the app never computes a grade or XP.
 
@@ -13,13 +13,14 @@ npm install && npm run dev                 # http://localhost:4000/v1
 # 2. App
 npm install
 npx expo start                             # press i / a / w, or scan the QR code
+npx expo start --tunnel                    # phone on another network, or a codespace
 ```
 
 Or run everything from the repo root with `npm run dev` (see the root README, which also covers GitHub Codespaces).
 
 In development the app sends API calls to Metro itself (`/v1` on the dev server), and `metro.config.js` proxies them to `API_PROXY_TARGET` (default `http://127.0.0.1:4000`). Web, simulators, phones on the same network, `--tunnel` and Codespaces therefore need nothing beyond Metro. Production builds use `EXPO_PUBLIC_API_URL` (see `.env.example`).
 
-Expo Go runs everything except push reminders. Those need a development build (`npx expo run:ios` / `npx expo run:android`, or EAS) and an EAS project ID; without one, turning reminders on still saves the preference.
+Expo Go (the store version runs SDK 58) runs everything except push reminders. Those need a development build (`npx expo run:ios` / `npx expo run:android`, or EAS) and an EAS project ID; without one, turning reminders on still saves the preference.
 
 Sign in with the seeded learner `alex@certpath.dev` / `certpath-demo`, or start fresh as a guest. On the first lesson, answering **A, B, B, A, D** reproduces the plan's walkthrough: 3/5 correct and +75 XP.
 

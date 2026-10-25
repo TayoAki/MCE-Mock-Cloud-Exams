@@ -69,7 +69,7 @@ export default function Learn() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <ScrollView
         contentContainerClassName="px-5 pt-3 pb-8 gap-4"
-        refreshControl={<RefreshControl refreshing={path.isRefetching} onRefresh={() => Promise.all([refetch(), path.refetch(), practice.refetch()])} />}
+        refreshControl={<RefreshControl refreshing={path.isRefetching} onRefresh={async () => { await Promise.all([refetch(), path.refetch(), practice.refetch()]); }} />}
       >
         <AppHeader />
         {isLoading || path.isLoading ? <LoadingState /> : null}

@@ -1,15 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps, ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View, type PressableProps } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View, type ColorValue, type PressableProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '@/lib/api';
 import { colors } from '@/lib/theme';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
-export function Icon({ name, size = 20, color = colors.ink }: { name: IconName; size?: number; color?: ComponentProps<typeof Ionicons>['color'] }) {
+export function Icon({ name, size = 20, color }: { name: IconName; size?: number; color?: ColorValue }) {
   // Icons are decorative; the surrounding control carries the accessible name.
-  return <Ionicons name={name} size={size} color={color} aria-hidden />;
+  // Navigation passes a ColorValue (which may be null or a number); the app's colors are strings.
+  return <Ionicons name={name} size={size} color={typeof color === 'string' ? color : colors.ink} aria-hidden />;
 }
 
 /** Page shell: safe-area padding, scrolling content and an optional pinned footer. */
