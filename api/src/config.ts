@@ -22,6 +22,8 @@ const schema = z.object({
   AI_DAILY_CALLS_PER_USER: z.coerce.number().int().nonnegative().default(20),
   AI_DAILY_CALLS_GLOBAL: z.coerce.number().int().nonnegative().default(2000),
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
+  /** Off (the default): CertPath is free and every learner has every feature. On: Plus gating, the preview and store purchases. */
+  PLUS_ENABLED: bool.default(false),
   STORE_SANDBOX: bool.default(true),
   EXPO_PUSH_ENABLED: bool.default(false),
   INVITE_URL_BASE: z.string().default('certpath://join'),
@@ -29,6 +31,8 @@ const schema = z.object({
   WORKERS_ENABLED: bool.default(true),
   /** Require a different staff member to review a question than the one who wrote it. */
   SEPARATE_REVIEWER: bool.default(false),
+  /** Load the pilot content and the admin account into an empty database at startup (no demo learner). */
+  SEED_ON_START: bool.default(false),
   SEED_ADMIN_EMAIL: z.string().default('admin@certpath.dev'),
   SEED_ADMIN_PASSWORD: z.string().default('certpath-admin'),
   SEED_DEMO_EMAIL: z.string().default('alex@certpath.dev'),
@@ -46,6 +50,11 @@ export const config = parsed.data;
 
 if (config.NODE_ENV === 'production' && config.JWT_SECRET === 'dev-only-secret-change-me') {
   console.error('JWT_SECRET must be set in production');
+  process.exit(1);
+}
+
+if (config.NODE_ENV === 'production' && config.SEED_ON_START && (config.SEED_ADMIN_PASSWORD === 'certpath-admin' || config.SEED_ADMIN_PASSWORD.length < 16)) {
+  console.error('SEED_ON_START needs a SEED_ADMIN_PASSWORD of at least 16 characters in production');
   process.exit(1);
 }
 

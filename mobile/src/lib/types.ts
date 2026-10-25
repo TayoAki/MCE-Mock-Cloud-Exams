@@ -51,6 +51,8 @@ export interface Me {
   };
   xp_total: number;
   entitlements: Entitlement[];
+  /** False while CertPath is free: every learner has every feature and nothing is for sale. */
+  plus_enabled: boolean;
   plus_active: boolean;
   plus_ends_at: string | null;
   preview_used: boolean;

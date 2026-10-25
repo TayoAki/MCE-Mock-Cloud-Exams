@@ -51,6 +51,8 @@ export interface SeedOptions {
   publish?: boolean;
   /** Create the admin and demo learner accounts. */
   accounts?: boolean;
+  /** With accounts, also create the demo learner (default true). */
+  demoLearner?: boolean;
 }
 
 async function ensureUser(input: { email: string; password: string; displayName: string; roles: Role[]; timezone: string }) {
@@ -194,6 +196,8 @@ export async function seedDatabase(options: SeedOptions = {}) {
       roles: ['admin', 'reviewer'],
       timezone: 'Etc/UTC',
     });
+  }
+  if (options.accounts && (options.demoLearner ?? true)) {
     result.demoUserId = await ensureUser({
       email: config.SEED_DEMO_EMAIL,
       password: config.SEED_DEMO_PASSWORD,

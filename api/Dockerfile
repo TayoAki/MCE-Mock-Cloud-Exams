@@ -1,5 +1,7 @@
 FROM node:22-alpine AS build
 WORKDIR /app
+# The in-memory MongoDB used by tests and `npm run dev` isn't needed in the image.
+ENV MONGOMS_DISABLE_POSTINSTALL=1
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json tsconfig.build.json ./

@@ -10,7 +10,7 @@ Base path `/v1`. JSON in and out, snake_case fields. The design contract is `doc
 |---|---|---|
 | 400 | `validation_failed` | Body or query is invalid; unknown fields are rejected. `details.issues` lists them |
 | 401 | `unauthorized` | Missing, expired or revoked token |
-| 403 | `plus_required` | Needs Plus; `details.feature` is `full_bank`, `custom_quiz`, `mocks` or `ai_explain` |
+| 403 | `plus_required` | Needs Plus; `details.feature` is `full_bank`, `custom_quiz`, `mocks` or `ai_explain`. Never returned while Plus is off (`PLUS_ENABLED=false`, the default), when every learner has every feature |
 | 403 | `account_required`, `insufficient_role` | Guest or role restriction |
 | 404 | `not_found` | Missing, malformed or not yours |
 | 409 | `idempotency_conflict` | A request ID was reused with a different body |
@@ -25,13 +25,13 @@ Base path `/v1`. JSON in and out, snake_case fields. The design contract is `doc
 | POST | `/auth/register` | optional | `{email, password ≥8, display_name?, timezone?}`. With a guest token this upgrades the same identity (`upgraded_guest: true`) |
 | POST | `/auth/login` | — | `{email, password}` → `{token, user}` |
 | POST | `/auth/logout-all` | user | Revokes every token for the user |
-| GET | `/me` | user | Profile, streak (current, longest, this week's credited days), XP, active entitlements, preview used, preferences, enrollments |
+| GET | `/me` | user | Profile, streak (current, longest, this week's credited days), XP, `plus_enabled`, active entitlements, preview used, preferences, enrollments |
 | PATCH | `/me/preferences` | user | `timezone` (IANA; applies from next local midnight once any study is credited, once per day), `daily_goal_minutes` 5/10/15, `reminders_enabled`, `daily_local_time`, `quiet_start`, `quiet_end`, `weekly_circle_summary`, `display_name` |
 | GET | `/me/entitlements` | user | Active entitlements |
-| POST | `/me/preview` | account | `{accept_terms: true, client_request_id}`. One no-card, nonrenewing 14-day preview per account |
+| POST | `/me/preview` | account | `{accept_terms: true, client_request_id}`. One no-card, nonrenewing 14-day preview per account. 409 `plus_unavailable` while Plus is off |
 | POST / DELETE | `/me/push-tokens` | user | Register or remove an Expo push token |
 | POST | `/me/deletion-request` | user | Stops reminders, leaves circles and signs out everywhere; data is deleted after `DELETION_GRACE_DAYS` |
-| POST | `/store/verify` | account | `{provider, signed_transaction, client_request_id}`. Only the sandbox verifier exists (`sandbox:<product>:<txn>`); Apple and Google return 501. Duplicate events never extend access; another account's receipt gets a 409 |
+| POST | `/store/verify` | account | `{provider, signed_transaction, client_request_id}`. Only the sandbox verifier exists (`sandbox:<product>:<txn>`); Apple and Google return 501. Duplicate events never extend access; another account's receipt gets a 409. 409 `plus_unavailable` while Plus is off |
 
 ## Catalog and learning path
 

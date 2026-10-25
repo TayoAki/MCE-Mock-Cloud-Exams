@@ -136,6 +136,7 @@ export async function profileSummary(user: UserRecord) {
     streak: habits,
     xp_total: xp,
     entitlements: entitlements.map(toEntitlement),
+    plus_enabled: config.PLUS_ENABLED,
     plus_active: entitlements.length > 0,
     plus_ends_at: entitlements[0]?.endsAt.toISOString() ?? null,
     preview_used: !!previewUsed,
@@ -226,6 +227,7 @@ export async function updatePreferences(user: UserRecord, input: PreferencesInpu
 
 /** One explicit, no-card, nonrenewing 14-day preview per account. */
 export async function startPreview(user: UserRecord) {
+  if (!config.PLUS_ENABLED) throw conflict('plus_unavailable', 'CertPath is free right now, so there is nothing to preview');
   if (user.isGuest) throw forbidden('account_required', 'Save your progress with an account before starting the preview');
   if (await Entitlement.exists({ userId: user._id, source: 'preview' })) {
     throw conflict('preview_already_used', 'The free preview can be used once per account');
@@ -279,6 +281,7 @@ function verifyStoreToken(provider: 'apple' | 'google', token: string): Verified
 
 /** Grants only from verified events; duplicate events never extend access twice. */
 export async function verifyPurchase(user: UserRecord, input: { provider: 'apple' | 'google'; signed_transaction: string }) {
+  if (!config.PLUS_ENABLED) throw conflict('plus_unavailable', 'CertPath is free right now, so there is nothing to buy');
   if (user.isGuest) throw forbidden('account_required', 'Create an account before purchasing');
   const purchase = verifyStoreToken(input.provider, input.signed_transaction);
 

@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Banner, Body, Button, Icon, LoadingState, Pill, Screen, Small, Title } from '@/components/ui';
-import { useCurrentEnrollment, usePractice, useProgress } from '@/lib/queries';
+import { useCurrentEnrollment, useMe, usePractice, useProgress } from '@/lib/queries';
 import { useStartSession } from '@/lib/sessions';
 import { colors } from '@/lib/theme';
 
@@ -15,6 +15,7 @@ export default function CustomQuiz() {
   const { enrollment } = useCurrentEnrollment();
   const practice = usePractice(enrollment?.id);
   const progress = useProgress(enrollment?.id);
+  const plusEnabled = useMe().data?.plus_enabled;
   const [domains, setDomains] = useState<string[]>([]);
   const [size, setSize] = useState(10);
   const { start, pending, error } = useStartSession();
@@ -43,7 +44,7 @@ export default function CustomQuiz() {
         <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} className="h-11 w-11 justify-center">
           <Icon name="chevron-back" size={24} color={colors.ink} />
         </Pressable>
-        <Pill tone="primary" label="Plus" />
+        {plusEnabled ? <Pill tone="primary" label="Plus" /> : null}
       </View>
       <Title>{timed ? 'Build your pace.' : 'Choose your topics.'}</Title>
       <Body muted>{timed ? `About ${Math.round(perItem)} minutes for ${size} questions, the same pace as the exam.` : 'Mix the domains you want. Fresh questions come first.'}</Body>

@@ -1,5 +1,8 @@
+import mongoose from 'mongoose';
 import { describe, expect, it } from 'vitest';
-import { QuestionFamily, QuestionKey, QuestionVersion } from '../src/models/index.js';
+import { config } from '../src/config.js';
+import { QuestionFamily, QuestionKey, QuestionVersion, User } from '../src/models/index.js';
+import { seedDatabase } from '../src/seed/seed.js';
 
 describe('seed content', () => {
   it('spreads correct answers across positions and keeps the plan sample intact', async () => {
@@ -14,5 +17,17 @@ describe('seed content', () => {
     const sample = await QuestionFamily.find({ familyKey: { $in: ['retained-files', 'history-versus-data', 'vacuum-purpose', 'version-query', 'retention-settings'] } }).lean();
     const sampleKeys = await QuestionKey.find({ _id: { $in: (await QuestionVersion.find({ familyId: { $in: sample.map((f) => f._id) } }).lean()).map((q) => q._id) } }).lean();
     expect(sampleKeys.map((k) => k.correctOptions[0]).sort()).toEqual(['A', 'A', 'A', 'B', 'C']);
+  });
+
+  // Runs last in this file: it starts from an empty database, as a fresh deployment does.
+  it('a production start loads the content once, with the admin and no demo learner', async () => {
+    await mongoose.connection.dropDatabase();
+    const first = await seedDatabase({ publish: true, accounts: true, demoLearner: false });
+    const again = await seedDatabase({ publish: true, accounts: true, demoLearner: false });
+    expect(again.examVersionId).toBe(first.examVersionId);
+    expect(first.demoUserId).toBeUndefined();
+    expect(await User.exists({ email: config.SEED_ADMIN_EMAIL })).toBeTruthy();
+    expect(await User.exists({ email: config.SEED_DEMO_EMAIL })).toBeNull();
+    expect(await QuestionFamily.countDocuments()).toBe(60);
   });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { config } from '../src/config.js';
 import { Entitlement, PracticeSession, RewardLedger } from '../src/models/index.js';
 import { expireOverdueSessions } from '../src/services/completion.js';
 import { as, enroll, guest, id, registered } from './helpers.js';
@@ -151,6 +152,35 @@ describe('plans and access', () => {
     expect(explained.body.sources).toEqual(receipt.body.feedback.sources);
     const other = await registered();
     await as(other.token).post('/explanations', { attempt_id: receipt.body.attempt_id, style: 'short' }).expect(404);
+  });
+
+  it('with Plus off, every learner has every feature and nothing is for sale', async () => {
+    config.PLUS_ENABLED = false;
+    try {
+      const { token, userId } = await guest();
+      const enrollmentId = await enroll(token);
+      const me = await as(token).get('/me').expect(200);
+      expect(me.body).toMatchObject({ plus_enabled: false, plus_active: false });
+      const practice = await as(token).get(`/enrollments/${enrollmentId}/practice`).expect(200);
+      expect(practice.body.features).toEqual(['ai_explain', 'custom_quiz', 'full_bank', 'mocks']);
+      // Guests too: no daily sample limit, custom and timed quizzes, AI help.
+      await startSample(token, enrollmentId);
+      await startSample(token, enrollmentId);
+      await as(token).post('/sessions', { enrollment_id: enrollmentId, client_session_id: id(), mode: 'timed', question_count: 10 }).expect(201);
+      const quick = (await as(token).post('/sessions', { enrollment_id: enrollmentId, client_session_id: id(), mode: 'quick' }).expect(201)).body;
+      const receipt = await as(token)
+        .post(`/sessions/${quick.id}/answers`, { session_item_id: quick.items[0].session_item_id, client_submission_id: id(), selected_options: ['A'] })
+        .expect(200);
+      await as(token).post('/explanations', { attempt_id: receipt.body.attempt_id, style: 'short' }).expect(200);
+
+      const { token: account } = await registered();
+      expect((await as(account).post('/me/preview', { accept_terms: true, client_request_id: id() }).expect(409)).body.code).toBe('plus_unavailable');
+      const sale = await as(account).post('/store/verify', { provider: 'apple', signed_transaction: 'sandbox:certpath.plus.monthly:txn-free', client_request_id: id() }).expect(409);
+      expect(sale.body.code).toBe('plus_unavailable');
+      expect(await Entitlement.countDocuments({ userId })).toBe(0);
+    } finally {
+      config.PLUS_ENABLED = true;
+    }
   });
 
   it('free quick practice stays within unlocked lessons; Plus opens the full bank', async () => {

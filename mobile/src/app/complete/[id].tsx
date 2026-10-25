@@ -102,7 +102,7 @@ export default function Complete() {
       ) : null}
       {reminder === 'enabled' || reminder === 'unavailable' ? <Banner tone="success">Reminder saved. We’ll skip it on days you’ve already studied.</Banner> : null}
 
-      {firstLesson && me.data && !me.data.plus_active && !me.data.preview_used ? (
+      {firstLesson && me.data?.plus_enabled && !me.data.plus_active && !me.data.preview_used ? (
         <NavRow icon="sparkles-outline" title="Try 14 days of Plus" subtitle="No card. No automatic renewal." onPress={() => router.push('/premium')} />
       ) : null}
 

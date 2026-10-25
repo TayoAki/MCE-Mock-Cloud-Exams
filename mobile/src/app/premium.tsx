@@ -32,6 +32,18 @@ export default function Premium() {
   const [endDate] = useState(() => new Date(Date.now() + 14 * 86_400_000).toLocaleDateString(undefined, { month: 'long', day: 'numeric' }));
   const m = me.data;
 
+  if (m && !m.plus_enabled) {
+    return (
+      <Screen footer={<Button label="Back to learning" onPress={close} />}>
+        <View className="items-center pt-6">
+          <Cube size={96} mood="proud" />
+        </View>
+        <Title>Everything is free right now.</Title>
+        <Body muted>The full question bank, timed and custom quizzes, mock exams and extra explanations are all included. There is nothing to buy.</Body>
+      </Screen>
+    );
+  }
+
   async function startPreview() {
     if (m?.user.is_guest) {
       router.push('/account');

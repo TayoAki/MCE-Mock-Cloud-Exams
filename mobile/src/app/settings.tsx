@@ -130,8 +130,12 @@ export default function Settings() {
         </>
       ) : null}
 
-      <Text className="text-muted text-xs font-bold uppercase tracking-wider pt-2">Plan</Text>
-      <NavRow icon="sparkles-outline" title={me.plus_active ? 'Plus is active' : 'CertPath Plus'} subtitle={me.plus_active && me.plus_ends_at ? `Until ${new Date(me.plus_ends_at).toLocaleDateString()}` : 'Free plan'} onPress={() => router.push('/premium')} />
+      {me.plus_enabled ? (
+        <>
+          <Text className="text-muted text-xs font-bold uppercase tracking-wider pt-2">Plan</Text>
+          <NavRow icon="sparkles-outline" title={me.plus_active ? 'Plus is active' : 'CertPath Plus'} subtitle={me.plus_active && me.plus_ends_at ? `Until ${new Date(me.plus_ends_at).toLocaleDateString()}` : 'Free plan'} onPress={() => router.push('/premium')} />
+        </>
+      ) : null}
 
       <Text className="text-muted text-xs font-bold uppercase tracking-wider pt-2">Privacy</Text>
       <Small>We keep analytics free of your email, answers and reasoning. Deleting your account stops reminders immediately and removes your learning data after a short grace period.</Small>
