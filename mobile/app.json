@@ -10,7 +10,10 @@
     "backgroundColor": "#F7F6FB",
     "ios": {
       "bundleIdentifier": "dev.certpath.app",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "dev.certpath.app",

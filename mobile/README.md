@@ -24,6 +24,22 @@ Expo Go (the store version runs SDK 58) runs everything except push reminders. T
 
 Sign in with the seeded learner `alex@certpath.dev` / `certpath-demo`, or start fresh as a guest. On the first lesson, answering **A, B, B, A, D** reproduces the plan's walkthrough: 3/5 correct and +75 XP.
 
+## TestFlight (EAS Build)
+
+`eas.json` has one `production` profile: a store build that talks to the hosted API (`EXPO_PUBLIC_API_URL`), with build numbers kept by EAS and raised on every build. `ios.config.usesNonExemptEncryption: false` answers App Store Connect's export-compliance question (the app only uses standard HTTPS).
+
+You need an Expo account and an Apple Developer Program membership. From this directory:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest init          # links an EAS project; commit the projectId it writes to app.json
+npx eas-cli@latest build --platform ios --profile production --auto-submit
+```
+
+The first build asks you to sign in to Apple and lets EAS create the distribution certificate, provisioning profile and push key; accept those defaults. `--auto-submit` then uploads the build to App Store Connect, creating the app there if needed. After Apple finishes processing it, add yourself under **TestFlight → Internal Testing** and install it with the TestFlight app.
+
+The bundle identifier is `dev.certpath.app`. If App Store Connect reports the name "CertPath" as taken, choose another listing name there; the name on the home screen stays CertPath.
+
 ## Structure
 
 ```
