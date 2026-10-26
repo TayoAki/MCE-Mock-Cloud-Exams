@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown, Keyframe } from 'react-native-reanimated';
 import { Cube } from '@/components/Cube';
+import { Confetti, CountUp, riseIn } from '@/components/motion';
 import { Banner, Button, Card, ErrorState, Eyebrow, LoadingState, NavRow, Pill, Screen, Small } from '@/components/ui';
 import { WeekDots } from '@/components/WeekDots';
 import { trackEvent } from '@/lib/analytics';
 import { get } from '@/lib/api';
+import { feedback as play } from '@/lib/feedback';
 import { enableReminders } from '@/lib/notifications';
 import { useMe, useRefreshLearning } from '@/lib/queries';
 import type { Completion } from '@/lib/types';
@@ -22,6 +25,16 @@ const MODE_LABEL: Record<string, string> = {
   custom: 'Custom quiz complete',
 };
 
+// The celebration's beats, in ms after the results arrive.
+const BEAT = { title: 300, xp: 550, detail: 1000, streakCard: 1100, ignite: 1450, stamp: 1650 } as const;
+
+const stampIn = new Keyframe({
+  0: { opacity: 0, transform: [{ scale: 2.4 }] },
+  100: { opacity: 1, transform: [{ scale: 1 }] },
+})
+  .duration(320)
+  .delay(BEAT.stamp);
+
 /** S06: activity XP and streak; the reward is effort, not readiness. */
 export default function Complete() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,6 +42,19 @@ export default function Complete() {
   const result = useQuery({ queryKey: ['results', id], queryFn: () => get<Completion>(`/sessions/${id}/results`) });
   const me = useMe();
   const [reminder, setReminder] = useState<'idle' | 'busy' | 'enabled' | 'denied' | 'unavailable'>('idle');
+  const [skip, setSkip] = useState(false);
+
+  // Sound and haptics play once, when the result first arrives.
+  const celebrated = useRef(false);
+  const credited = !!result.data?.study_day_credited;
+  useEffect(() => {
+    if (!result.data || celebrated.current) return;
+    celebrated.current = true;
+    play.complete();
+    if (!credited) return;
+    const timer = setTimeout(play.streak, BEAT.ignite);
+    return () => clearTimeout(timer);
+  }, [result.data, credited]);
 
   useEffect(() => {
     refresh();
@@ -43,33 +69,50 @@ export default function Complete() {
   if (result.error || !result.data) return <Screen><ErrorState error={result.error} onRetry={() => result.refetch()} /></Screen>;
   const c = result.data;
   const firstLesson = c.mode === 'lesson' && c.xp_granted > 0;
+  const perfect = c.total >= 5 && c.correct === c.total;
 
   return (
+    <View className="flex-1">
     <Screen footer={<Button label="Back to my path" onPress={() => router.dismissTo('/learn')} />}>
-      <View className="items-center gap-3 pt-2">
+      {/* Tapping the hero skips the count-up. */}
+      <Pressable accessible={false} onPress={() => setSkip(true)} className="items-center gap-3 pt-2">
         <Eyebrow>{MODE_LABEL[c.mode] ?? 'Practice complete'}</Eyebrow>
-        <Cube size={112} mood="proud" />
-        <Text accessibilityRole="header" className="text-ink text-[26px] font-extrabold text-center">
-          {c.study_day_credited ? 'You showed up. That counts.' : 'Extra practice, well spent.'}
-        </Text>
-        <Text className="text-primary text-[40px] font-extrabold" accessibilityLabel={`${c.xp_granted} XP earned`}>
-          +{c.xp_granted} XP
-        </Text>
-        <Text className="text-muted text-[15px]">
-          {c.correct} of {c.total} correct{c.mode === 'lesson' ? ' on the first try' : ''}
-        </Text>
-      </View>
+        <Cube size={112} mood={perfect || c.study_day_credited ? 'cheer' : 'proud'} motion="jump" />
+        <Animated.View entering={FadeInDown.delay(BEAT.title).duration(380)}>
+          <Text accessibilityRole="header" className="text-ink text-[26px] font-extrabold text-center">
+            {perfect ? 'Perfect lesson!' : c.study_day_credited ? 'You showed up. That counts.' : 'Extra practice, well spent.'}
+          </Text>
+        </Animated.View>
+        <View accessible accessibilityLabel={`${c.xp_granted} XP earned`}>
+          <CountUp to={c.xp_granted} prefix="+" suffix=" XP" delay={BEAT.xp} skip={skip} className="text-primary text-[40px] font-extrabold" />
+        </View>
+        <Animated.View entering={FadeIn.delay(BEAT.detail).duration(300)}>
+          <Text className="text-muted text-[15px]">
+            {c.correct} of {c.total} correct{c.mode === 'lesson' ? ' on the first try' : ''}
+          </Text>
+        </Animated.View>
+      </Pressable>
 
       {me.data ? (
-        <Card className="gap-3">
-          <View className="flex-row items-center justify-between">
-            <Text className="text-ink text-[18px] font-extrabold">
-              {me.data.streak.current}-day streak
-            </Text>
-            {c.study_day_credited ? <Pill tone="streak" label="Keep going" /> : <Pill tone="muted" label="Today already counted" />}
-          </View>
-          <WeekDots week={me.data.streak.week} />
-        </Card>
+        <Animated.View entering={riseIn(BEAT.streakCard)}>
+          <Card className="gap-3">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-ink text-[18px] font-extrabold">
+                {me.data.streak.current}-day streak
+              </Text>
+              {c.study_day_credited ? (
+                <Animated.View entering={stampIn}>
+                  <View className="rounded-lg border-2 border-streak px-2 py-0.5" style={{ transform: [{ rotate: '-6deg' }] }}>
+                    <Text className="text-streak-dark text-[13px] font-extrabold uppercase tracking-wider">Today counts</Text>
+                  </View>
+                </Animated.View>
+              ) : (
+                <Pill tone="muted" label="Today already counted" />
+              )}
+            </View>
+            <WeekDots week={me.data.streak.week} igniteTodayAt={c.study_day_credited ? BEAT.ignite : undefined} />
+          </Card>
+        </Animated.View>
       ) : null}
 
       {c.correct < c.total ? (
@@ -108,5 +151,7 @@ export default function Complete() {
 
       <Small className="text-center">XP tracks activity. It is not an exam score.</Small>
     </Screen>
+    {perfect || c.study_day_credited ? <Confetti count={perfect ? 90 : 60} /> : null}
+    </View>
   );
 }

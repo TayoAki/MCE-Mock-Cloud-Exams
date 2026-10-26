@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { ComponentProps, ReactNode } from 'react';
+import { useEffect, type ComponentProps, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View, type ColorValue, type PressableProps } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '@/lib/api';
 import { colors } from '@/lib/theme';
@@ -138,6 +139,12 @@ export function Pill({ label, tone = 'primary', icon }: { label: string; tone?: 
 
 export function ProgressBar({ value, tone = 'primary', label }: { value: number; tone?: 'primary' | 'success'; label?: string }) {
   const pct = Math.max(0, Math.min(1, value)) * 100;
+  const width = useSharedValue(pct);
+  useEffect(() => {
+    // Springs forward on each step; Reduce Motion makes it jump.
+    width.set(withSpring(pct, { damping: 18, stiffness: 160, mass: 1 }));
+  }, [pct, width]);
+  const fill = useAnimatedStyle(() => ({ width: `${width.get()}%` }));
   return (
     <View
       accessibilityRole="progressbar"
@@ -145,7 +152,7 @@ export function ProgressBar({ value, tone = 'primary', label }: { value: number;
       accessibilityValue={{ min: 0, max: 100, now: Math.round(pct) }}
       className="h-2.5 rounded-full bg-primary-tint overflow-hidden"
     >
-      <View className={`h-full rounded-full ${tone === 'success' ? 'bg-success' : 'bg-primary'}`} style={{ width: `${pct}%` }} />
+      <Animated.View style={[{ height: '100%', borderRadius: 999, backgroundColor: tone === 'success' ? colors.success : colors.primary }, fill]} />
     </View>
   );
 }

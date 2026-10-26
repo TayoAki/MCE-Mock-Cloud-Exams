@@ -71,6 +71,7 @@ src/
 - **Sealed mocks.** Mock answers show no feedback until submission; results show domain denominators and "Practice score · not a pass prediction".
 - **Guests.** A guest gets a real server identity, so grading stays server-side. Registering upgrades that same identity and keeps every attempt and credit. Signing in to a different existing account does not merge guest progress, and the screen says so.
 - **Plus.** Plan-gated actions (timed/custom quizzes, full mocks, extra explanations) open the preview screen. The 14-day preview needs an account, starts only on an explicit tap and never renews. Store purchases are not wired up (see the root README).
+- **Motion, sound and haptics.** Answers, combos, lesson completion, the streak and the path have short animations (`src/components/motion.tsx`, the animated `Cube`), sounds and haptics (`src/lib/feedback.ts`). Sound and haptics have switches in Settings, sounds stay quiet when the phone is on silent, and Reduce Motion shows every final state without confetti or movement. The sound effects are synthesized by `scripts/generate-sounds.py`. Use the `SPRING` presets for springs: Reanimated 4's default spring is heavy (mass 4), so a config that only sets damping wobbles for seconds.
 - **Accessibility.** Controls are at least 44pt, use `role` / `aria-*` props (honored on iOS, Android and web), and decorative icons are hidden from screen readers. Feedback uses words and icons, not just color.
 
 ## Checks

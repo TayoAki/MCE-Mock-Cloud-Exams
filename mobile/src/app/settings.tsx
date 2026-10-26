@@ -1,10 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, Switch, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, Switch, Text, View } from 'react-native';
 import { Banner, Button, Card, Divider, ErrorState, Icon, LoadingState, NavRow, Screen, Small, Title } from '@/components/ui';
 import { ApiError, patch, post } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { setFeedbackPref, useFeedbackPrefs } from '@/lib/feedback';
 import { enableReminders } from '@/lib/notifications';
 import { useCurrentEnrollment } from '@/lib/queries';
 import { colors } from '@/lib/theme';
@@ -19,6 +20,7 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<{ tone: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const feel = useFeedbackPrefs();
   const device = deviceTimezone();
 
   async function update(path: string, body: object, success?: string) {
@@ -113,6 +115,27 @@ export default function Settings() {
             <Small>{`Quiet hours ${prefs.quiet_start}–${prefs.quiet_end}. No reminder once you've studied that day.`}</Small>
           </>
         ) : null}
+      </Card>
+
+      <Text className="text-muted text-xs font-bold uppercase tracking-wider pt-2">Sound and feel</Text>
+      <Card className="gap-3">
+        <View className="flex-row items-center justify-between min-h-[44px]">
+          <View className="flex-1 pr-3">
+            <Text className="text-ink text-[15px] font-bold">Sound effects</Text>
+            <Small>Quiet when your phone is on silent.</Small>
+          </View>
+          <Switch accessibilityLabel="Sound effects" value={feel.sound} onValueChange={(on) => setFeedbackPref('sound', on)} trackColor={{ true: colors.primary, false: colors.locked }} />
+        </View>
+        {Platform.OS !== 'web' ? (
+          <>
+            <Divider />
+            <View className="flex-row items-center justify-between min-h-[44px]">
+              <Text className="text-ink text-[15px] font-bold">Haptics</Text>
+              <Switch accessibilityLabel="Haptics" value={feel.haptics} onValueChange={(on) => setFeedbackPref('haptics', on)} trackColor={{ true: colors.primary, false: colors.locked }} />
+            </View>
+          </>
+        ) : null}
+        <Small>Animations follow your device’s Reduce Motion setting.</Small>
       </Card>
 
       {enrollment ? (

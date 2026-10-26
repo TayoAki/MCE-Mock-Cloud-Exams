@@ -1,13 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useMemo, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Bump, SPRING, pop, popIn, riseIn, useShake } from '@/components/motion';
 import { Banner, Button, ErrorState, Icon, LoadingState, ProgressBar, Screen, Small } from '@/components/ui';
 import { trackEvent } from '@/lib/analytics';
 import { ApiError, post } from '@/lib/api';
+import { feedback as play } from '@/lib/feedback';
 import { newId } from '@/lib/ids';
 import { clearPending, loadPending, savePending, type PendingAnswer } from '@/lib/pending';
 import { useRefreshLearning, useSession } from '@/lib/queries';
@@ -17,10 +19,30 @@ import type { AnswerReceipt, Explanation, Feedback, Session, SessionItem } from 
 type OptionState = 'idle' | 'selected' | 'correct' | 'wrong' | 'dim';
 
 function OptionRow({ letter, text, state, multiple, onPress, disabled }: { letter: string; text: string; state: OptionState; multiple: boolean; onPress: () => void; disabled: boolean }) {
+  const reduced = useReducedMotion();
+  const scale = useSharedValue(1);
+  // The mint fill sweeps in from the left when this option is revealed as correct.
+  const sweep = useSharedValue(state === 'correct' ? 1 : 0);
+  const previous = useRef(state);
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = state;
+    if (before === state) return;
+    if (state !== 'correct') {
+      sweep.set(0);
+      return;
+    }
+    sweep.set(reduced ? 1 : withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) }));
+    if (!reduced) scale.set(pop(1.04));
+  }, [state, reduced, scale, sweep]);
+  const shake = useShake(state === 'wrong');
+  const press = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
+  const fill = useAnimatedStyle(() => ({ transform: [{ scaleX: sweep.get() }] }));
+
   const box = {
     idle: 'border-border bg-surface',
     selected: 'border-primary bg-primary-tint',
-    correct: 'border-success bg-mint',
+    correct: 'border-success bg-surface',
     wrong: 'border-coral bg-coral-tint',
     dim: 'border-border bg-surface opacity-70',
   }[state];
@@ -33,26 +55,38 @@ function OptionRow({ letter, text, state, multiple, onPress, disabled }: { lette
   }[state];
   const status = state === 'correct' ? ', correct answer' : state === 'wrong' ? ', your answer, incorrect' : state === 'selected' ? ', selected' : '';
   return (
-    <Pressable
-      accessibilityRole={multiple ? 'checkbox' : 'radio'}
-      aria-checked={state === 'selected' || state === 'wrong' || state === 'correct'} aria-disabled={disabled}
-      accessibilityLabel={`Option ${letter}: ${text}${status}`}
-      disabled={disabled}
-      onPress={onPress}
-      className={`min-h-[56px] flex-row items-center gap-3 rounded-[16px] border-2 px-3.5 py-3 ${box}`}
-    >
-      <View className={`h-8 w-8 ${multiple ? 'rounded-lg' : 'rounded-full'} items-center justify-center ${badge}`}>
-        {state === 'correct' ? (
-          <Icon name="checkmark" size={18} color="#FFFFFF" />
-        ) : state === 'wrong' ? (
-          <Icon name="close" size={18} color="#FFFFFF" />
-        ) : (
-          <Text className={`text-[14px] font-bold ${state === 'selected' ? 'text-white' : 'text-muted'}`}>{letter}</Text>
-        )}
-      </View>
-      <Text className="flex-1 text-ink text-[15px] leading-[21px]">{text}</Text>
-    </Pressable>
+    <Animated.View style={[shake, press]}>
+      <Pressable
+        accessibilityRole={multiple ? 'checkbox' : 'radio'}
+        aria-checked={state === 'selected' || state === 'wrong' || state === 'correct'} aria-disabled={disabled}
+        accessibilityLabel={`Option ${letter}: ${text}${status}`}
+        disabled={disabled}
+        onPress={onPress}
+        onPressIn={() => !reduced && scale.set(withSpring(0.97, SPRING.press))}
+        onPressOut={() => scale.set(withSpring(1, SPRING.press))}
+        className={`min-h-[56px] flex-row items-center gap-3 rounded-[16px] border-2 px-3.5 py-3 overflow-hidden ${box}`}
+      >
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.mint, transformOrigin: 'left' }, fill]} />
+        <View className={`h-8 w-8 ${multiple ? 'rounded-lg' : 'rounded-full'} items-center justify-center ${badge}`}>
+          {state === 'correct' || state === 'wrong' ? (
+            <Animated.View entering={popIn()}>
+              <Icon name={state === 'correct' ? 'checkmark' : 'close'} size={18} color="#FFFFFF" />
+            </Animated.View>
+          ) : (
+            <Text className={`text-[14px] font-bold ${state === 'selected' ? 'text-white' : 'text-muted'}`}>{letter}</Text>
+          )}
+        </View>
+        <Text className="flex-1 text-ink text-[15px] leading-[21px]">{text}</Text>
+      </Pressable>
+    </Animated.View>
   );
+}
+
+/** Correct answers in a row at the end of the answered items (display only; the server owns XP). */
+function trailingCorrect(items: SessionItem[]) {
+  let run = 0;
+  for (const item of items.filter((i) => i.submission)) run = item.submission?.feedback?.correct ? run + 1 : 0;
+  return run;
 }
 
 function optionState(key: string, item: SessionItem, selected: string[], feedback: Feedback | null): OptionState {
@@ -151,6 +185,7 @@ export default function SessionScreen() {
   const [explanation, setExplanation] = useState<Explanation | null>(null);
   const [explaining, setExplaining] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [earned, setEarned] = useState<{ itemId: string; xp: number } | null>(null);
   const remaining = useCountdown(s);
 
   const answered = s?.items.filter((i) => i.submission).length ?? 0;
@@ -227,9 +262,9 @@ export default function SessionScreen() {
       applyReceipt(item, answer.body, receipt);
       if (!sealed) {
         setShowingId(item.session_item_id);
-        if (Platform.OS !== 'web' && receipt.feedback) {
-          Haptics.notificationAsync(receipt.feedback.correct ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
-        }
+        setEarned({ itemId: item.session_item_id, xp: receipt.xp_granted ?? 0 });
+        if (receipt.feedback?.correct) play.correct(trailingCorrect(s?.items ?? []) + 1);
+        else if (receipt.feedback) play.wrong();
       } else {
         setSelected([]);
       }
@@ -303,6 +338,8 @@ export default function SessionScreen() {
   const multiple = current?.answer_type === 'multiple';
   const allAnswered = answered === s.items.length;
   const lowTime = remaining !== null && remaining < 60_000;
+  const combo = sealed ? 0 : trailingCorrect(s.items);
+  const xpHere = earned && earned.itemId === current?.session_item_id ? earned.xp : 0;
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -313,6 +350,16 @@ export default function SessionScreen() {
         <View className="flex-1">
           <ProgressBar value={answered / s.items.length} label={`${answered} of ${s.items.length} answered`} />
         </View>
+        {combo >= 3 ? (
+          <Animated.View entering={popIn()}>
+            <Bump value={combo}>
+              <View accessibilityLabel={`${combo} correct in a row`} className="flex-row items-center gap-1 rounded-full bg-streak-tint px-2.5 py-1">
+                <Icon name="flame" size={14} color={colors.streakDark} />
+                <Text className="text-streak-dark text-[13px] font-extrabold">{combo}</Text>
+              </View>
+            </Bump>
+          </Animated.View>
+        ) : null}
         {remaining !== null ? (
           <View accessibilityLabel={`Time left ${formatTime(remaining)}`} className={`flex-row items-center gap-1 rounded-full px-2.5 py-1 ${lowTime ? 'bg-coral-tint' : 'bg-primary-tint'}`}>
             <Icon name="time-outline" size={14} color={lowTime ? colors.coralDark : colors.primaryDark} />
@@ -336,27 +383,40 @@ export default function SessionScreen() {
               {multiple && !feedback ? <Small>Select all that apply.</Small> : null}
               {current.repeat && !sealed ? <Small>You’ve seen this idea before. Repeats count separately from new questions.</Small> : null}
             </View>
-            <View className="gap-2.5">
-              {current.options.map((o) => (
-                <OptionRow
-                  key={o.key}
-                  letter={o.key}
-                  text={o.text}
-                  multiple={multiple}
-                  disabled={!!current.submission || submitting || !!pending}
-                  state={optionState(o.key, current, selected, feedback)}
-                  onPress={() => setSelected((prev) => (multiple ? (prev.includes(o.key) ? prev.filter((k) => k !== o.key) : [...prev, o.key]) : [o.key]))}
-                />
+            {/* Keyed by question so each one's options stagger in fresh. */}
+            <View key={current.session_item_id} className="gap-2.5">
+              {current.options.map((o, i) => (
+                <Animated.View key={o.key} entering={FadeInDown.delay(60 + i * 55).duration(280)}>
+                  <OptionRow
+                    letter={o.key}
+                    text={o.text}
+                    multiple={multiple}
+                    disabled={!!current.submission || submitting || !!pending}
+                    state={optionState(o.key, current, selected, feedback)}
+                    onPress={() => {
+                      play.select();
+                      setSelected((prev) => (multiple ? (prev.includes(o.key) ? prev.filter((k) => k !== o.key) : [...prev, o.key]) : [o.key]));
+                    }}
+                  />
+                </Animated.View>
               ))}
             </View>
 
             {feedback ? (
+              <Animated.View entering={riseIn()}>
               <View accessibilityLiveRegion="polite" className={`rounded-[20px] p-4 gap-2 ${feedback.correct ? 'bg-mint' : 'bg-coral-tint'}`}>
                 <View className="flex-row items-center gap-2">
                   <Icon name={feedback.correct ? 'checkmark-circle' : 'bulb'} size={22} color={feedback.correct ? colors.success : colors.coralDark} />
-                  <Text accessibilityRole="header" className={`text-[17px] font-extrabold ${feedback.correct ? 'text-success' : 'text-coral-dark'}`}>
-                    {feedback.correct ? 'You got it!' : 'A useful one to review'}
+                  <Text accessibilityRole="header" className={`flex-1 text-[17px] font-extrabold ${feedback.correct ? 'text-success' : 'text-coral-dark'}`}>
+                    {feedback.correct ? (combo >= 3 ? `${combo} in a row!` : 'You got it!') : 'A useful one to review'}
                   </Text>
+                  {xpHere > 0 ? (
+                    <Animated.View entering={popIn(150)}>
+                      <View accessibilityLabel={`${xpHere} XP earned`} className="rounded-full bg-primary px-2.5 py-1">
+                        <Text className="text-white text-[13px] font-extrabold">+{xpHere} XP</Text>
+                      </View>
+                    </Animated.View>
+                  ) : null}
                 </View>
                 {!feedback.correct ? (
                   <Text className="text-ink text-[14px] font-semibold">Correct answer: {feedback.correct_options.join(', ')}</Text>
@@ -376,6 +436,7 @@ export default function SessionScreen() {
                   </Pressable>
                 ))}
               </View>
+              </Animated.View>
             ) : null}
 
             {explanation ? (
