@@ -11,6 +11,13 @@ CertPath runs as one Railway project with four parts. Only the API talks to the 
 
 Because both web apps call `/v1` on their own origin, they need no API URL at build time and no CORS.
 
+## Setting it up
+
+1. Deploy the MongoDB template on its own and wait until both of its services have finished. Creating other services while a template is still applying can drop them, and variables that reference a service that doesn't exist yet never bind.
+2. When the init service logs "Single node replica initiated successfully", delete it (it has done its job).
+3. Create the **api**, **web** and **admin** services, apply the settings and variables below, and generate their domains.
+4. Connect each one to this repository and branch. Railway builds on every push to it, but only for the service whose watch paths changed.
+
 ## Service settings
 
 | Service | Root directory | Healthcheck | Watch paths |
@@ -28,7 +35,7 @@ The watch paths stop a change in one app from rebuilding the others.
 | Variable | Value |
 |---|---|
 | `PORT` | `4000` |
-| `MONGODB_URI` | `mongodb://${{Mongo Single Replica.MONGOUSER}}:${{Mongo Single Replica.MONGOPASSWORD}}@${{Mongo Single Replica.RAILWAY_PRIVATE_DOMAIN}}:27017/certpath?authSource=admin&directConnection=true` |
+| `MONGODB_URI` | `${{Mongo Single Replica.MONGO_PRIVATE_URL}}/certpath?authSource=admin&directConnection=true` |
 | `JWT_SECRET` | 64 random hex characters (`openssl rand -hex 32`). Changing it signs everyone out |
 | `SEED_ON_START` | `true`: loads the pilot content and the admin account into the empty database on first start. Later starts change nothing |
 | `SEED_ADMIN_EMAIL` | `admin@certpath.dev` (the backoffice login) |

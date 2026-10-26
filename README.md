@@ -11,6 +11,18 @@ This repository implements the CertPath v2 replan in `docs/plan/` (product, jour
 | [`admin/`](admin/README.md) | Content review and operations backoffice | Vite, React 19, React Router, TanStack Query, Tailwind v4 |
 | [`docs/`](docs/) | [`API.md`](docs/API.md) endpoint reference, [`DEPLOY.md`](docs/DEPLOY.md) Railway hosting; `plan/` holds the original bundle | — |
 
+## Hosted beta
+
+CertPath is free for now (`PLUS_ENABLED=false`): every learner has every feature and nothing is for sale.
+
+| What | Where |
+|---|---|
+| Learner app (web) | https://web-production-74d65.up.railway.app |
+| Backoffice | https://admin-production-cd47.up.railway.app (sign in as `admin@certpath.dev`; the password is the API service's `SEED_ADMIN_PASSWORD` in Railway) |
+| API for the phone app | https://api-production-7c3cf.up.railway.app/v1 |
+
+It runs on Railway from this branch: see [`docs/DEPLOY.md`](docs/DEPLOY.md). The questions are still unreviewed drafts, so treat it as a beta.
+
 ## Quick start
 
 Node 22.13+. No database to install: the API's dev mode starts an in-memory MongoDB replica set and seeds it.
