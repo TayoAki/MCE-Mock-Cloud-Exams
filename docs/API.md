@@ -72,6 +72,30 @@ Base path `/v1`. JSON in and out, snake_case fields. The design contract is `doc
 | POST | `/circle-joins` | `{token}` |
 | POST | `/events` | Client analytics: allowlisted event names and properties only |
 
+## Engagement (gems, quests, streaks, leagues, friends)
+
+Everything is decided and stored by the server; the app only displays it. Numbers live in `api/src/lib/rules.ts`. Gems are earned only (lessons, chests, badges, the monthly challenge, league podiums, circle quests); CertPath sells nothing for money.
+
+`POST /sessions/:id/complete` (and `GET /sessions/:id/results`) include `engagement`: `accuracy`, `duration_seconds`, `gems_earned`, `gems_total`, `level {level, title, xp, floor, next, leveled_up}`, `quests [{key, label, target, progress, done}]`, `chest_available`, `league {tier, rank, previous_rank, size, xp, promote, demote, ends_at} | null` and `celebrations`. A retried completion returns the same stored summary.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/me/engagement` | Gems, freezes (max 2), weekend amulet, wager, XP boost, repair offer, level, league tier, shop prices. Applies freezes or the amulet to missed days first |
+| GET | `/me/quests` | Today's three quests (sized to the daily goal), the chest, and the monthly challenge (30 quests) |
+| POST | `/me/quests/chest` | Opens today's chest once all three quests are done: gems, a 15-minute double-XP boost, or a streak freeze. Repeats return the same reward. 409 `quests_incomplete` |
+| GET | `/me/achievements` | Badge catalog with `earned_at`, plus earned monthly-challenge badges |
+| GET | `/me/celebrations` | Queued moments to play, oldest first: `level_up`, `achievement`, `streak_milestone`, `quest_complete`, `quests_done`, `monthly_challenge`, `freeze_used`, `amulet_used`, `streak_broken`, `streak_repaired`, `wager_won`, `wager_lost`, `league_result`, `friend_streak`, `high_five`, `nudge`, `circle_quest` |
+| POST | `/me/celebrations/seen` | `{ids}`: marks them played |
+| GET / POST | `/shop`, `/shop/purchase` | `{item: streak_freeze \| weekend_amulet \| streak_repair \| streak_wager, client_request_id}`. Idempotent per request ID. 409 `not_enough_gems`, `freezes_full`, `amulet_active`, `nothing_to_repair`, `wager_active` |
+| GET | `/leagues/current` | This week's table (UTC Monday to Monday, up to 30 learners per cohort, six tiers from Bronze to Lakehouse) with promotion and demotion zones, or `joined: false` until the first XP of the week |
+| PUT | `/me/league-visibility` | `{hidden}`: leave and stay out of league tables |
+| GET / POST | `/friend-streaks` | `{friend_id}` of someone in one of your circles; up to 5. A day counts when both studied that date |
+| POST | `/friend-streaks/:id/accept\|decline\|end` | Only the invited friend can accept |
+| POST | `/friends/:id/high-five`, `/friends/:id/nudge` | Circle members only; one of each per friend per day. A nudge is refused once they've studied (409 `already_studied`) |
+| GET | `/circles/:id/activity` | The weekly circle quest (XP together, 100 per member, max 1,500), members' weekly XP, and recent finished lessons |
+
+Streak rules: a freeze, the weekend amulet or a repair protects a missed date, which keeps the streak continuous but never counts as a study day. Freezes are spent only when every missed day can be covered; otherwise the streak breaks, the freezes are kept, and a repair is offered for 3 days. A wager stakes 50 gems on keeping the streak for 7 days and pays 100.
+
 ## Backoffice (staff)
 
 | Method | Path | Notes |

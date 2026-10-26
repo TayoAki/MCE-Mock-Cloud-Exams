@@ -1,5 +1,6 @@
 import { expireOverdueSessions } from '../services/completion.js';
 import { processDeletions } from '../services/deletion.js';
+import { closeLeagueWeeks } from '../services/leagues.js';
 import { dispatchReminders, planReminders } from '../services/notifications.js';
 
 type Job = { name: string; everyMs: number; run: () => Promise<unknown> };
@@ -10,6 +11,8 @@ const JOBS: Job[] = [
   { name: 'plan_reminders', everyMs: 5 * 60_000, run: () => planReminders() },
   { name: 'dispatch_reminders', everyMs: 60_000, run: () => dispatchReminders() },
   { name: 'process_deletions', everyMs: 10 * 60_000, run: () => processDeletions() },
+  // League weeks end Monday 00:00 UTC; rank and move each finished cohort once.
+  { name: 'close_league_weeks', everyMs: 5 * 60_000, run: () => closeLeagueWeeks() },
 ];
 
 /** In-process scheduler. Run a single API instance with workers enabled, or move these to a job runner. */

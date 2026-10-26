@@ -18,10 +18,11 @@ import { track } from '../lib/analytics.js';
 import { HttpError, badRequest, conflict, forbidden, notFound, unauthorized } from '../lib/errors.js';
 import { uuid } from '../lib/ids.js';
 import { PLUS_FEATURES, PREVIEW_DAYS } from '../lib/rules.js';
-import { effectiveTimezone, isValidZone, nextLocalMidnight } from '../lib/time.js';
+import { effectiveTimezone, isValidZone, localDate, nextLocalMidnight } from '../lib/time.js';
 import { activeEntitlements, toEntitlement } from './access.js';
 import { currentVersions } from './content.js';
 import { habitSummary, xpTotal } from './progress.js';
+import { syncStreak } from './streaks.js';
 
 export function toProfile(user: UserRecord) {
   return {
@@ -123,6 +124,8 @@ export async function logoutEverywhere(userId: string) {
 
 export async function profileSummary(user: UserRecord) {
   const timezone = effectiveTimezone(user);
+  // Applies freezes or the weekend amulet to any days missed since the last visit.
+  await tx(() => syncStreak(user._id, localDate(new Date(), timezone)));
   const [habits, xp, entitlements, previewUsed, prefs, enrollments] = await Promise.all([
     habitSummary(user._id, timezone),
     xpTotal(user._id),

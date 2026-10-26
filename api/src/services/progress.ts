@@ -4,6 +4,7 @@ import {
   Enrollment,
   ObjectiveProgress,
   PracticeSession,
+  ProtectedDay,
   ReviewQueue,
   RewardLedger,
   StreakState,
@@ -149,13 +150,16 @@ export async function habitSummary(userId: string, timezone: string, now = new D
   const today = localDate(now, timezone);
   const week = localWeek(now, timezone);
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(week.startDate, i));
-  const [streak, credited] = await Promise.all([
+  const [streak, credited, protectedDays] = await Promise.all([
     StreakState.findById(userId).lean(),
     DailyStudyDay.find({ userId, studyDate: { $in: weekDates } }).select({ studyDate: 1 }).lean(),
+    ProtectedDay.find({ userId, date: { $in: weekDates } }).select({ date: 1, source: 1 }).lean(),
   ]);
   const creditedSet = new Set(credited.map((c) => c.studyDate));
+  const protectedBy = new Map(protectedDays.map((p) => [p.date, p.source]));
   const state = {
     lastStudyDate: streak?.lastStudyDate ?? null,
+    lastCoveredDate: streak?.lastCoveredDate ?? null,
     currentDays: streak?.currentDays ?? 0,
     longestDays: streak?.longestDays ?? 0,
   };
@@ -165,6 +169,6 @@ export async function habitSummary(userId: string, timezone: string, now = new D
     last_study_date: state.lastStudyDate,
     studied_today: state.lastStudyDate === today,
     today,
-    week: weekDates.map((date) => ({ date, studied: creditedSet.has(date), is_today: date === today })),
+    week: weekDates.map((date) => ({ date, studied: creditedSet.has(date), protected: protectedBy.get(date) ?? null, is_today: date === today })),
   };
 }

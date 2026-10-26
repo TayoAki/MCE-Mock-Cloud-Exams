@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allocateBlueprint, creditStreak, displayedStreak, nextReview } from '../src/lib/rules.js';
+import { allocateBlueprint, amuletWeekend, creditStreak, displayedStreak, leagueZones, levelFor, missedDates, nextReview, planProtection } from '../src/lib/rules.js';
 import { inQuietHours, localDate, localTimeOn, startOfLocalDay } from '../src/lib/time.js';
 import { gradeSelection } from '../src/services/grading.js';
 
@@ -40,6 +40,7 @@ describe('streaks', () => {
   it('a gap restarts current and keeps longest', () => {
     expect(creditStreak({ ...state, lastStudyDate: '2026-10-22' }, '2026-10-25')).toEqual({
       lastStudyDate: '2026-10-25',
+      lastCoveredDate: '2026-10-25',
       currentDays: 1,
       longestDays: 5,
       inserted: true,
@@ -51,6 +52,37 @@ describe('streaks', () => {
   it('shows a broken streak as zero after a missed day', () => {
     expect(displayedStreak(state, '2026-10-25')).toBe(3);
     expect(displayedStreak(state, '2026-10-26')).toBe(0);
+  });
+  it('protected days keep the streak continuous without counting as study days', () => {
+    const frozen = { ...state, lastCoveredDate: '2026-10-25' };
+    expect(displayedStreak(frozen, '2026-10-26')).toBe(3);
+    expect(creditStreak(frozen, '2026-10-26')).toMatchObject({ currentDays: 4, lastCoveredDate: '2026-10-26' });
+    expect(missedDates(frozen, '2026-10-28')).toEqual(['2026-10-26', '2026-10-27']);
+    expect(missedDates({ ...state, currentDays: 0 }, '2026-10-28')).toEqual([]);
+  });
+  it('spends freezes only when every missed day can be covered, amulet days first', () => {
+    const weekend = new Set(['2026-10-24', '2026-10-25']);
+    expect(planProtection(['2026-10-23', '2026-10-24', '2026-10-25'], 1, weekend)).toMatchObject({ coverable: true, freezesUsed: 1 });
+    expect(planProtection(['2026-10-22', '2026-10-23'], 1, new Set())).toEqual({ coverable: false, protect: [], freezesUsed: 0 });
+  });
+  it('an amulet covers the coming weekend, or this one from Saturday', () => {
+    expect(amuletWeekend('2026-10-21')).toEqual(['2026-10-24', '2026-10-25']); // Wednesday
+    expect(amuletWeekend('2026-10-24')).toEqual(['2026-10-24', '2026-10-25']); // Saturday
+    expect(amuletWeekend('2026-10-25')).toEqual(['2026-10-31', '2026-11-01']); // Sunday: next weekend
+  });
+});
+
+describe('levels and leagues', () => {
+  it('levels follow 25·(L−1)·L cumulative XP', () => {
+    expect(levelFor(0)).toMatchObject({ level: 1, title: 'Intern', next: 50 });
+    expect(levelFor(149).level).toBe(2);
+    expect(levelFor(500)).toMatchObject({ level: 5, title: 'Data Wrangler', floor: 500, next: 750 });
+  });
+  it('promotes about a fifth of a cohort and demotes about 15%, never off the ends', () => {
+    expect(leagueZones(30, 1)).toEqual({ promote: 6, demote: 4 });
+    expect(leagueZones(30, 0)).toEqual({ promote: 6, demote: 0 });
+    expect(leagueZones(30, 5)).toEqual({ promote: 0, demote: 4 });
+    expect(leagueZones(3, 2)).toEqual({ promote: 1, demote: 0 });
   });
 });
 

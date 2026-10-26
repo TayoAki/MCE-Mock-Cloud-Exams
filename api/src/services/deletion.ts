@@ -3,9 +3,18 @@ import {
   AiUsage,
   AnalyticsEvent,
   Attempt,
+  Achievement,
+  Celebration,
   CircleInvite,
   CircleMember,
+  DailyQuestSet,
   DailyStudyDay,
+  EngagementProfile,
+  FriendStreak,
+  GemLedger,
+  HighFive,
+  LeagueMember,
+  ProtectedDay,
   Enrollment,
   Entitlement,
   ExamOutcome,
@@ -41,6 +50,12 @@ export async function deleteUserData(userId: string) {
     await (model as typeof Attempt).deleteMany({ userId });
   }
   await StreakState.deleteOne({ _id: userId });
+  for (const model of [GemLedger, ProtectedDay, DailyQuestSet, Achievement, Celebration, LeagueMember] as const) {
+    await (model as typeof GemLedger).deleteMany({ userId });
+  }
+  await EngagementProfile.deleteOne({ _id: userId });
+  await FriendStreak.updateMany({ pair: userId, status: { $ne: 'ended' } }, { $set: { status: 'ended' } });
+  await HighFive.deleteMany({ $or: [{ fromId: userId }, { toId: userId }] });
   await AnalyticsEvent.deleteMany({ userId });
   await StoreEvent.updateMany({ userId }, { $set: { userId: null, 'redactedPayload.deleted_owner': sha256(userId) } });
   await User.updateOne(

@@ -14,9 +14,11 @@ import {
 } from '../models/index.js';
 import { track } from '../lib/analytics.js';
 import { HttpError, conflict, notFound } from '../lib/errors.js';
-import { PRACTICE_SCORE_NOTE, QUALIFYING_ITEMS, XP, creditStreak, displayedStreak } from '../lib/rules.js';
-import { daysBetween, effectiveTimezone, localDate } from '../lib/time.js';
+import { PRACTICE_SCORE_NOTE, QUALIFYING_ITEMS, XP, displayedStreak } from '../lib/rules.js';
+import { effectiveTimezone, localDate } from '../lib/time.js';
+import { afterCompletion, type EngagementSummary } from './engagement.js';
 import { applyGradedAttempt, gradeSelection, grantReward } from './grading.js';
+import { creditDay, syncStreak } from './streaks.js';
 
 /** Modes a learner may submit before answering everything; the rest must be complete. */
 const EARLY_SUBMIT_MODES = new Set(['mock', 'timed']);
@@ -37,6 +39,8 @@ export interface Completion {
   fresh_count: number | null;
   lesson_id: string | null;
   completed_at: string;
+  /** Quests, level, gems, league and celebrations from this session. */
+  engagement: EngagementSummary;
 }
 
 /**
@@ -128,12 +132,9 @@ export async function finalizeSession(
     // Study credit depends on submitted work, not correctness. Unanswered timeout items don't count.
     const qualifying = answered.size >= QUALIFYING_ITEMS;
     let studyDayCredited = false;
-    const streak = await StreakState.findOneAndUpdate(
-      { _id: session.userId },
-      { $setOnInsert: { currentDays: 0, longestDays: 0, lastStudyDate: null }, $set: { updatedAt: now } },
-      { upsert: true, returnDocument: 'after' },
-    );
     const today = localDate(now, timezone);
+    // Missed days are protected (or the streak breaks) before today's credit.
+    await syncStreak(session.userId, today);
     if (qualifying) {
       const credit = await DailyStudyDay.updateOne(
         { userId: session.userId, studyDate: today },
@@ -142,17 +143,7 @@ export async function finalizeSession(
       );
       if (credit.upsertedCount) {
         studyDayCredited = true;
-        // A credit dated before the last one (after a timezone move) keeps the streak as is.
-        if (!streak.lastStudyDate || daysBetween(streak.lastStudyDate, today) > 0) {
-          const next = creditStreak(
-            { lastStudyDate: streak.lastStudyDate ?? null, currentDays: streak.currentDays, longestDays: streak.longestDays },
-            today,
-          );
-          streak.currentDays = next.currentDays;
-          streak.longestDays = next.longestDays;
-          streak.lastStudyDate = next.lastStudyDate;
-          await streak.save();
-        }
+        await creditDay(session.userId, today);
         await NotificationJob.updateMany(
           { userId: session.userId, studyDate: today, status: 'queued' },
           { $set: { status: 'cancelled', reason: 'studied' } },
@@ -160,8 +151,26 @@ export async function finalizeSession(
       }
     }
 
-    const xpRows = await RewardLedger.find({ sessionId: session._id }).select({ amount: 1 }).lean();
+    // Mark the session finished first, so quests and badges count it.
     const config = (session.selectionConfig ?? {}) as { sample?: boolean; fresh_count?: number };
+    session.status = status;
+    session.completedAt = now;
+    session.qualifying = qualifying;
+    session.completion = { mode: session.mode, correct, total: session.items.length };
+    await session.save();
+    const engagement = await afterCompletion({
+      userId: session.userId,
+      session,
+      status,
+      correct,
+      total: session.items.length,
+      timezone,
+      today,
+      studyDayCredited,
+      now,
+    });
+    const streak = (await StreakState.findById(session.userId).lean())!;
+    const xpRows = await RewardLedger.find({ sessionId: session._id }).select({ amount: 1 }).lean();
     const summary: Completion = {
       session_id: session._id,
       mode: session.mode,
@@ -172,7 +181,7 @@ export async function finalizeSession(
       xp_granted: xpRows.reduce((sum, r) => sum + r.amount, 0),
       study_day_credited: studyDayCredited,
       current_streak: displayedStreak(
-        { lastStudyDate: streak.lastStudyDate ?? null, currentDays: streak.currentDays, longestDays: streak.longestDays },
+        { lastStudyDate: streak.lastStudyDate ?? null, lastCoveredDate: streak.lastCoveredDate ?? null, currentDays: streak.currentDays, longestDays: streak.longestDays },
         today,
       ),
       domains: [...perDomain.values()].filter((d) => d.total > 0),
@@ -181,11 +190,9 @@ export async function finalizeSession(
       fresh_count: typeof config.fresh_count === 'number' ? config.fresh_count : null,
       lesson_id: session.lessonId ?? null,
       completed_at: now.toISOString(),
+      engagement,
     };
 
-    session.status = status;
-    session.completedAt = now;
-    session.qualifying = qualifying;
     session.completion = summary;
     await session.save();
     fresh = true;

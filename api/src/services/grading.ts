@@ -1,6 +1,7 @@
 import { tx } from '../db.js';
 import {
   Attempt,
+  EngagementProfile,
   ObjectiveProgress,
   PracticeSession,
   QuestionExposure,
@@ -13,7 +14,7 @@ import {
 import { track } from '../lib/analytics.js';
 import { HttpError, badRequest, conflict, isDuplicateKey, notFound } from '../lib/errors.js';
 import { uuid } from '../lib/ids.js';
-import { XP, nextReview } from '../lib/rules.js';
+import { BOOST, XP, nextReview } from '../lib/rules.js';
 import { effectiveTimezone, localDate, startOfLocalDay } from '../lib/time.js';
 
 /** Feedback is withheld for these modes until the session is finalized. */
@@ -159,6 +160,19 @@ export async function applyGradedAttempt(
       sourceId: attempt._id,
       idempotencyKey: `review:${attempt.enrollmentId}:${attempt.familyId}:${today}`,
     });
+  }
+  // A chest's XP boost multiplies what this answer earned.
+  if (xp > 0) {
+    const profile = await EngagementProfile.findById(attempt.userId).select({ boostUntil: 1 }).lean();
+    if (profile?.boostUntil && profile.boostUntil > now) {
+      xp += await grant(attempt.userId, attempt.sessionId, {
+        amount: xp * (BOOST.multiplier - 1),
+        reasonCode: 'xp_boost',
+        sourceType: 'attempt',
+        sourceId: attempt._id,
+        idempotencyKey: `attempt:${attempt._id}:boost`,
+      });
+    }
   }
   return { firstSeen, xp, scheduledStage };
 }

@@ -21,6 +21,8 @@ const streakSchema = new Schema(
     currentDays: { type: Number, required: true, default: 0, min: 0 },
     longestDays: { type: Number, required: true, default: 0, min: 0 },
     lastStudyDate: { type: String, match: DATE_RE, default: null },
+    /** Latest date the streak is continuous through, including protected days. */
+    lastCoveredDate: { type: String, match: DATE_RE, default: null },
     updatedAt: { type: Date, default: Date.now },
   },
   opts,
@@ -32,6 +34,8 @@ export const REWARD_REASONS = [
   'first_correct',
   'lesson_complete',
   'review_repeat',
+  'perfect_lesson',
+  'xp_boost',
   'manual_adjustment',
 ] as const;
 

@@ -7,6 +7,7 @@ import { accessLog, errorHandler, notFoundHandler, requestId } from './lib/http.
 import { adminRouter } from './routes/admin.js';
 import { authRouter } from './routes/auth.js';
 import { circlesRouter } from './routes/circles.js';
+import { engagementRouter } from './routes/engagement.js';
 import { learnerRouter } from './routes/learner.js';
 import { meRouter } from './routes/me.js';
 import { sessionsRouter } from './routes/sessions.js';
@@ -27,7 +28,7 @@ export function createApp() {
   });
 
   const v1 = express.Router();
-  v1.use(authRouter, learnerRouter, sessionsRouter, meRouter, circlesRouter, adminRouter);
+  v1.use(authRouter, learnerRouter, sessionsRouter, meRouter, circlesRouter, engagementRouter, adminRouter);
   app.use('/v1', v1);
 
   app.use(notFoundHandler);
