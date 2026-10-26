@@ -92,7 +92,7 @@ Everything is decided and stored by the server; the app only displays it. Number
 | GET / POST | `/friend-streaks` | `{friend_id}` of someone in one of your circles; up to 5. A day counts when both studied that date |
 | POST | `/friend-streaks/:id/accept\|decline\|end` | Only the invited friend can accept |
 | POST | `/friends/:id/high-five`, `/friends/:id/nudge` | Circle members only; one of each per friend per day. A nudge is refused once they've studied (409 `already_studied`) |
-| GET | `/circles/:id/activity` | The weekly circle quest (XP together, 100 per member, max 1,500), members' weekly XP, and recent finished lessons |
+| GET | `/circles/:id/activity` | The weekly circle quest (XP together, 100 per member, max 1,500), members' weekly XP and whether each studied today (so nudges go only to those who haven't), and recent finished lessons |
 
 Streak rules: a freeze, the weekend amulet or a repair protects a missed date, which keeps the streak continuous but never counts as a study day. Freezes are spent only when every missed day can be covered; otherwise the streak breaks, the freezes are kept, and a repair is offered for 3 days. A wager stakes 50 gems on keeping the streak for 7 days and pays 100.
 

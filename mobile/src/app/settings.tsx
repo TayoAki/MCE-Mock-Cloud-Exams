@@ -3,11 +3,11 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Platform, Pressable, Switch, Text, View } from 'react-native';
 import { Banner, Button, Card, Divider, ErrorState, Icon, LoadingState, NavRow, Screen, Small, Title } from '@/components/ui';
-import { ApiError, patch, post } from '@/lib/api';
+import { ApiError, patch, post, put } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { setFeedbackPref, useFeedbackPrefs } from '@/lib/feedback';
 import { enableReminders } from '@/lib/notifications';
-import { useCurrentEnrollment } from '@/lib/queries';
+import { useCurrentEnrollment, useEngagement } from '@/lib/queries';
 import { colors } from '@/lib/theme';
 import { deviceTimezone } from '@/lib/timezone';
 
@@ -21,6 +21,7 @@ export default function Settings() {
   const [message, setMessage] = useState<{ tone: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const feel = useFeedbackPrefs();
+  const engagement = useEngagement();
   const device = deviceTimezone();
 
   async function update(path: string, body: object, success?: string) {
@@ -39,6 +40,16 @@ export default function Settings() {
     const result = await enableReminders(me?.preferences.daily_local_time).catch(() => 'denied' as const);
     await queryClient.invalidateQueries();
     setMessage(result === 'denied' ? { tone: 'info', text: 'Notifications are off for CertPath. Allow them in system settings to get reminders.' } : { tone: 'success', text: 'Reminders are on.' });
+  }
+
+  async function setLeagueVisible(visible: boolean) {
+    setMessage(null);
+    try {
+      await put('/me/league-visibility', { hidden: !visible });
+      await Promise.all(['engagement', 'league'].map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
+    } catch (e) {
+      setMessage({ tone: 'error', text: e instanceof ApiError ? e.message : 'Could not save' });
+    }
   }
 
   async function deleteAccount() {
@@ -137,6 +148,26 @@ export default function Settings() {
         ) : null}
         <Small>Animations follow your device’s Reduce Motion setting.</Small>
       </Card>
+
+      {engagement.data ? (
+        <>
+          <Text className="text-muted text-xs font-bold uppercase tracking-wider pt-2">Leagues</Text>
+          <Card className="gap-2">
+            <View className="flex-row items-center justify-between min-h-[44px]">
+              <View className="flex-1 pr-3">
+                <Text className="text-ink text-[15px] font-bold">Show me in leagues</Text>
+                <Small>{u.is_guest ? 'Others see an anonymous name.' : `Others see “${u.display_name}” and your weekly XP.`}</Small>
+              </View>
+              <Switch
+                accessibilityLabel="Show me in leagues"
+                value={!engagement.data.league.hidden}
+                onValueChange={setLeagueVisible}
+                trackColor={{ true: colors.primary, false: colors.locked }}
+              />
+            </View>
+          </Card>
+        </>
+      ) : null}
 
       {enrollment ? (
         <>

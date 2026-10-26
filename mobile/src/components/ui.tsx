@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
 import { useEffect, type ComponentProps, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View, type ColorValue, type PressableProps } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -137,7 +138,14 @@ export function Pill({ label, tone = 'primary', icon }: { label: string; tone?: 
   );
 }
 
-export function ProgressBar({ value, tone = 'primary', label }: { value: number; tone?: 'primary' | 'success'; label?: string }) {
+const BAR_TONES = {
+  primary: { fill: colors.primary, track: colors.primaryTint },
+  success: { fill: colors.success, track: colors.mint },
+  streak: { fill: colors.streak, track: colors.streakTint },
+  gem: { fill: colors.gem, track: colors.gemTint },
+} as const;
+
+export function ProgressBar({ value, tone = 'primary', label }: { value: number; tone?: keyof typeof BAR_TONES; label?: string }) {
   const pct = Math.max(0, Math.min(1, value)) * 100;
   const width = useSharedValue(pct);
   useEffect(() => {
@@ -150,9 +158,10 @@ export function ProgressBar({ value, tone = 'primary', label }: { value: number;
       accessibilityRole="progressbar"
       accessibilityLabel={label}
       accessibilityValue={{ min: 0, max: 100, now: Math.round(pct) }}
-      className="h-2.5 rounded-full bg-primary-tint overflow-hidden"
+      className="h-2.5 rounded-full overflow-hidden"
+      style={{ backgroundColor: BAR_TONES[tone].track }}
     >
-      <Animated.View style={[{ height: '100%', borderRadius: 999, backgroundColor: tone === 'success' ? colors.success : colors.primary }, fill]} />
+      <Animated.View style={[{ height: '100%', borderRadius: 999, backgroundColor: BAR_TONES[tone].fill }, fill]} />
     </View>
   );
 }
@@ -224,6 +233,20 @@ export function NavRow({ title, subtitle, onPress, icon, right, disabled }: { ti
         {subtitle ? <Text className="text-muted text-[13px]">{subtitle}</Text> : null}
       </View>
       {right ?? <Icon name="chevron-forward" size={18} color={colors.muted} />}
+    </Pressable>
+  );
+}
+
+/** Back to the previous screen, or home when the screen was opened directly. */
+export function BackButton() {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Back"
+      onPress={() => (router.canGoBack() ? router.back() : router.replace('/learn'))}
+      className="h-11 w-11 justify-center"
+    >
+      <Icon name="chevron-back" size={24} color={colors.ink} />
     </Pressable>
   );
 }

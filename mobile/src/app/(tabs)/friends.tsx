@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Share, Text, TextInput, View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
+import { CirclePanels } from '@/components/CirclePanels';
 import { Cube } from '@/components/Cube';
 import { Banner, Body, Button, Card, ErrorState, Eyebrow, LoadingState, Pill, Screen, Small, Title } from '@/components/ui';
 import { trackEvent } from '@/lib/analytics';
@@ -114,6 +115,7 @@ export default function Friends() {
             ))}
           </Card>
           <Small>{c.note} Weeks run Monday to Sunday in {c.timezone}.</Small>
+          {circleId ? <CirclePanels circleId={circleId} /> : null}
           <Button label="Invite a friend" icon="share-outline" onPress={invite} />
           {inviteLink ? (
             <Banner tone="success" title="Invite link (expires in 7 days)">
@@ -148,7 +150,7 @@ export default function Friends() {
             </View>
             <Button label="Create circle" loading={busy} onPress={create} />
           </Card>
-          <Small>One study day counts once. No XP race. Got an invite link? Open it on this device to join.</Small>
+          <Small>Track study days together, share a weekly quest, keep friend streaks and trade high-fives. Got an invite link? Open it on this device to join.</Small>
         </>
       ) : null}
     </Screen>

@@ -77,7 +77,7 @@ export async function circleView(userId: string, circleId: string, now = new Dat
     week_starts_at: week.startsAt.toISOString(),
     week_ends_at: week.endsAt.toISOString(),
     members: roster,
-    note: 'One study day counts once. No XP race.',
+    note: 'Each study day counts once per person.',
   };
 }
 

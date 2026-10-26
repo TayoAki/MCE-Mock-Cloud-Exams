@@ -185,9 +185,21 @@ export async function circleActivity(userId: string, circleId: string, now = new
   const weekly = new Map(
     (await LeagueMember.find({ userId: { $in: q.ids }, weekStart: q.weekStart }).select({ userId: 1, xp: 1 }).lean()).map((m) => [m.userId, m.xp]),
   );
+  // Each member's own local day, so the app only offers a nudge that can be sent.
+  const studiedToday = new Set<string>();
+  for (const id of q.ids) {
+    if (await DailyStudyDay.exists({ userId: id, studyDate: localDate(now, await zoneOf(id, now)) })) studiedToday.add(id);
+  }
   return {
     quest: { target: q.target, progress: Math.min(q.target, q.progress), done: q.progress >= q.target, ends_at: q.endsAt.toISOString(), reward_gems: GEMS.circleQuest },
-    members: q.ids.map((id) => ({ user_id: id, name: users.get(id) ?? 'Learner', is_you: id === userId, weekly_xp: weekly.get(id) ?? 0, high_fived_today: sentToday.has(id) })),
+    members: q.ids.map((id) => ({
+      user_id: id,
+      name: users.get(id) ?? 'Learner',
+      is_you: id === userId,
+      weekly_xp: weekly.get(id) ?? 0,
+      studied_today: studiedToday.has(id),
+      high_fived_today: sentToday.has(id),
+    })),
     feed: lessons.map((l) => ({
       user_id: l.userId,
       name: users.get(l.userId) ?? 'Learner',

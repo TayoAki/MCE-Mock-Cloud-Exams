@@ -214,7 +214,7 @@ describe('study circles (phase 2)', () => {
     const view = await as(owner.token).get(`/circles/${circle.body.id}`).expect(200);
     const friendRow = view.body.members.find((m: { is_you: boolean }) => !m.is_you);
     expect(friendRow.study_days).toBe(1);
-    expect(view.body.note).toBe('One study day counts once. No XP race.');
+    expect(view.body.note).toBe('Each study day counts once per person.');
 
     const outsider = await guest();
     await as(outsider.token).get(`/circles/${circle.body.id}`).expect(404);

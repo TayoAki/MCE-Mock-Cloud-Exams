@@ -17,4 +17,7 @@ export const colors = {
   streakTint: '#FFF4E0',
   border: '#E9E7F3',
   locked: '#D9D7E3',
+  gem: '#1FA2D6',
+  gemDark: '#0E6E94',
+  gemTint: '#E0F4FB',
 } as const;

@@ -47,7 +47,7 @@ export interface Me {
     last_study_date: string | null;
     studied_today: boolean;
     today: string;
-    week: { date: string; studied: boolean; is_today: boolean }[];
+    week: WeekDay[];
   };
   xp_total: number;
   entitlements: Entitlement[];
@@ -118,6 +118,143 @@ export interface DomainResult {
   total: number;
 }
 
+export interface WeekDay {
+  date: string;
+  studied: boolean;
+  /** A missed day a freeze, the weekend amulet or a repair covered. */
+  protected?: 'freeze' | 'amulet' | 'repair' | null;
+  is_today: boolean;
+}
+
+export type LeagueTier = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' | 'lakehouse';
+
+export interface Level {
+  level: number;
+  title: string;
+  xp: number;
+  floor: number;
+  next: number;
+}
+
+export interface Quest {
+  key: string;
+  label: string;
+  target: number;
+  progress: number;
+  done: boolean;
+}
+
+export interface Celebration {
+  id: string;
+  kind:
+    | 'level_up'
+    | 'achievement'
+    | 'streak_milestone'
+    | 'quest_complete'
+    | 'quests_done'
+    | 'monthly_challenge'
+    | 'freeze_used'
+    | 'amulet_used'
+    | 'streak_broken'
+    | 'streak_repaired'
+    | 'wager_won'
+    | 'wager_lost'
+    | 'league_result'
+    | 'friend_streak'
+    | 'high_five'
+    | 'nudge'
+    | 'circle_quest';
+  payload: Record<string, string | number | null>;
+  created_at: string;
+}
+
+export interface LeagueStanding {
+  tier: LeagueTier;
+  rank: number;
+  previous_rank: number | null;
+  size: number;
+  xp: number;
+  week_start: string;
+  ends_at: string;
+  promote: number;
+  demote: number;
+}
+
+export interface EngagementSummary {
+  accuracy: number;
+  duration_seconds: number | null;
+  gems_earned: number;
+  gems_total: number;
+  level: Level & { leveled_up: boolean };
+  quests: Quest[];
+  chest_available: boolean;
+  league: LeagueStanding | null;
+  celebrations: Celebration[];
+}
+
+export type ShopItem = 'streak_freeze' | 'weekend_amulet' | 'streak_repair' | 'streak_wager';
+
+export interface Engagement {
+  gems: number;
+  freezes: number;
+  max_freezes: number;
+  amulet: { saturday: string; sunday: string } | null;
+  wager: { started_on: string; ends_on: string; stake: number; payout: number; status: 'active' | 'won' | 'lost' } | null;
+  boost_until: string | null;
+  repair: { days: number; until: string; price: number } | null;
+  level: Level;
+  league: { tier: LeagueTier; hidden: boolean };
+  prices: Record<ShopItem, number>;
+}
+
+export type ChestReward = { kind: 'gems'; amount: number } | { kind: 'xp_boost'; minutes: number; until: string } | { kind: 'streak_freeze' };
+
+export interface QuestsView {
+  date: string;
+  quests: Quest[];
+  chest: { available: boolean; opened: boolean; reward: ChestReward | null };
+  monthly: { month: string; target: number; progress: number };
+}
+
+export interface Badge {
+  key: string;
+  title: string;
+  description: string;
+  icon: string;
+  group: 'habit' | 'learning' | 'practice' | 'social' | 'league';
+  earned_at: string | null;
+}
+
+export interface LeagueView {
+  tier: LeagueTier;
+  tiers: LeagueTier[];
+  hidden: boolean;
+  joined: boolean;
+  week_start: string;
+  ends_at: string;
+  promote: number;
+  demote: number;
+  rows: { rank: number; name: string; xp: number; is_me: boolean; zone: 'promote' | 'demote' | null }[];
+  last_result: { week_start: string; tier: LeagueTier; rank: number | null; outcome: 'promoted' | 'demoted' | 'stayed' | null } | null;
+}
+
+export interface FriendStreakRow {
+  id: string;
+  friend: { id: string; name: string };
+  status: 'pending' | 'active';
+  invited_by_me: boolean;
+  current: number;
+  longest: number;
+  me_today: boolean;
+  friend_today: boolean;
+}
+
+export interface CircleActivity {
+  quest: { target: number; progress: number; done: boolean; ends_at: string; reward_gems: number };
+  members: { user_id: string; name: string; is_you: boolean; weekly_xp: number; studied_today: boolean; high_fived_today: boolean }[];
+  feed: { user_id: string; name: string; is_you: boolean; kind: 'lesson_completed'; at: string }[];
+}
+
 export interface Completion {
   session_id: string;
   mode: SessionMode;
@@ -134,6 +271,8 @@ export interface Completion {
   fresh_count: number | null;
   lesson_id: string | null;
   completed_at: string;
+  /** Present for sessions finished after gamification shipped. */
+  engagement?: EngagementSummary;
 }
 
 export interface Session {

@@ -5,10 +5,11 @@ import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withDelay
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { Cube } from '@/components/Cube';
+import { QuestsSummary } from '@/components/gamify';
 import { Pulse, SPRING, pop as popTo } from '@/components/motion';
 import { Banner, Body, Button, Eyebrow, ErrorState, Icon, LoadingState, NavRow, Small, Title } from '@/components/ui';
 import { feedback as play } from '@/lib/feedback';
-import { useCurrentEnrollment, useExams, usePath, usePractice } from '@/lib/queries';
+import { useCurrentEnrollment, useExams, usePath, usePractice, useQuests } from '@/lib/queries';
 import { useStartSession } from '@/lib/sessions';
 import { colors } from '@/lib/theme';
 import type { LessonNode } from '@/lib/types';
@@ -77,6 +78,7 @@ export default function Learn() {
   const exams = useExams();
   const path = usePath(enrollment?.id);
   const practice = usePractice(enrollment?.id);
+  const quests = useQuests();
   const { start, pending, error: startError } = useStartSession();
   const reduced = useReducedMotion();
   const { height } = useWindowDimensions();
@@ -90,6 +92,7 @@ export default function Learn() {
       if (enrollment?.id) {
         path.refetch();
         practice.refetch();
+        quests.refetch();
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [enrollment?.id]),
@@ -137,6 +140,7 @@ export default function Learn() {
 
             {enrollment?.status === 'paused' ? <Banner tone="warn" title="Study reminders are paused">Your path is still here whenever you want it.</Banner> : null}
             {enrollment?.status === 'passed' ? <Banner tone="success" title="Congratulations on your exam">Keep practising, or start a new certification when one is available.</Banner> : null}
+            {quests.data ? <QuestsSummary quests={quests.data.quests} chestReady={quests.data.chest.available} onPress={() => router.push('/quests')} /> : null}
             {due > 0 ? <NavRow icon="refresh" title={`${due} ${due === 1 ? 'review' : 'reviews'} due today`} subtitle="A little review, a stronger memory" onPress={() => router.push('/review')} /> : null}
 
             {current ? (

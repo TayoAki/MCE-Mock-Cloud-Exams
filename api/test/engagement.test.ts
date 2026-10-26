@@ -256,7 +256,8 @@ describe('friends', () => {
     const activity = (await as(owner.token).get(`/circles/${circleId}/activity`).expect(200)).body;
     expect(activity.quest).toMatchObject({ target: 200, done: false });
     expect(activity.feed[0]).toMatchObject({ kind: 'lesson_completed', is_you: false });
-    expect(activity.members.find((m: { is_you: boolean }) => !m.is_you).high_fived_today).toBe(true);
+    expect(activity.members.find((m: { is_you: boolean }) => !m.is_you)).toMatchObject({ high_fived_today: true, studied_today: true });
+    expect(activity.members.find((m: { is_you: boolean }) => m.is_you)).toMatchObject({ studied_today: false });
   });
 
   it('the circle quest pays every member once the circle reaches its weekly XP', async () => {

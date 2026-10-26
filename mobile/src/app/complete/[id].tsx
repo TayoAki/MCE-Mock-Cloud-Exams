@@ -1,18 +1,21 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, Keyframe } from 'react-native-reanimated';
 import { Cube } from '@/components/Cube';
+import { ChestButton, ChestModal, LevelBar, QuestRow, StatTile, TIER_STYLE, TierBadge } from '@/components/gamify';
 import { Confetti, CountUp, riseIn } from '@/components/motion';
-import { Banner, Button, Card, ErrorState, Eyebrow, LoadingState, NavRow, Pill, Screen, Small } from '@/components/ui';
+import { Banner, Button, Card, ErrorState, Eyebrow, Icon, LoadingState, NavRow, Pill, Screen, Small } from '@/components/ui';
 import { WeekDots } from '@/components/WeekDots';
 import { trackEvent } from '@/lib/analytics';
 import { get } from '@/lib/api';
+import { holdCelebrations } from '@/lib/celebrations';
 import { feedback as play } from '@/lib/feedback';
 import { enableReminders } from '@/lib/notifications';
 import { useMe, useRefreshLearning } from '@/lib/queries';
-import type { Completion } from '@/lib/types';
+import { colors } from '@/lib/theme';
+import type { Completion, LeagueStanding } from '@/lib/types';
 
 const MODE_LABEL: Record<string, string> = {
   lesson: 'Daily lesson complete',
@@ -26,7 +29,19 @@ const MODE_LABEL: Record<string, string> = {
 };
 
 // The celebration's beats, in ms after the results arrive.
-const BEAT = { title: 300, xp: 550, detail: 1000, streakCard: 1100, ignite: 1450, stamp: 1650 } as const;
+const BEAT = { title: 300, xp: 550, detail: 900, stats: 1000, streakCard: 1350, ignite: 1700, stamp: 1900, level: 2100, quests: 2350, league: 2600, done: 3100 } as const;
+
+function duration(seconds: number | null) {
+  if (seconds === null) return '—';
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function leagueLine(l: LeagueStanding) {
+  const tier = TIER_STYLE[l.tier].label;
+  if (l.previous_rank === null) return `You joined the ${tier} League at #${l.rank}`;
+  if (l.previous_rank > l.rank) return `Up ${l.previous_rank - l.rank} to #${l.rank} in ${tier}`;
+  return `#${l.rank} of ${l.size} in ${tier}`;
+}
 
 const stampIn = new Keyframe({
   0: { opacity: 0, transform: [{ scale: 2.4 }] },
@@ -43,6 +58,9 @@ export default function Complete() {
   const me = useMe();
   const [reminder, setReminder] = useState<'idle' | 'busy' | 'enabled' | 'denied' | 'unavailable'>('idle');
   const [skip, setSkip] = useState(false);
+  const [chestOpen, setChestOpen] = useState(false);
+  const [chestTaken, setChestTaken] = useState(false);
+  const queryClient = useQueryClient();
 
   // Sound and haptics play once, when the result first arrives.
   const celebrated = useRef(false);
@@ -50,11 +68,14 @@ export default function Complete() {
   useEffect(() => {
     if (!result.data || celebrated.current) return;
     celebrated.current = true;
+    // Level-ups and badges from this session play after this screen's own sequence.
+    holdCelebrations(BEAT.done + 900);
+    queryClient.invalidateQueries({ queryKey: ['celebrations'] });
     play.complete();
     if (!credited) return;
     const timer = setTimeout(play.streak, BEAT.ignite);
     return () => clearTimeout(timer);
-  }, [result.data, credited]);
+  }, [result.data, credited, queryClient]);
 
   useEffect(() => {
     refresh();
@@ -70,6 +91,7 @@ export default function Complete() {
   const c = result.data;
   const firstLesson = c.mode === 'lesson' && c.xp_granted > 0;
   const perfect = c.total >= 5 && c.correct === c.total;
+  const g = c.engagement;
 
   return (
     <View className="flex-1">
@@ -93,6 +115,14 @@ export default function Complete() {
         </Animated.View>
       </Pressable>
 
+      {g ? (
+        <View className="flex-row gap-2.5">
+          <StatTile icon="locate" label="Accuracy" value={`${g.accuracy}%`} color={colors.success} tint={colors.mint} delay={BEAT.stats} />
+          <StatTile icon="time" label="Time" value={duration(g.duration_seconds)} color={colors.primary} tint={colors.primaryTint} delay={BEAT.stats + 120} />
+          <StatTile icon="diamond" label="Gems" value={`+${g.gems_earned}`} color={colors.gemDark} tint={colors.gemTint} delay={BEAT.stats + 240} />
+        </View>
+      ) : null}
+
       {me.data ? (
         <Animated.View entering={riseIn(BEAT.streakCard)}>
           <Card className="gap-3">
@@ -112,6 +142,47 @@ export default function Complete() {
             </View>
             <WeekDots week={me.data.streak.week} igniteTodayAt={c.study_day_credited ? BEAT.ignite : undefined} />
           </Card>
+        </Animated.View>
+      ) : null}
+
+      {g ? (
+        <Animated.View entering={riseIn(BEAT.level)}>
+          <Card className="gap-2">
+            {g.level.leveled_up ? (
+              <View className="flex-row">
+                <Pill tone="primary" icon="arrow-up" label="Level up!" />
+              </View>
+            ) : null}
+            <LevelBar level={g.level} from={g.level.leveled_up ? 0 : (g.level.xp - c.xp_granted - g.level.floor) / Math.max(1, g.level.next - g.level.floor)} delay={BEAT.level + 300} />
+          </Card>
+        </Animated.View>
+      ) : null}
+
+      {g?.quests.length ? (
+        <Animated.View entering={riseIn(BEAT.quests)}>
+          <Card className="gap-3">
+            <Text className="text-ink text-[16px] font-extrabold">Daily quests</Text>
+            {g.quests.map((q, i) => (
+              <QuestRow key={q.key} quest={q} delay={BEAT.quests + 300 + i * 120} />
+            ))}
+            {g.chest_available && !chestTaken ? <ChestButton onPress={() => setChestOpen(true)} /> : null}
+          </Card>
+        </Animated.View>
+      ) : null}
+
+      {g?.league ? (
+        <Animated.View entering={riseIn(BEAT.league)}>
+          <NavRow
+            title={leagueLine(g.league)}
+            subtitle={g.league.rank <= g.league.promote ? 'In the promotion zone' : `${g.league.xp} XP this week`}
+            right={
+              <View className="flex-row items-center gap-2">
+                {g.league.previous_rank !== null && g.league.previous_rank > g.league.rank ? <Icon name="arrow-up" size={18} color={colors.success} /> : null}
+                <TierBadge tier={g.league.tier} size={36} />
+              </View>
+            }
+            onPress={() => router.push('/league')}
+          />
         </Animated.View>
       ) : null}
 
@@ -152,6 +223,7 @@ export default function Complete() {
       <Small className="text-center">XP tracks activity. It is not an exam score.</Small>
     </Screen>
     {perfect || c.study_day_credited ? <Confetti count={perfect ? 90 : 60} /> : null}
+    <ChestModal visible={chestOpen} onClose={() => setChestOpen(false)} onOpened={() => setChestTaken(true)} />
     </View>
   );
 }

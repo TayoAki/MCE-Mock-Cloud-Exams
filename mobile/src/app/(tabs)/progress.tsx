@@ -3,8 +3,9 @@ import { useCallback } from 'react';
 import { Text, View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { DomainBar } from '@/components/DomainBar';
+import { LevelBar } from '@/components/gamify';
 import { Banner, Body, Button, Card, ErrorState, Eyebrow, LoadingState, NavRow, Pill, Screen, Small, Title } from '@/components/ui';
-import { useCurrentEnrollment, useExams, useProgress } from '@/lib/queries';
+import { useAchievements, useCurrentEnrollment, useEngagement, useExams, useProgress } from '@/lib/queries';
 import { useStartSession } from '@/lib/sessions';
 
 /** S11: coverage and first-seen evidence with denominators. No pass probability. */
@@ -12,6 +13,8 @@ export default function ProgressTab() {
   const { enrollment, data: me } = useCurrentEnrollment();
   const progress = useProgress(enrollment?.id);
   const exams = useExams();
+  const engagement = useEngagement();
+  const achievements = useAchievements();
   const { start, pending, error } = useStartSession();
 
   useFocusEffect(
@@ -85,12 +88,20 @@ export default function ProgressTab() {
             </Small>
           </Card>
 
-          <Card className="gap-1">
-            <Text className="text-ink text-[16px] font-bold">Activity</Text>
+          <Card className="gap-3">
+            {engagement.data ? <LevelBar level={engagement.data.level} /> : <Text className="text-ink text-[16px] font-bold">Activity</Text>}
             <Small>
-              {me?.xp_total ?? 0} XP · {me?.streak.current ?? 0}-day streak · longest {me?.streak.longest ?? 0}. XP and streaks measure showing up, not readiness.
+              {me?.xp_total ?? 0} XP · {me?.streak.current ?? 0}-day streak · longest {me?.streak.longest ?? 0}. XP, levels and streaks measure showing up, not readiness.
             </Small>
           </Card>
+          <NavRow
+            icon="ribbon-outline"
+            title="Badges"
+            subtitle={achievements.data ? `${achievements.data.badges.filter((b) => b.earned_at).length} of ${achievements.data.badges.length} earned` : undefined}
+            onPress={() => router.push('/achievements')}
+          />
+          <NavRow icon="flame-outline" title="Streak" subtitle={`${me?.streak.current ?? 0} days · freezes, amulet and wagers`} onPress={() => router.push('/streak')} />
+          <NavRow icon="diamond-outline" title="Shop" subtitle={engagement.data ? `${engagement.data.gems} gems to spend` : undefined} onPress={() => router.push('/shop')} />
 
           <Card tone="mint" className="gap-2">
             <Text className="text-success text-[16px] font-bold">Passing is the goal.</Text>

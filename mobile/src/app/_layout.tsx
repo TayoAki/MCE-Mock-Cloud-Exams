@@ -5,7 +5,9 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { CelebrationPlayer } from '@/components/CelebrationPlayer';
 import { ApiError } from '@/lib/api';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { colors } from '@/lib/theme';
@@ -33,6 +35,7 @@ function Navigator() {
   // (including a deep-linked session) queries the API without it.
   if (status === 'loading') return null;
   return (
+    <View style={{ flex: 1 }}>
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="onboarding" />
@@ -42,6 +45,8 @@ function Navigator() {
       <Stack.Screen name="premium" options={{ presentation: 'modal' }} />
       <Stack.Screen name="account" options={{ presentation: 'modal' }} />
     </Stack>
+    <CelebrationPlayer />
+    </View>
   );
 }
 
