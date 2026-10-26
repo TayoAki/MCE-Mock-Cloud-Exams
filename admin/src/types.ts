@@ -120,7 +120,7 @@ export interface QuestionRow {
   revision: number;
   prompt: string;
   status: PublicationStatus;
-  answer_type: 'single' | 'multiple';
+  answer_type: AnswerType;
   objective_id: string;
   domain_id: string;
   reviewed: boolean;
@@ -137,8 +137,13 @@ export interface QuestionOption {
 export interface QuestionDetail extends Omit<QuestionRow, 'open_issues'> {
   difficulty: number;
   options: QuestionOption[];
+  match_targets: QuestionOption[];
+  presentation: 'text' | 'listen';
+  input_hint: string | null;
+  story_id: string | null;
   source_url: string;
   correct_options: string[];
+  accepted_answers: string[];
   rationale: string;
   reviewed_notes: string;
   reviewed_by: string | null;
@@ -152,11 +157,22 @@ export interface QuestionDetail extends Omit<QuestionRow, 'open_issues'> {
   repaired_enrollments?: number;
 }
 
+export type AnswerType = 'single' | 'multiple' | 'order' | 'match' | 'type';
+
+/**
+ * Order questions list options in their correct order (correct_options in that
+ * order); match questions give aligned options and match_targets with "A=1"
+ * pairs. The server scrambles both keys when it saves.
+ */
 export interface QuestionInput {
   prompt: string;
-  answer_type: 'single' | 'multiple';
+  answer_type: AnswerType;
   options: QuestionOption[];
+  match_targets?: QuestionOption[];
   correct_options: string[];
+  accepted_answers?: string[];
+  presentation?: 'text' | 'listen';
+  input_hint?: string | null;
   rationale: string;
   source_url: string;
   reviewed_notes?: string;
@@ -245,4 +261,16 @@ export interface ReminderTemplateStat {
   sent: number;
   converted: number;
   rate: number | null;
+}
+
+export interface StoryDetail {
+  id: string;
+  exam_version_id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  characters: { name: string; role: string }[];
+  parts: ({ kind: 'line'; speaker: string | null; text: string } | { kind: 'question'; family_key: string })[];
+  status: 'draft' | 'published' | 'retired';
+  updated_at: string;
 }

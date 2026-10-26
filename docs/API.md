@@ -41,6 +41,7 @@ Base path `/v1`. JSON in and out, snake_case fields. The design contract is `doc
 | GET / POST | `/enrollments` | user | POST `{exam_version_id, exam_date?, client_request_id}`; planned exams get a 409 `exam_not_available` |
 | PATCH | `/enrollments/:id` | owner | `{exam_date?, status?: active\|paused}`. Pausing cancels queued reminders |
 | GET | `/enrollments/:id/path` | owner | Ordered lessons with `locked/available/in_progress/completed`, units, `current_lesson_id` and `active_session_id` |
+| GET | `/enrollments/:id/stories` | owner | Published stories with `question_count`, `completed` and `active_session_id` |
 | GET | `/enrollments/:id/practice` | owner | Due review count, missed count, mock inventory (`full_form_available`, sample size), features, active sessions |
 | GET | `/enrollments/:id/reviews` | owner | Due and upcoming concepts with stage and due time |
 | GET | `/enrollments/:id/progress` | owner | Coverage, first-seen and repeat accuracy with denominators, per-domain evidence (`enough_practice` once 5 new questions), focus recommendation, mock history. No pass probability |
@@ -49,10 +50,10 @@ Base path `/v1`. JSON in and out, snake_case fields. The design contract is `doc
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/sessions` | `{enrollment_id, client_session_id, mode, lesson_id?, domain_ids?, question_count?}`. Modes: `lesson`, `checkpoint`, `quick`, `missed`, `weakest`, `review` (free); `timed`, `custom`, full `mock` (Plus). A sample mock (≤10, one a day on the free plan) is blueprint-balanced and labelled. A full mock with thin inventory gets a 409 `insufficient_inventory` with the per-domain shortfall. Reopening an unfinished lesson returns the same session |
+| POST | `/sessions` | `{enrollment_id, client_session_id, mode, lesson_id?, story_id?, domain_ids?, question_count?}`. Modes: `lesson`, `checkpoint`, `quick`, `missed`, `weakest`, `review`, `story` (free); `timed`, `custom`, full `mock` (Plus). Mocks and timed quizzes use only `single` and `multiple` questions, like the real exam. Story questions are served only by their story. Reopening an unfinished story returns the same session. A sample mock (≤10, one a day on the free plan) is blueprint-balanced and labelled. A full mock with thin inventory gets a 409 `insufficient_inventory` with the per-domain shortfall. Reopening an unfinished lesson returns the same session |
 | GET | `/sessions` | Active sessions to resume |
-| GET | `/sessions/:id` | Prompts (no keys), submissions, feedback for answered learning items, `deadline_at` and `server_time`. An overdue session is finalized as `expired` first |
-| POST | `/sessions/:id/answers` | `{session_item_id, client_submission_id, selected_options, confidence?, reasoning_text?}` → `{attempt_id, accepted, feedback, xp_granted}`. Mock feedback is `null` until finalized |
+| GET | `/sessions/:id` | Prompts (no keys), submissions, feedback for answered learning items, `deadline_at` and `server_time`. Items carry `answer_type`, `options`, `match_targets`, `presentation` (`text` or `listen`) and `input_hint`. Story sessions add `story {title, characters, parts}`, where parts are lines (`speaker`, `text`) and questions (`session_item_id`). An overdue session is finalized as `expired` first |
+| POST | `/sessions/:id/answers` | `{session_item_id, client_submission_id, selected_options, typed_answer?, input_mode?, confidence?, reasoning_text?}` → `{attempt_id, accepted, feedback, xp_granted}`. `selected_options` holds choices for `single`/`multiple`, every option key in sequence for `order`, `"A=2"` pairs covering every item for `match`, and is empty for `type`, which sends `typed_answer` (graded ignoring case, spacing and punctuation, with one typo allowed from five letters and two from twelve). `input_mode` is `tap`, `keyboard` or `voice`. Feedback adds `expected_answer` for typed questions; for order questions `correct_options` is the correct sequence. Mock feedback is `null` until finalized |
 | POST | `/sessions/:id/complete` | Finalizes once and returns the same summary on every retry: correct/total, answered, XP, study-day credit, streak, domain breakdown, `practice_score_note` |
 | POST | `/sessions/:id/abandon` | Non-mock sessions only; earns nothing |
 | GET | `/sessions/:id/results` | The stored completion summary |
@@ -112,7 +113,9 @@ Streak rules: a freeze, the weekend amulet or a repair protects a missed date, w
 | POST | `/admin/exam-versions/:id/units`, `/admin/exam-versions/:id/lessons` | Create or update (pass `id`) |
 | POST | `/admin/lessons/:id/status` | `draft`, `published` or `retired` |
 | GET | `/admin/exam-versions/:id/families` | Families with their latest revision, for lesson pools |
-| GET / POST | `/admin/questions` | List (filters `exam_version_id`, `status`, `objective_id`, `needs_review`, `q`) or create a family with draft revision 1 |
+| GET / POST | `/admin/questions` | List (filters `exam_version_id`, `status`, `objective_id`, `needs_review`, `q`) or create a family with draft revision 1. `answer_type` is `single`, `multiple`, `order` (options in their correct order, `correct_options` in that order), `match` (aligned `options` and `match_targets`, `correct_options` as `"A=1"` pairs) or `type` (`accepted_answers`, optional `input_hint`). Order and match keys are scrambled on save so they never reveal the answer. `presentation: listen` reads the prompt aloud |
+| GET / POST | `/admin/stories` | List a version's stories, or create one: `{exam_version_id, slug, title, summary?, characters [{name, role}], parts [{kind: line, speaker?, text} \| {kind: question, family_key}], status}`. Saving tags the questions with the story so regular practice skips them; publishing needs every question published |
+| GET / PUT | `/admin/stories/:id` | Read or replace a story |
 | GET / PUT | `/admin/questions/:id` | Detail with key, rationale, revisions, audit, issues and attempt stats. PUT edits a draft and clears its review |
 | POST | `/admin/questions/:id/review` | Approve a draft (`SEPARATE_REVIEWER=true` requires a different person) |
 | POST | `/admin/questions/:id/publish` | Re-validates and publishes; retires the family's previous published revision |

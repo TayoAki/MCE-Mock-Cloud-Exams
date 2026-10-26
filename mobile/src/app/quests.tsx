@@ -22,7 +22,7 @@ export default function Quests() {
       <View className="gap-1">
         <Eyebrow>Daily quests · resets in {timeLeft(nextMidnight())}</Eyebrow>
         <Title>{done === 3 ? 'All done today!' : `${done} of 3 quests done`}</Title>
-        <Body muted>Finish all three to open today’s chest.</Body>
+        <Body muted>{q?.chest.opened ? 'Chest opened. New quests arrive tomorrow.' : done === 3 ? 'Your chest is ready to open.' : 'Finish all three to open today’s chest.'}</Body>
       </View>
       {quests.isLoading ? <LoadingState /> : null}
       {quests.error ? <ErrorState error={quests.error} onRetry={() => quests.refetch()} /> : null}

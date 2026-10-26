@@ -28,7 +28,7 @@ export interface EngagementSummary {
  */
 export async function afterCompletion(c: {
   userId: string;
-  session: { _id: string; mode: string; lessonId?: string | null; enrollmentId: string; startedAt: Date };
+  session: { _id: string; mode: string; lessonId?: string | null; enrollmentId: string; startedAt: Date; selectionConfig?: unknown };
   status: 'completed' | 'expired';
   correct: number;
   total: number;
@@ -42,6 +42,11 @@ export async function afterCompletion(c: {
   const lessonDone = c.status === 'completed' && !!session.lessonId && (session.mode === 'lesson' || session.mode === 'checkpoint');
   const lessonKey = `enrollment:${session.enrollmentId}:lesson:${session.lessonId}`;
   if (lessonDone) await earnGems(userId, GEMS.lessonComplete, 'lesson_complete', `${lessonKey}:gems`);
+  // A story's gems come once per story, the first time it is finished.
+  const storyId = (session.selectionConfig as { story_id?: string } | undefined)?.story_id;
+  if (c.status === 'completed' && session.mode === 'story' && storyId) {
+    await earnGems(userId, GEMS.storyComplete, 'story_complete', `enrollment:${session.enrollmentId}:story:${storyId}:gems`);
+  }
   if (lessonDone && c.total >= 5 && c.correct === c.total) {
     await grantReward(userId, session._id, {
       amount: PERFECT_BONUS_XP,

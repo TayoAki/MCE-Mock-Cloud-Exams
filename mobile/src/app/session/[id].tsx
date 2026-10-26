@@ -6,6 +6,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bump, SPRING, pop, popIn, riseIn, useShake } from '@/components/motion';
+import { ListenPrompt, MatchAnswer, OrderAnswer, TypeAnswer, answerBody, answerReady, formatHint } from '@/components/questions';
 import { Banner, Button, ErrorState, Icon, LoadingState, ProgressBar, Screen, Small } from '@/components/ui';
 import { trackEvent } from '@/lib/analytics';
 import { ApiError, post } from '@/lib/api';
@@ -175,6 +176,8 @@ export default function SessionScreen() {
   const sealed = s?.feedback_timing === 'after_submit';
 
   const [selected, setSelected] = useState<string[]>([]);
+  const [typed, setTyped] = useState('');
+  const [inputMode, setInputMode] = useState<'tap' | 'keyboard' | 'voice'>('tap');
   const [showingId, setShowingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [pending, setPending] = useState<PendingAnswer | null>(null);
@@ -198,6 +201,11 @@ export default function SessionScreen() {
 
   // A finished session belongs on its summary screen.
   useEffect(() => {
+    // Stories have their own screen.
+    if (s?.mode === 'story') {
+      router.replace(`/story/${s.id}`);
+      return;
+    }
     if (!s || s.status === 'active') return;
     if (s.status === 'abandoned') router.dismissTo('/learn');
     else if (s.mode === 'mock') router.replace(`/results/${s.id}`);
@@ -213,6 +221,7 @@ export default function SessionScreen() {
       if (!item || item.submission) clearPending(s.id);
       else {
         setSelected(p.body.selected_options);
+        setTyped(p.body.typed_answer ?? '');
         // Resend the identical payload; the server decides whether it already committed.
         submit(p);
       }
@@ -224,7 +233,11 @@ export default function SessionScreen() {
   if (current?.session_item_id !== shownItemId) {
     setShownItemId(current?.session_item_id);
     setExplanation(null);
-    if (!pending) setSelected([]);
+    if (!pending) {
+      setSelected([]);
+      setTyped('');
+      setInputMode('tap');
+    }
   }
 
   // When the server deadline passes, the server finalizes the form; fetch and move on.
@@ -240,7 +253,16 @@ export default function SessionScreen() {
             answered_count: old.answered_count + 1,
             items: old.items.map((i) =>
               i.session_item_id === item.session_item_id
-                ? { ...i, submission: { attempt_id: receipt.attempt_id, selected_options: body.selected_options, submitted_at: new Date().toISOString(), feedback: receipt.feedback } }
+                ? {
+                    ...i,
+                    submission: {
+                      attempt_id: receipt.attempt_id,
+                      selected_options: body.selected_options,
+                      typed_answer: body.typed_answer ?? null,
+                      submitted_at: new Date().toISOString(),
+                      feedback: receipt.feedback,
+                    },
+                  }
                 : i,
             ),
           }
@@ -267,6 +289,7 @@ export default function SessionScreen() {
         else if (receipt.feedback) play.wrong();
       } else {
         setSelected([]);
+        setTyped('');
       }
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(0, 'error', 'Something went wrong');
@@ -288,7 +311,8 @@ export default function SessionScreen() {
   function check() {
     if (!current) return;
     if (pending?.body.session_item_id === current.session_item_id) return submit(pending);
-    submit({ sessionId: id, body: { session_item_id: current.session_item_id, client_submission_id: newId(), selected_options: [...selected].sort() } });
+    if (!answerReady(current, { selected, typed, inputMode })) return;
+    submit({ sessionId: id, body: { session_item_id: current.session_item_id, client_submission_id: newId(), ...answerBody(current, { selected, typed, inputMode }) } });
   }
 
   async function finish() {
@@ -377,13 +401,35 @@ export default function SessionScreen() {
           <>
             <View className="gap-2">
               <Text className="text-primary text-xs font-bold uppercase tracking-wider">{topic}</Text>
-              <Text accessibilityRole="header" className="text-ink text-[22px] leading-[29px] font-extrabold">
-                {current.prompt}
-              </Text>
+              {current.presentation === 'listen' ? (
+                <ListenPrompt key={current.session_item_id} text={current.prompt} revealed={!!feedback} />
+              ) : (
+                <Text accessibilityRole="header" className="text-ink text-[22px] leading-[29px] font-extrabold">
+                  {current.prompt}
+                </Text>
+              )}
               {multiple && !feedback ? <Small>Select all that apply.</Small> : null}
               {current.repeat && !sealed ? <Small>You’ve seen this idea before. Repeats count separately from new questions.</Small> : null}
             </View>
-            {/* Keyed by question so each one's options stagger in fresh. */}
+            {current.answer_type === 'order' ? (
+              <OrderAnswer key={current.session_item_id} item={current} value={selected} onChange={setSelected} disabled={!!current.submission || submitting || !!pending} feedback={feedback} />
+            ) : current.answer_type === 'match' ? (
+              <MatchAnswer key={current.session_item_id} item={current} value={selected} onChange={setSelected} disabled={!!current.submission || submitting || !!pending} feedback={feedback} />
+            ) : current.answer_type === 'type' ? (
+              <TypeAnswer
+                key={current.session_item_id}
+                item={current}
+                value={typed}
+                onChange={(text, mode) => {
+                  setTyped(text);
+                  setInputMode(mode);
+                }}
+                disabled={!!current.submission || submitting || !!pending}
+                feedback={feedback}
+                onSubmit={check}
+              />
+            ) : (
+            /* Keyed by question so each one's options stagger in fresh. */
             <View key={current.session_item_id} className="gap-2.5">
               {current.options.map((o, i) => (
                 <Animated.View key={o.key} entering={FadeInDown.delay(60 + i * 55).duration(280)}>
@@ -401,6 +447,7 @@ export default function SessionScreen() {
                 </Animated.View>
               ))}
             </View>
+            )}
 
             {feedback ? (
               <Animated.View entering={riseIn()}>
@@ -418,7 +465,7 @@ export default function SessionScreen() {
                     </Animated.View>
                   ) : null}
                 </View>
-                {!feedback.correct ? (
+                {!feedback.correct && (current.answer_type === 'single' || current.answer_type === 'multiple') ? (
                   <Text className="text-ink text-[14px] font-semibold">Correct answer: {feedback.correct_options.join(', ')}</Text>
                 ) : null}
                 <Text className="text-ink text-[15px] leading-[22px]">{feedback.rationale}</Text>
@@ -449,7 +496,7 @@ export default function SessionScreen() {
               </View>
             ) : null}
 
-            {!sealed && !feedback ? <Small>Original practice item. Select {multiple ? 'every answer that applies' : 'one answer'}.</Small> : null}
+            {!sealed && !feedback ? <Small>Original practice item. {formatHint(current)}</Small> : null}
             {sealed ? <Small>Answers are saved as you go. Feedback appears after you submit the mock.</Small> : null}
           </>
         ) : allAnswered && sealed ? (
@@ -485,7 +532,7 @@ export default function SessionScreen() {
           </>
         ) : current ? (
           <>
-            <Button label={sealed ? 'Save answer' : 'Check answer'} disabled={selected.length === 0} loading={submitting} onPress={check} />
+            <Button label={sealed ? 'Save answer' : 'Check answer'} disabled={!answerReady(current, { selected, typed, inputMode })} loading={submitting} onPress={check} />
             {sealed && answered > 0 ? <Button label="Submit mock now" variant="ghost" onPress={() => setConfirmSubmit(true)} /> : null}
           </>
         ) : allAnswered ? (

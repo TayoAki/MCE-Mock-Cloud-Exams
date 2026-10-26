@@ -19,6 +19,7 @@ import { QuestionDetailPage } from './pages/QuestionDetail';
 import { NewQuestionPage } from './pages/QuestionNew';
 import { QuestionsPage } from './pages/Questions';
 import { StaffPage } from './pages/Staff';
+import { StoriesPage } from './pages/Stories';
 import { VersionProvider } from './version';
 import './index.css';
 
@@ -66,6 +67,7 @@ const router = createBrowserRouter([
       { path: 'questions', element: <QuestionsPage /> },
       { path: 'questions/new', element: <NewQuestionPage /> },
       { path: 'questions/:id', element: <QuestionDetailPage /> },
+      { path: 'stories', element: <StoriesPage /> },
       { path: 'issues', element: <IssuesPage /> },
       { path: 'learners', element: <LearnersPage /> },
       { path: 'learners/:id', element: <LearnerDetailPage /> },

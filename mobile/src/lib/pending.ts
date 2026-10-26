@@ -7,7 +7,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  */
 export interface PendingAnswer {
   sessionId: string;
-  body: { session_item_id: string; client_submission_id: string; selected_options: string[] };
+  body: {
+    session_item_id: string;
+    client_submission_id: string;
+    selected_options: string[];
+    typed_answer?: string;
+    input_mode?: 'tap' | 'keyboard' | 'voice';
+  };
 }
 
 const key = (sessionId: string) => `certpath.pending.${sessionId}`;

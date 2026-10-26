@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { currentUser, requireAuth, requireRole } from '../auth/middleware.js';
-import { QuestionFamily, QuestionVersion } from '../models/index.js';
+import { ANSWER_TYPES, QuestionFamily, QuestionVersion } from '../models/index.js';
 import { dateParam, idParam, parseBody, parseQuery, uuidParam } from '../lib/http.js';
 import * as content from '../services/content-admin.js';
 import * as ops from '../services/admin-ops.js';
 import { reminderStats } from '../services/reminders.js';
+import { getStoryAdmin, listStoriesAdmin, saveStory } from '../services/stories.js';
 
 /** Private content-review and operations interface. Staff only. */
 export const adminRouter = Router();
@@ -141,9 +142,13 @@ adminRouter.get('/admin/exam-versions/:id/families', async (req, res) => {
 const optionSchema = z.strictObject({ key: z.string().regex(/^[A-Z]$/), text: z.string().min(1).max(500) });
 const questionFields = {
   prompt: z.string().min(10).max(4000),
-  answer_type: z.enum(['single', 'multiple']),
-  options: z.array(optionSchema).min(2).max(8),
-  correct_options: z.array(z.string().regex(/^[A-Z]$/)).min(1).max(8),
+  answer_type: z.enum(ANSWER_TYPES),
+  options: z.array(optionSchema).max(8),
+  match_targets: z.array(z.strictObject({ key: z.string().regex(/^[1-9]$/), text: z.string().min(1).max(300) })).max(6).optional(),
+  correct_options: z.array(z.string().regex(/^[A-Z](=[1-9])?$/)).max(8),
+  accepted_answers: z.array(z.string().min(1).max(100)).max(10).optional(),
+  presentation: z.enum(['text', 'listen']).optional(),
+  input_hint: z.string().max(80).nullable().optional(),
   rationale: z.string().min(1).max(4000),
   source_url: z.url(),
   reviewed_notes: z.string().max(2000).optional(),
@@ -175,6 +180,43 @@ adminRouter.post('/admin/questions', async (req, res) => {
     }),
   );
   res.status(201).json(await content.createQuestion(currentUser(req), body));
+});
+
+// ---------- Stories ----------
+
+const storyBody = z.strictObject({
+  exam_version_id: uuidParam,
+  slug: z.string().regex(/^[a-z0-9-]{3,60}$/),
+  title: z.string().min(3).max(80),
+  summary: z.string().max(200).optional(),
+  characters: z.array(z.strictObject({ name: z.string().min(1).max(30), role: z.string().max(40) })).min(1).max(4),
+  parts: z
+    .array(
+      z.discriminatedUnion('kind', [
+        z.strictObject({ kind: z.literal('line'), speaker: z.string().max(30).nullable().optional(), text: z.string().min(1).max(600) }),
+        z.strictObject({ kind: z.literal('question'), family_key: z.string().min(1).max(120) }),
+      ]),
+    )
+    .min(2)
+    .max(40),
+  status: z.enum(['draft', 'published', 'retired']),
+});
+
+adminRouter.get('/admin/stories', async (req, res) => {
+  const query = parseQuery(req, z.object({ exam_version_id: uuidParam }));
+  res.json({ stories: await listStoriesAdmin(query.exam_version_id) });
+});
+
+adminRouter.get('/admin/stories/:id', async (req, res) => {
+  res.json(await getStoryAdmin(idParam(req)));
+});
+
+adminRouter.post('/admin/stories', async (req, res) => {
+  res.status(201).json(await saveStory(currentUser(req), parseBody(req, storyBody)));
+});
+
+adminRouter.put('/admin/stories/:id', async (req, res) => {
+  res.json(await saveStory(currentUser(req), parseBody(req, storyBody), idParam(req)));
 });
 
 adminRouter.get('/admin/questions/:id', async (req, res) => {

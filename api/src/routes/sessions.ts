@@ -27,6 +27,7 @@ sessionsRouter.post('/sessions', writeLimiter, async (req, res) => {
       client_session_id: uuidParam,
       mode: z.enum(SESSION_MODES),
       lesson_id: uuidParam.optional(),
+      story_id: uuidParam.optional(),
       domain_ids: z.array(uuidParam).max(20).optional(),
       question_count: z.int().min(1).max(200).optional(),
     }),
@@ -49,7 +50,10 @@ sessionsRouter.post('/sessions/:id/answers', answerLimiter, async (req, res) => 
     z.strictObject({
       session_item_id: uuidParam,
       client_submission_id: uuidParam,
-      selected_options: z.array(z.string().regex(/^[A-Z]$/)).min(1).max(26),
+      // Choice keys ("A"), or "A=2" pairs for match questions; empty for typed answers.
+      selected_options: z.array(z.string().regex(/^[A-Z](=[1-9])?$/)).max(26),
+      typed_answer: z.string().max(200).optional(),
+      input_mode: z.enum(['tap', 'keyboard', 'voice']).optional(),
       confidence: z.enum(['unsure', 'somewhat', 'confident']).optional(),
       reasoning_text: z.string().max(2000).optional(),
     }),

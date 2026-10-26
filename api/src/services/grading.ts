@@ -12,6 +12,8 @@ import {
   User,
 } from '../models/index.js';
 import { track } from '../lib/analytics.js';
+import { canonicalAnswer, gradeAnswer, sameAnswer } from '../lib/answers.js';
+import type { AnswerType } from '../models/bank.js';
 import { HttpError, badRequest, conflict, isDuplicateKey, notFound } from '../lib/errors.js';
 import { uuid } from '../lib/ids.js';
 import { BOOST, XP, nextReview } from '../lib/rules.js';
@@ -22,15 +24,24 @@ export const DELAYED_FEEDBACK_MODES = new Set(['mock']);
 
 export interface Feedback {
   correct: boolean;
+  /** Choices, the correct sequence for order questions, or "A=2" pairs for match. */
   correct_options: string[];
+  /** The model answer for typed questions. */
+  expected_answer: string | null;
   rationale: string;
   sources: string[];
 }
 
-export function buildFeedback(isCorrect: boolean, key: { correctOptions: string[]; rationale: string }, sourceUrl: string): Feedback {
+export function buildFeedback(
+  isCorrect: boolean,
+  key: { correctOptions: string[]; acceptedAnswers?: string[] | null; rationale: string },
+  sourceUrl: string,
+  answerType: AnswerType = 'single',
+): Feedback {
   return {
     correct: isCorrect,
-    correct_options: [...key.correctOptions].sort(),
+    correct_options: answerType === 'order' ? [...key.correctOptions] : [...key.correctOptions].sort(),
+    expected_answer: answerType === 'type' ? (key.acceptedAnswers?.[0] ?? null) : null,
     rationale: key.rationale,
     sources: [sourceUrl],
   };
@@ -181,6 +192,8 @@ export interface SubmitInput {
   session_item_id: string;
   client_submission_id: string;
   selected_options: string[];
+  typed_answer?: string;
+  input_mode?: 'tap' | 'keyboard' | 'voice';
   confidence?: 'unsure' | 'somewhat' | 'confident';
   reasoning_text?: string;
 }
@@ -201,15 +214,23 @@ async function receiptFor(attempt: { _id: string; questionVersionId: string; isC
     }
   }
   const [qv, key] = await Promise.all([
-    QuestionVersion.findById(attempt.questionVersionId).select({ sourceUrl: 1 }).lean(),
+    QuestionVersion.findById(attempt.questionVersionId).select({ sourceUrl: 1, answerType: 1 }).lean(),
     QuestionKey.findById(attempt.questionVersionId).lean(),
   ]);
   if (!qv || !key) throw new HttpError(500, 'content_missing', 'Grading data is missing for this question');
-  return { attempt_id: attempt._id, accepted: true, feedback: buildFeedback(attempt.isCorrect!, key, qv.sourceUrl) };
+  return { attempt_id: attempt._id, accepted: true, feedback: buildFeedback(attempt.isCorrect!, key, qv.sourceUrl, qv.answerType as AnswerType) };
 }
 
-function sameSubmission(attempt: { sessionItemId: string; selectedOptions: string[] }, input: SubmitInput) {
-  return attempt.sessionItemId === input.session_item_id && gradeSelection(attempt.selectedOptions, input.selected_options);
+/** Whether a retry carries the same answer as the committed attempt, compared in stored form. */
+async function sameSubmission(attempt: { sessionItemId: string; questionVersionId: string; selectedOptions: string[]; typedAnswer?: string | null }, input: SubmitInput) {
+  if (attempt.sessionItemId !== input.session_item_id) return false;
+  const qv = await QuestionVersion.findById(attempt.questionVersionId).select({ answerType: 1, options: 1, matchTargets: 1 }).lean();
+  if (!qv) return false;
+  try {
+    return sameAnswer(attempt, canonicalAnswer({ answerType: qv.answerType as AnswerType, options: qv.options, matchTargets: qv.matchTargets }, input));
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -219,7 +240,7 @@ function sameSubmission(attempt: { sessionItemId: string; selectedOptions: strin
 export async function submitAnswer(userId: string, sessionId: string, input: SubmitInput): Promise<AnswerReceipt> {
   const prior = await Attempt.findOne({ userId, clientSubmissionId: input.client_submission_id }).lean();
   if (prior) {
-    if (prior.sessionId !== sessionId || !sameSubmission(prior, input)) {
+    if (prior.sessionId !== sessionId || !(await sameSubmission(prior, input))) {
       throw conflict('idempotency_conflict', 'This submission ID was already used for a different answer');
     }
     return receiptFor(prior);
@@ -249,16 +270,14 @@ export async function submitAnswer(userId: string, sessionId: string, input: Sub
       const existing = await Attempt.findOne({ sessionItemId: item._id });
       if (existing) {
         // A concurrent retry of this same submission committed first: return its result.
-        if (existing.clientSubmissionId === input.client_submission_id && sameSubmission(existing, input)) return { replayOf: existing };
+        if (existing.clientSubmissionId === input.client_submission_id && (await sameSubmission(existing, input))) return { replayOf: existing };
         throw conflict('already_answered', 'This question already has a final answer');
       }
 
       const qv = await QuestionVersion.findById(item.questionVersionId).lean();
       if (!qv) throw new HttpError(500, 'content_missing', 'Question content is missing');
-      const validKeys = new Set(qv.options.map((o) => o.key));
-      const selected = [...new Set(input.selected_options)];
-      if (selected.some((k) => !validKeys.has(k))) throw badRequest('invalid_option', 'A selected option is not part of this question');
-      if (qv.answerType === 'single' && selected.length !== 1) throw badRequest('invalid_cardinality', 'Choose exactly one answer');
+      const answerType = qv.answerType as AnswerType;
+      const answer = canonicalAnswer({ answerType, options: qv.options, matchTargets: qv.matchTargets }, input);
 
       const [attempt] = await Attempt.create([
         {
@@ -273,7 +292,9 @@ export async function submitAnswer(userId: string, sessionId: string, input: Sub
           domainId: item.domainId,
           mode: locked.mode,
           clientSubmissionId: input.client_submission_id,
-          selectedOptions: selected.sort(),
+          selectedOptions: answer.selected,
+          typedAnswer: answer.typed,
+          inputMode: input.input_mode ?? (answerType === 'type' ? 'keyboard' : 'tap'),
           confidence: input.confidence ?? null,
           reasoningText: input.reasoning_text ?? null,
           submittedAt: now,
@@ -285,7 +306,7 @@ export async function submitAnswer(userId: string, sessionId: string, input: Sub
       }
       const key = await QuestionKey.findById(qv._id).lean();
       if (!key) throw new HttpError(500, 'content_missing', 'Grading data is missing for this question');
-      const isCorrect = gradeSelection(selected, key.correctOptions);
+      const isCorrect = gradeAnswer(answerType, answer, key);
       const user = await User.findById(userId).select({ timezone: 1, pendingTimezone: 1 }).lean();
       const timezone = effectiveTimezone(user!, now);
       const effects = await applyGradedAttempt(attempt!, isCorrect, { timezone, now, sessionMode: locked.mode });
@@ -295,7 +316,7 @@ export async function submitAnswer(userId: string, sessionId: string, input: Sub
     // A concurrent retry with the same submission ID committed first.
     if (isDuplicateKey(err)) {
       const winner = await Attempt.findOne({ userId, clientSubmissionId: input.client_submission_id }).lean();
-      if (winner && winner.sessionId === sessionId && sameSubmission(winner, input)) return receiptFor(winner);
+      if (winner && winner.sessionId === sessionId && (await sameSubmission(winner, input))) return receiptFor(winner);
       throw conflict('already_answered', 'This question already has a final answer');
     }
     throw err;

@@ -19,6 +19,8 @@ import {
 import { config } from '../config.js';
 import { HttpError, badRequest, conflict, notFound } from '../lib/errors.js';
 import { allocateBlueprint } from '../lib/rules.js';
+import { keyMatchPairs, keyOrderSteps } from '../lib/answers.js';
+import type { AnswerType } from '../models/bank.js';
 
 type Actor = Pick<UserRecord, '_id' | 'roles'>;
 
@@ -322,14 +324,55 @@ export async function versionDetail(versionId: string) {
 
 // ---------- Questions ----------
 
+/**
+ * Authoring input. Order questions list options in their correct order with
+ * correct_options in that same order; match questions give aligned options and
+ * match_targets with "A=1" pairs. The server re-keys both so stored keys never
+ * reveal the answer.
+ */
 interface QuestionInput {
   prompt: string;
-  answer_type: 'single' | 'multiple';
+  answer_type: AnswerType;
   options: { key: string; text: string }[];
+  match_targets?: { key: string; text: string }[];
   correct_options: string[];
+  accepted_answers?: string[];
+  presentation?: 'text' | 'listen';
+  input_hint?: string | null;
   rationale: string;
   source_url: string;
   reviewed_notes?: string;
+}
+
+/** The stored form of a validated input: re-keyed order steps and match targets, trimmed typed answers. */
+function prepareQuestion(input: QuestionInput) {
+  const base = { presentation: input.presentation ?? 'text', inputHint: input.input_hint?.trim() || null };
+  if (input.answer_type === 'order') {
+    const byKey = new Map(input.options.map((o) => [o.key, o.text.trim()]));
+    const keyed = keyOrderSteps(input.correct_options.map((k) => byKey.get(k)!));
+    return { ...base, options: keyed.options, matchTargets: [], correctOptions: keyed.correct, acceptedAnswers: [] };
+  }
+  if (input.answer_type === 'match') {
+    const left = new Map(input.options.map((o) => [o.key, o.text.trim()]));
+    const right = new Map((input.match_targets ?? []).map((t) => [t.key, t.text.trim()]));
+    const pairs = [...input.correct_options].sort().map((p) => {
+      const [l, r] = p.split('=');
+      return { left: left.get(l!)!, right: right.get(r!)! };
+    });
+    const keyed = keyMatchPairs(pairs);
+    return { ...base, options: keyed.options, matchTargets: keyed.targets, correctOptions: keyed.correct, acceptedAnswers: [] };
+  }
+  if (input.answer_type === 'type') {
+    const accepted = [...new Set((input.accepted_answers ?? []).map((a) => a.trim()).filter(Boolean))];
+    return { ...base, options: [], matchTargets: [], correctOptions: [], acceptedAnswers: accepted };
+  }
+  return {
+    ...base,
+    options: input.options.map((o) => ({ key: o.key, text: o.text })),
+    matchTargets: [],
+    correctOptions: [...new Set(input.correct_options)].sort(),
+    acceptedAnswers: [],
+  };
 }
 
 function toQuestionRow(q: { _id: string; familyId: string; examVersionId: string; revision: number; prompt: string; status: string; objectiveId: string; domainId: string; reviewedBy?: string | null; createdAt: Date; answerType: string }) {
@@ -389,8 +432,13 @@ export async function questionDetail(questionVersionId: string) {
     family_key: family?.familyKey ?? '',
     difficulty: family?.difficulty ?? 1,
     options: q.options.map((o) => ({ key: o.key, text: o.text })),
+    match_targets: (q.matchTargets ?? []).map((t) => ({ key: t.key, text: t.text })),
+    presentation: q.presentation ?? 'text',
+    input_hint: q.inputHint ?? null,
+    story_id: q.storyId ?? null,
     source_url: q.sourceUrl,
     correct_options: key?.correctOptions ?? [],
+    accepted_answers: key?.acceptedAnswers ?? [],
     rationale: key?.rationale ?? '',
     reviewed_notes: key?.reviewedNotes ?? '',
     reviewed_by: q.reviewedBy ?? null,
@@ -408,13 +456,46 @@ export async function questionDetail(questionVersionId: string) {
 function validateQuestion(input: QuestionInput) {
   const problems: string[] = [];
   const keys = input.options.map((o) => o.key);
-  if (input.options.length < 2) problems.push('At least two options are required');
-  if (new Set(keys).size !== keys.length) problems.push('Option keys must be unique');
-  if (input.options.some((o) => !o.text.trim())) problems.push('Every option needs text');
+  const type = input.answer_type;
+  if (type === 'type') {
+    const accepted = (input.accepted_answers ?? []).map((a) => a.trim()).filter(Boolean);
+    if (input.options.length) problems.push('A typed-answer question has no options');
+    if (!accepted.length) problems.push('Add at least one accepted answer');
+    if (accepted.some((a) => a.length > 100)) problems.push('Accepted answers must be short (100 characters at most)');
+  } else {
+    if (input.options.length < 2) problems.push('At least two options are required');
+    if (new Set(keys).size !== keys.length) problems.push('Option keys must be unique');
+    if (input.options.some((o) => !o.text.trim())) problems.push('Every option needs text');
+  }
   const correct = new Set(input.correct_options);
-  if ([...correct].some((k) => !keys.includes(k))) problems.push('Correct options must be among the options');
-  if (input.answer_type === 'single' && correct.size !== 1) problems.push('A single-answer question needs exactly one correct option');
-  if (input.answer_type === 'multiple' && correct.size < 1) problems.push('A multiple-answer question needs at least one correct option');
+  if (type === 'single' || type === 'multiple') {
+    if ([...correct].some((k) => !keys.includes(k))) problems.push('Correct options must be among the options');
+    if (type === 'single' && correct.size !== 1) problems.push('A single-answer question needs exactly one correct option');
+    if (type === 'multiple' && correct.size < 1) problems.push('A multiple-answer question needs at least one correct option');
+  }
+  if (type === 'order') {
+    if (input.options.length < 3 || input.options.length > 8) problems.push('An order question needs 3 to 8 steps');
+    if (input.correct_options.length !== keys.length || correct.size !== keys.length || [...correct].some((k) => !keys.includes(k))) {
+      problems.push('The correct order must list every step exactly once');
+    }
+  }
+  if (type === 'match') {
+    const targets = (input.match_targets ?? []).map((t) => t.key);
+    if (input.options.length > 6) problems.push('A match question has at most 6 pairs');
+    if (targets.length !== keys.length) problems.push('Each item needs exactly one match');
+    if ((input.match_targets ?? []).some((t) => !t.text.trim())) problems.push('Every match needs text');
+    const lefts = input.correct_options.map((p) => p.split('=')[0]);
+    const rights = input.correct_options.map((p) => p.split('=')[1]);
+    if (
+      input.correct_options.length !== keys.length ||
+      new Set(lefts).size !== keys.length ||
+      new Set(rights).size !== keys.length ||
+      lefts.some((l) => !keys.includes(l!)) ||
+      rights.some((r) => !targets.includes(r!))
+    ) {
+      problems.push('Pair every item with a different match');
+    }
+  }
   if (!input.rationale.trim()) problems.push('A reviewed rationale is required');
   if (!/^https?:\/\/\S+$/.test(input.source_url)) problems.push('A source URL is required');
   if (input.prompt.trim().length < 10) problems.push('The prompt is too short');
@@ -431,6 +512,7 @@ export async function createQuestion(
   input: QuestionInput & { exam_version_id: string; objective_id: string; family_key: string; difficulty?: number },
 ) {
   requireValid(input);
+  const prepared = prepareQuestion(input);
   const objective = await Objective.findOne({ _id: input.objective_id, examVersionId: input.exam_version_id }).lean();
   if (!objective) throw badRequest('invalid_objective', 'Objective is not in this exam version');
   const id = await tx(async () => {
@@ -446,12 +528,17 @@ export async function createQuestion(
         revision: 1,
         prompt: input.prompt.trim(),
         answerType: input.answer_type,
-        options: input.options,
+        options: prepared.options,
+        matchTargets: prepared.matchTargets,
+        presentation: prepared.presentation,
+        inputHint: prepared.inputHint,
         sourceUrl: input.source_url,
         createdBy: actor._id,
       },
     ]);
-    await QuestionKey.create([{ _id: qv!._id, correctOptions: [...new Set(input.correct_options)].sort(), rationale: input.rationale.trim(), reviewedNotes: input.reviewed_notes ?? '' }]);
+    await QuestionKey.create([
+      { _id: qv!._id, correctOptions: prepared.correctOptions, acceptedAnswers: prepared.acceptedAnswers, rationale: input.rationale.trim(), reviewedNotes: input.reviewed_notes ?? '' },
+    ]);
     await audit(actor, 'question_version', qv!._id, 'created');
     return qv!._id;
   });
@@ -461,20 +548,32 @@ export async function createQuestion(
 /** Drafts are editable; any edit clears a prior review so it must be reviewed again. */
 export async function updateDraft(actor: Actor, questionVersionId: string, input: QuestionInput) {
   requireValid(input);
+  const prepared = prepareQuestion(input);
   await tx(async () => {
     const q = await QuestionVersion.findById(questionVersionId);
     if (!q) throw notFound('Question');
     if (q.status !== 'draft') throw conflict('question_immutable', 'Published and retired revisions are immutable; create a new revision');
     q.prompt = input.prompt.trim();
     q.answerType = input.answer_type;
-    q.set('options', input.options);
+    q.set('options', prepared.options);
+    q.set('matchTargets', prepared.matchTargets);
+    q.presentation = prepared.presentation;
+    q.inputHint = prepared.inputHint;
     q.sourceUrl = input.source_url;
     q.reviewedBy = null;
     q.reviewedAt = null;
     await q.save();
     await QuestionKey.updateOne(
       { _id: q._id },
-      { $set: { correctOptions: [...new Set(input.correct_options)].sort(), rationale: input.rationale.trim(), reviewedNotes: input.reviewed_notes ?? '', updatedAt: new Date() } },
+      {
+        $set: {
+          correctOptions: prepared.correctOptions,
+          acceptedAnswers: prepared.acceptedAnswers,
+          rationale: input.rationale.trim(),
+          reviewedNotes: input.reviewed_notes ?? '',
+          updatedAt: new Date(),
+        },
+      },
       { upsert: true },
     );
     await audit(actor, 'question_version', q._id, 'edited');
@@ -510,9 +609,11 @@ export async function publishQuestion(actor: Actor, questionVersionId: string) {
     if (!key) throw conflict('key_missing', 'The answer key is missing');
     const problems = validateQuestion({
       prompt: q.prompt,
-      answer_type: q.answerType,
+      answer_type: q.answerType as AnswerType,
       options: q.options.map((o) => ({ key: o.key, text: o.text })),
+      match_targets: (q.matchTargets ?? []).map((t) => ({ key: t.key, text: t.text })),
       correct_options: key.correctOptions,
+      accepted_answers: key.acceptedAnswers ?? [],
       rationale: key.rationale,
       source_url: q.sourceUrl,
     });
@@ -538,6 +639,7 @@ export async function publishQuestion(actor: Actor, questionVersionId: string) {
 /** A new draft revision copied from any revision in the family, with edits applied. */
 export async function createRevision(actor: Actor, questionVersionId: string, input: QuestionInput) {
   requireValid(input);
+  const prepared = prepareQuestion(input);
   const id = await tx(async () => {
     const base = await QuestionVersion.findById(questionVersionId).lean();
     if (!base) throw notFound('Question');
@@ -552,12 +654,18 @@ export async function createRevision(actor: Actor, questionVersionId: string, in
         revision: (latest?.revision ?? base.revision) + 1,
         prompt: input.prompt.trim(),
         answerType: input.answer_type,
-        options: input.options,
+        options: prepared.options,
+        matchTargets: prepared.matchTargets,
+        presentation: prepared.presentation,
+        inputHint: prepared.inputHint,
+        storyId: base.storyId ?? null,
         sourceUrl: input.source_url,
         createdBy: actor._id,
       },
     ]);
-    await QuestionKey.create([{ _id: qv!._id, correctOptions: [...new Set(input.correct_options)].sort(), rationale: input.rationale.trim(), reviewedNotes: input.reviewed_notes ?? '' }]);
+    await QuestionKey.create([
+      { _id: qv!._id, correctOptions: prepared.correctOptions, acceptedAnswers: prepared.acceptedAnswers, rationale: input.rationale.trim(), reviewedNotes: input.reviewed_notes ?? '' },
+    ]);
     await audit(actor, 'question_version', qv!._id, 'created', `Revision of ${base._id}`);
     return qv!._id;
   });

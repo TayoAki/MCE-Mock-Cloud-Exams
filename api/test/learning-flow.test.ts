@@ -38,7 +38,22 @@ describe('the daily lesson loop', () => {
     // Prompts never carry keys or rationale.
     for (const item of session.items) {
       expect(Object.keys(item).sort()).toEqual(
-        ['answer_type', 'domain_title', 'objective_title', 'options', 'position', 'prompt', 'question_version_id', 'repeat', 'session_item_id', 'submission'].sort(),
+        [
+          'answer_type',
+          'domain_title',
+          'family_id',
+          'input_hint',
+          'match_targets',
+          'objective_title',
+          'options',
+          'position',
+          'presentation',
+          'prompt',
+          'question_version_id',
+          'repeat',
+          'session_item_id',
+          'submission',
+        ].sort(),
       );
     }
     const receipts = await answerAll(token, session);

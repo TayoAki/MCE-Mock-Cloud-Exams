@@ -8,7 +8,9 @@ import {
   Objective,
   PracticeSession,
   QuestionKey,
+  Story,
   Unit,
+  type AnswerType,
   type SessionMode,
 } from '../models/index.js';
 import { track } from '../lib/analytics.js';
@@ -26,9 +28,12 @@ export interface StartInput {
   client_session_id: string;
   mode: SessionMode;
   lesson_id?: string;
+  story_id?: string;
   domain_ids?: string[];
   question_count?: number;
 }
+
+type StoryPartView = { kind: 'line'; speaker: string | null; text: string } | { kind: 'question'; session_item_id: string };
 
 type SessionLean = Omit<NonNullable<Awaited<ReturnType<typeof loadSession>>>, '__v'>;
 
@@ -73,6 +78,10 @@ export async function startSession(user: UserRecord, input: StartInput) {
     }).lean();
     if (active) return sessionView(await getOwnedSession(user._id, active._id));
   }
+  if (input.story_id) {
+    const active = await PracticeSession.findOne({ userId: user._id, enrollmentId: enrollment._id, mode: 'story', 'selectionConfig.story_id': input.story_id, status: 'active' }).lean();
+    if (active) return sessionView(await getOwnedSession(user._id, active._id));
+  }
 
   const now = new Date();
   const features = await featureSet(user._id, now);
@@ -84,7 +93,7 @@ export async function startSession(user: UserRecord, input: StartInput) {
       features,
       now,
     },
-    { mode: input.mode, lessonId: input.lesson_id, domainIds: input.domain_ids, questionCount: input.question_count },
+    { mode: input.mode, lessonId: input.lesson_id, storyId: input.story_id, domainIds: input.domain_ids, questionCount: input.question_count },
   );
 
   let created;
@@ -161,14 +170,18 @@ export async function sessionView(session: SessionLean) {
     if (!q) throw new HttpError(500, 'content_missing', 'Assigned question content is missing');
     const attempt = byItem.get(item._id);
     const key = attempt ? keys.get(attempt.questionVersionId) : undefined;
-    const feedback: Feedback | null = attempt && attempt.isCorrect != null && key ? buildFeedback(attempt.isCorrect, key, q.sourceUrl) : null;
+    const feedback: Feedback | null = attempt && attempt.isCorrect != null && key ? buildFeedback(attempt.isCorrect, key, q.sourceUrl, q.answerType as AnswerType) : null;
     return {
       session_item_id: item._id,
       question_version_id: q._id,
+      family_id: item.familyId,
       position: item.position,
       prompt: q.prompt,
       answer_type: q.answerType,
       options: q.options.map((o) => ({ key: o.key, text: o.text })),
+      match_targets: (q.matchTargets ?? []).map((t) => ({ key: t.key, text: t.text })),
+      presentation: q.presentation ?? 'text',
+      input_hint: q.inputHint ?? null,
       objective_title: objectiveTitles.get(item.objectiveId) ?? '',
       domain_title: domainTitles.get(item.domainId) ?? '',
       repeat: item.repeat,
@@ -176,6 +189,7 @@ export async function sessionView(session: SessionLean) {
         ? {
             attempt_id: attempt._id,
             selected_options: attempt.selectedOptions,
+            typed_answer: attempt.typedAnswer ?? null,
             submitted_at: attempt.submittedAt.toISOString(),
             feedback,
           }
@@ -184,6 +198,8 @@ export async function sessionView(session: SessionLean) {
   });
 
   const config = (session.selectionConfig ?? {}) as Record<string, unknown>;
+  const story = session.mode === 'story' && typeof config.story_id === 'string' ? await Story.findById(config.story_id).lean() : null;
+  const itemByFamily = new Map(session.items.map((i) => [i.familyId, i._id]));
   return {
     id: session._id,
     mode: session.mode,
@@ -199,6 +215,21 @@ export async function sessionView(session: SessionLean) {
     feedback_timing: DELAYED_FEEDBACK_MODES.has(session.mode) ? 'after_submit' : 'per_answer',
     items,
     completion: session.completion ?? null,
+    story: story
+      ? {
+          id: story._id,
+          title: story.title,
+          characters: story.characters.map((c) => ({ name: c.name, role: c.role })),
+          // Questions whose family has no published revision are skipped, like any unavailable item.
+          parts: story.parts.flatMap((p): StoryPartView[] =>
+            p.kind === 'line'
+              ? [{ kind: 'line' as const, speaker: p.speaker ?? null, text: p.text ?? '' }]
+              : itemByFamily.has(p.familyId!)
+                ? [{ kind: 'question' as const, session_item_id: itemByFamily.get(p.familyId!)! }]
+                : [],
+          ),
+        }
+      : null,
   };
 }
 
@@ -278,11 +309,14 @@ export async function sessionFeedback(userId: string, sessionId: string) {
         session_item_id: item._id,
         position: item.position,
         prompt: q.prompt,
+        answer_type: q.answerType,
         options: q.options.map((o) => ({ key: o.key, text: o.text })),
+        match_targets: (q.matchTargets ?? []).map((t) => ({ key: t.key, text: t.text })),
         selected_options: attempt?.selectedOptions ?? [],
+        typed_answer: attempt?.typedAnswer ?? null,
         attempt_id: attempt?._id ?? null,
         answered: !!attempt,
-        feedback: buildFeedback(attempt?.isCorrect === true, key, q.sourceUrl),
+        feedback: buildFeedback(attempt?.isCorrect === true, key, q.sourceUrl, q.answerType as AnswerType),
       };
     }),
   };

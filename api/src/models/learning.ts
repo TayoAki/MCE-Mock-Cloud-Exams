@@ -11,6 +11,7 @@ export const SESSION_MODES = [
   'mock',
   'review',
   'checkpoint',
+  'story',
 ] as const;
 export type SessionMode = (typeof SESSION_MODES)[number];
 
@@ -104,7 +105,11 @@ const attemptSchema = new Schema(
     domainId: { type: String, required: true },
     mode: { type: String, required: true, enum: SESSION_MODES },
     clientSubmissionId: { type: String, required: true },
-    selectedOptions: { type: [String], required: true },
+    /** Sorted choices, the tapped sequence for order questions, or "A=2" pairs for match. */
+    selectedOptions: { type: [String], default: [] },
+    /** The typed (or spoken) answer for typed-answer questions. */
+    typedAnswer: { type: String, maxlength: 200, default: null },
+    inputMode: { type: String, enum: ['tap', 'keyboard', 'voice'], default: 'tap' },
     confidence: { type: String, enum: ['unsure', 'somewhat', 'confident'], default: null },
     reasoningText: { type: String, maxlength: 2000, default: null },
     submittedAt: { type: Date, required: true, default: Date.now },

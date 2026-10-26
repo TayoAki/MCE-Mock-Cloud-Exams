@@ -49,6 +49,7 @@ function Navigator() {
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="session/[id]" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="story/[id]" options={{ gestureEnabled: false }} />
       <Stack.Screen name="complete/[id]" options={{ gestureEnabled: false }} />
       <Stack.Screen name="premium" options={{ presentation: 'modal' }} />
       <Stack.Screen name="account" options={{ presentation: 'modal' }} />

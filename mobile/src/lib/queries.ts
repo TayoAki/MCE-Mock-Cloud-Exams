@@ -18,6 +18,7 @@ import type {
   QuestsView,
   Reviews,
   Session,
+  StorySummary,
 } from './types';
 
 export function useMe() {
@@ -74,6 +75,14 @@ export function useCircle(circleId?: string) {
   return useQuery({ queryKey: ['circle', circleId], queryFn: () => get<Circle>(`/circles/${circleId}`), enabled: !!circleId });
 }
 
+export function useStories(enrollmentId?: string) {
+  return useQuery({
+    queryKey: ['stories', enrollmentId],
+    queryFn: () => get<{ stories: StorySummary[] }>(`/enrollments/${enrollmentId}/stories`).then((r) => r.stories),
+    enabled: !!enrollmentId,
+  });
+}
+
 function useSignedIn() {
   return useAuth().status === 'signedIn';
 }
@@ -126,7 +135,7 @@ export function useRefreshLearning() {
   const queryClient = useQueryClient();
   return () =>
     Promise.all(
-      ['me', 'path', 'practice', 'reviews', 'progress', 'sessions', 'circle', 'engagement', 'quests', 'achievements', 'league', 'friend-streaks', 'circle-activity'].map(
+      ['me', 'path', 'practice', 'reviews', 'progress', 'sessions', 'circle', 'stories', 'engagement', 'quests', 'achievements', 'league', 'friend-streaks', 'circle-activity'].map(
         (key) => queryClient.invalidateQueries({ queryKey: [key] }),
       ),
     );

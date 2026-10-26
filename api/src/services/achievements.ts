@@ -26,6 +26,7 @@ type Stat =
   | 'circles'
   | 'friend_streak'
   | 'high_fives'
+  | 'stories'
   | 'domains_all';
 
 export interface AchievementDef {
@@ -47,6 +48,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { key: 'perfect_1', title: 'Flawless', description: 'Finish a lesson with no mistakes', icon: 'diamond', group: 'learning', stat: 'perfect', threshold: 1 },
   { key: 'perfect_10', title: 'Sharpshooter', description: 'Finish 10 lessons with no mistakes', icon: 'locate', group: 'learning', stat: 'perfect', threshold: 10 },
   { key: 'domains_all', title: 'Well rounded', description: 'Practice every exam domain', icon: 'grid', group: 'learning', stat: 'domains_all', threshold: 1 },
+  { key: 'story_1', title: 'Storyteller', description: 'Finish a story', icon: 'book', group: 'learning', stat: 'stories', threshold: 1 },
+  { key: 'stories_5', title: 'Page turner', description: 'Finish 5 stories', icon: 'library', group: 'learning', stat: 'stories', threshold: 5 },
   { key: 'reviews_10', title: 'Memory keeper', description: 'Complete 10 review sessions', icon: 'refresh-circle', group: 'practice', stat: 'reviews', threshold: 10 },
   { key: 'mock_1', title: 'Dress rehearsal', description: 'Finish a mock exam', icon: 'document-text', group: 'practice', stat: 'mocks', threshold: 1 },
   { key: 'mock_5', title: 'Exam-day calm', description: 'Finish 5 mock exams', icon: 'ribbon', group: 'practice', stat: 'mocks', threshold: 5 },
@@ -104,6 +107,7 @@ async function stats(userId: string): Promise<Record<Stat, number>> {
   });
   const reviews = await PracticeSession.countDocuments({ ...finished, mode: 'review' });
   const mocks = await PracticeSession.countDocuments({ ...finished, mode: 'mock' });
+  const stories = (await PracticeSession.distinct('selectionConfig.story_id', { userId, status: 'completed', mode: 'story' })).length;
   const xp = await xpTotal(userId);
   const quests = await DailyQuestSet.aggregate<{ n: number }>([
     { $match: { userId } },
@@ -133,6 +137,7 @@ async function stats(userId: string): Promise<Record<Stat, number>> {
     circles,
     friend_streak: Math.max(0, ...friend.map((f) => f.longestDays)),
     high_fives: highFives,
+    stories,
     domains_all: domainsAll,
   };
 }

@@ -71,9 +71,11 @@ export async function orderedLessons(examVersionId: string) {
 }
 
 /** Latest published revision per family (new sessions never get retired revisions). */
-export async function latestPublishedByFamily(examVersionId: string, familyIds?: string[]) {
+/** Story questions depend on their story's context, so only story sessions ask for them. */
+export async function latestPublishedByFamily(examVersionId: string, familyIds?: string[], opts: { stories?: boolean } = {}) {
   const filter: Record<string, unknown> = { examVersionId, status: 'published' };
   if (familyIds) filter.familyId = { $in: familyIds };
+  if (!opts.stories) filter.storyId = null;
   const rows = await QuestionVersion.find(filter).sort({ revision: -1 }).lean();
   const map = new Map<string, (typeof rows)[number]>();
   for (const r of rows) if (!map.has(r.familyId)) map.set(r.familyId, r);

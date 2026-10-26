@@ -3,22 +3,10 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { api } from '../api';
 import { useAuth } from '../auth';
-import { ProblemList, QuestionFields, questionProblems } from '../components/QuestionForm';
+import { ANSWER_TYPE_LABELS, AnswerPreview, ProblemList, QuestionFields, questionProblems, toInput } from '../components/QuestionForm';
 import { Badge, Button, Card, Checkbox, ErrorBox, Field, Loading, Modal, PageHeader, Ratio, StatusBadge, Textarea, cx, formatDate } from '../components/ui';
-import { FIXTURE_REVIEWER_ID, type QuestionDetail, type QuestionInput } from '../types';
+import { FIXTURE_REVIEWER_ID, type QuestionDetail } from '../types';
 import { useVersionObjectives, useWorkingVersion } from '../version';
-
-function toInput(q: QuestionDetail): QuestionInput {
-  return {
-    prompt: q.prompt,
-    answer_type: q.answer_type,
-    options: q.options.map((o) => ({ ...o })),
-    correct_options: [...q.correct_options],
-    rationale: q.rationale,
-    source_url: q.source_url,
-    reviewed_notes: q.reviewed_notes,
-  };
-}
 
 export function QuestionDetailPage() {
   const { id = '' } = useParams();
@@ -60,7 +48,9 @@ export function QuestionDetailPage() {
             <span className="font-mono">{q.family_key}</span>
             <span className="text-base font-normal text-muted">revision {q.revision}</span>
             <StatusBadge status={q.status} />
-            {q.answer_type === 'multiple' && <Badge tone="primary">multi-select</Badge>}
+            {q.answer_type !== 'single' && <Badge tone="primary">{ANSWER_TYPE_LABELS[q.answer_type].split(' (')[0]}</Badge>}
+            {q.presentation === 'listen' && <Badge tone="primary">listening</Badge>}
+            {q.story_id && <Badge>story</Badge>}
           </span>
         }
         subtitle={
@@ -122,18 +112,7 @@ export function QuestionDetailPage() {
         <div className="space-y-4 lg:col-span-2">
           <Card title="Question">
             <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{q.prompt}</p>
-            <ul className="mt-4 space-y-2">
-              {q.options.map((o) => {
-                const correct = q.correct_options.includes(o.key);
-                return (
-                  <li key={o.key} className={cx('flex items-start gap-3 rounded-lg border px-3 py-2', correct ? 'border-success/40 bg-mint/60' : 'border-border')}>
-                    <span className={cx('flex size-6 shrink-0 items-center justify-center rounded-md font-mono text-xs font-semibold', correct ? 'bg-success text-white' : 'bg-bg text-muted')}>{o.key}</span>
-                    <span className="flex-1 text-sm">{o.text}</span>
-                    {correct && <span className="text-xs font-medium text-success">Correct</span>}
-                  </li>
-                );
-              })}
-            </ul>
+            <AnswerPreview q={q} />
           </Card>
           <Card title="Reviewed rationale">
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{q.rationale}</p>

@@ -8,9 +8,11 @@ import {
   PracticeSession,
   QuestionExposure,
   QuestionKey,
+  QuestionVersion,
   RewardLedger,
   StreakState,
   User,
+  type AnswerType,
 } from '../models/index.js';
 import { track } from '../lib/analytics.js';
 import { HttpError, conflict, notFound } from '../lib/errors.js';
@@ -18,7 +20,8 @@ import { PRACTICE_SCORE_NOTE, QUALIFYING_ITEMS, XP, displayedStreak } from '../l
 import { effectiveTimezone, localDate } from '../lib/time.js';
 import { afterCompletion, type EngagementSummary } from './engagement.js';
 import { creditReminder } from './reminders.js';
-import { applyGradedAttempt, gradeSelection, grantReward } from './grading.js';
+import { applyGradedAttempt, grantReward } from './grading.js';
+import { gradeAnswer } from '../lib/answers.js';
 import { creditDay, syncStreak } from './streaks.js';
 
 /** Modes a learner may submit before answering everything; the rest must be complete. */
@@ -81,8 +84,10 @@ export async function finalizeSession(
     for (const attempt of attempts) {
       if (attempt.isCorrect !== null) continue;
       const key = await QuestionKey.findById(attempt.questionVersionId).lean();
-      if (!key) throw new HttpError(500, 'content_missing', 'Grading data is missing for a question');
-      await applyGradedAttempt(attempt, gradeSelection(attempt.selectedOptions, key.correctOptions), {
+      const qv = await QuestionVersion.findById(attempt.questionVersionId).select({ answerType: 1 }).lean();
+      if (!key || !qv) throw new HttpError(500, 'content_missing', 'Grading data is missing for a question');
+      const answer = { selected: attempt.selectedOptions, typed: attempt.typedAnswer ?? null };
+      await applyGradedAttempt(attempt, gradeAnswer(qv.answerType as AnswerType, answer, key), {
         timezone,
         now,
         sessionMode: session.mode,

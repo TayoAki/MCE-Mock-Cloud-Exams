@@ -95,7 +95,7 @@ export function QuestionsPage() {
                     </Link>
                     <div className="mt-0.5 font-mono text-xs text-muted">
                       {q.family_key}
-                      {q.answer_type === 'multiple' && <span className="ml-2 font-sans"><Badge tone="primary">multi-select</Badge></span>}
+                      {q.answer_type !== 'single' && <span className="ml-2 font-sans"><Badge tone="primary">{q.answer_type === 'multiple' ? 'multi-select' : q.answer_type === 'type' ? 'typed' : q.answer_type}</Badge></span>}
                     </div>
                   </Td>
                   <Td className="text-xs">

@@ -120,6 +120,7 @@ export function levelFor(xp: number) {
 export const GEMS = {
   lessonComplete: 5,
   perfectLesson: 5,
+  storyComplete: 10,
   achievement: 20,
   monthlyChallenge: 100,
   circleQuest: 30,

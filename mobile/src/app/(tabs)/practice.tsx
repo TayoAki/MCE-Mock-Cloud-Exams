@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { Banner, Body, Button, Eyebrow, ErrorState, Icon, LoadingState, NavRow, Pill, Screen, Title, type IconName } from '@/components/ui';
-import { useCurrentEnrollment, usePractice } from '@/lib/queries';
+import { useCurrentEnrollment, usePractice, useStories } from '@/lib/queries';
 import { useStartSession } from '@/lib/sessions';
 import { colors } from '@/lib/theme';
 import type { SessionMode } from '@/lib/types';
@@ -33,11 +33,15 @@ function Tile({ icon, title, subtitle, onPress, plus, busy }: { icon: IconName; 
 export default function Practice() {
   const { enrollment, isLoading, error } = useCurrentEnrollment();
   const practice = usePractice(enrollment?.id);
+  const stories = useStories(enrollment?.id);
   const { start, pending, error: startError, clearError } = useStartSession();
 
   useFocusEffect(
     useCallback(() => {
-      if (enrollment?.id) practice.refetch();
+      if (enrollment?.id) {
+        practice.refetch();
+        stories.refetch();
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [enrollment?.id]),
   );
@@ -65,9 +69,9 @@ export default function Practice() {
             <NavRow
               key={s.id}
               icon="play"
-              title={`Resume ${s.mode === 'mock' ? (s.sample ? 'sample mock' : 'mock exam') : s.mode === 'lesson' ? 'lesson' : `${s.mode} practice`}`}
+              title={`Resume ${s.mode === 'mock' ? (s.sample ? 'sample mock' : 'mock exam') : s.mode === 'lesson' ? 'lesson' : s.mode === 'story' ? 'story' : `${s.mode} practice`}`}
               subtitle={`${s.answered_count} of ${s.question_count} answered${s.deadline_at ? ' · timer running' : ''}`}
-              onPress={() => router.push(`/session/${s.id}`)}
+              onPress={() => router.push(s.mode === 'story' ? `/story/${s.id}` : `/session/${s.id}`)}
             />
           ))}
           {startError ? <Banner tone={startError.code === 'nothing_missed' || startError.code === 'nothing_due' ? 'success' : 'error'}>{startError.message}</Banner> : null}
@@ -93,6 +97,34 @@ export default function Practice() {
             <Tile icon="timer-outline" title="Timed quiz" subtitle="Build your pace" plus={plus('custom_quiz')} onPress={() => router.push('/custom?mode=timed')} />
             <Tile icon="options-outline" title="Custom quiz" subtitle="Choose your topics" plus={plus('custom_quiz')} onPress={() => router.push('/custom?mode=custom')} />
           </View>
+          {stories.data?.length ? (
+            <View className="gap-2.5">
+              <Text className="text-muted text-xs font-bold uppercase tracking-wider pt-1">Stories</Text>
+              {stories.data.map((story) => (
+                <Pressable
+                  key={story.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Story: ${story.title}. ${story.summary} ${story.question_count} questions${story.completed ? '. Finished' : ''}`}
+                  onPress={() => {
+                    if (story.active_session_id) router.push(`/story/${story.active_session_id}`);
+                    else start({ enrollment_id: enrollment?.id, mode: 'story', story_id: story.id });
+                  }}
+                  className="flex-row gap-3 rounded-[20px] bg-surface border border-border p-4 active:bg-primary-tint"
+                >
+                  <View className="h-12 w-12 rounded-[14px] bg-streak-tint items-center justify-center">
+                    <Icon name={story.completed ? 'checkmark-done' : 'book'} size={24} color={colors.streakDark} />
+                  </View>
+                  <View className="flex-1 gap-0.5">
+                    <Text className="text-ink text-[16px] font-extrabold">{story.title}</Text>
+                    <Text className="text-muted text-[13px] leading-[18px]">{story.summary}</Text>
+                    <Text className="text-primary text-[12px] font-bold pt-0.5">
+                      {story.completed ? 'Finished · read again' : story.active_session_id ? 'Continue' : `${story.question_count} decisions · about 4 min`}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
           <NavRow
             icon="document-text-outline"
             title="Mock exam"

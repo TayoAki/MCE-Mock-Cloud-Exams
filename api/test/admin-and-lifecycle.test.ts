@@ -24,7 +24,8 @@ describe('content backoffice', () => {
     await as().get('/admin/overview').expect(401);
     const staff = await admin();
     const overview = await as(staff.token).get('/admin/overview').expect(200);
-    expect(overview.body.questions_by_status.published).toBe(60);
+    // 60 multiple-choice items, 10 hands-on items in the newer formats and 8 story questions.
+    expect(overview.body.questions_by_status.published).toBe(78);
   });
 
   it('runs draft → review → publish, keeps revisions immutable and retires superseded ones', async () => {

@@ -55,7 +55,7 @@ describe('contextual AI explanations', () => {
     expect(request).toMatchObject({ model: config.AI_MODEL, fallbacks: 'default', betas: ['server-side-fallback-2026-07-01'], output_config: { effort: 'low' } });
     const prompt = request.messages[0].content as string;
     expect(prompt).toContain(rationale);
-    expect(prompt).toContain('<correct_options>A</correct_options>');
+    expect(prompt).toContain('<correct_answer>A</correct_answer>');
     // The learner's own text is fenced as untrusted input.
     expect(prompt).toContain('<learner_reasoning>');
   });

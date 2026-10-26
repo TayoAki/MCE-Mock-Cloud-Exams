@@ -13,6 +13,7 @@ import { computePath } from '../services/path.js';
 import { missedCount, ownedEnrollment, progressReport, reviewQueue } from '../services/progress.js';
 import { listActiveSessions } from '../services/sessions.js';
 import { mockInventory } from '../services/selection.js';
+import { listStories } from '../services/stories.js';
 
 export const learnerRouter = Router();
 
@@ -81,6 +82,11 @@ learnerRouter.get('/enrollments/:id/reviews', requireAuth, async (req, res) => {
 
 learnerRouter.get('/enrollments/:id/progress', requireAuth, async (req, res) => {
   res.json(await progressReport(currentUser(req)._id, idParam(req)));
+});
+
+/** Short workplace stories with questions inline, and whether each is finished or in progress. */
+learnerRouter.get('/enrollments/:id/stories', requireAuth, async (req, res) => {
+  res.json({ stories: await listStories(currentUser(req)._id, idParam(req)) });
 });
 
 /** Practice hub summary: due reviews, missed count, mock inventory and plan features. */

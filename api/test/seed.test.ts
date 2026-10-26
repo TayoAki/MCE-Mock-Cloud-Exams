@@ -28,6 +28,6 @@ describe('seed content', () => {
     expect(first.demoUserId).toBeUndefined();
     expect(await User.exists({ email: config.SEED_ADMIN_EMAIL })).toBeTruthy();
     expect(await User.exists({ email: config.SEED_DEMO_EMAIL })).toBeNull();
-    expect(await QuestionFamily.countDocuments()).toBe(60);
+    expect(await QuestionFamily.countDocuments()).toBe(78);
   });
 });

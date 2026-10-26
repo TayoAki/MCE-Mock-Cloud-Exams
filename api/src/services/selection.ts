@@ -1,10 +1,13 @@
 import {
   Attempt,
+  EXAM_ANSWER_TYPES,
   Lesson,
   ObjectiveProgress,
   PracticeSession,
   QuestionExposure,
   ReviewQueue,
+  Story,
+  type AnswerType,
   type SessionMode,
 } from '../models/index.js';
 import { HttpError, badRequest, conflict, notFound, plusRequired } from '../lib/errors.js';
@@ -17,9 +20,13 @@ import { computePath } from './path.js';
 export interface SelectionInput {
   mode: SessionMode;
   lessonId?: string;
+  storyId?: string;
   domainIds?: string[];
   questionCount?: number;
 }
+
+/** Mocks mirror the real exam, so they only use its multiple-choice formats. */
+const examStyle = (q: QuestionVersionLean) => EXAM_ANSWER_TYPES.includes(q.answerType as AnswerType);
 
 export interface SelectionContext {
   userId: string;
@@ -242,14 +249,15 @@ async function selectCustom(ctx: SelectionContext, input: SelectionInput, exposu
   const valid = new Set(domains.map((d) => d._id));
   if (domainIds.some((id) => !valid.has(id))) throw badRequest('invalid_domain', 'A selected domain is not part of this exam version');
   const requested = Math.min(input.questionCount ?? 10, 50);
+  const timed = input.mode === 'timed';
   const all = await latestPublishedByFamily(ctx.enrollment.examVersionId);
-  const pool = [...all.values()].filter((q) => domainIds.includes(q.domainId));
+  // A timed quiz rehearses exam conditions, so it uses the exam's formats like a mock.
+  const pool = [...all.values()].filter((q) => domainIds.includes(q.domainId) && (!timed || examStyle(q)));
   const items = requireItems(
     rankFresh(pool, exposure).slice(0, requested).map((q) => toItem(q, exposure)),
     'empty_selection',
     'No published questions match the selected domains',
   );
-  const timed = input.mode === 'timed';
   const secondsPerItem = (version.durationMinutes * 60) / version.questionCount;
   return {
     mode: input.mode,
@@ -286,7 +294,7 @@ async function selectMock(ctx: SelectionContext, input: SelectionInput, exposure
 
   const size = full ? version.questionCount : input.questionCount!;
   const all = await latestPublishedByFamily(ctx.enrollment.examVersionId);
-  const byDomain = domains.map((d) => rankFresh([...all.values()].filter((q) => q.domainId === d._id), exposure));
+  const byDomain = domains.map((d) => rankFresh([...all.values()].filter((q) => q.domainId === d._id && examStyle(q)), exposure));
   const allocation = allocateBlueprint(size, domains.map((d) => d.weightPercent));
 
   const shortfall = domains
@@ -328,6 +336,21 @@ async function selectMock(ctx: SelectionContext, input: SelectionInput, exposure
   };
 }
 
+/** A story asks its questions in the order they appear in the story. */
+async function selectStory(ctx: SelectionContext, input: SelectionInput, exposure: Map<string, Exposure>): Promise<Selection> {
+  if (!input.storyId) throw badRequest('story_required', 'story_id is required for story sessions');
+  const story = await Story.findOne({ _id: input.storyId, examVersionId: ctx.enrollment.examVersionId, status: 'published' }).lean();
+  if (!story) throw notFound('Story');
+  const familyIds = story.parts.filter((p) => p.kind === 'question' && p.familyId).map((p) => p.familyId!);
+  const pool = await latestPublishedByFamily(ctx.enrollment.examVersionId, familyIds, { stories: true });
+  const items = requireItems(
+    familyIds.map((id) => pool.get(id)).filter((q): q is QuestionVersionLean => !!q).map((q) => toItem(q, exposure)),
+    'no_published_content',
+    'This story has no published questions yet',
+  );
+  return { mode: 'story', items, lessonId: null, deadlineAt: null, config: { story_id: story._id } };
+}
+
 export async function selectItems(ctx: SelectionContext, input: SelectionInput): Promise<Selection> {
   const exposure = await exposureMap(ctx.userId, ctx.enrollment.examVersionId);
   switch (input.mode) {
@@ -347,13 +370,15 @@ export async function selectItems(ctx: SelectionContext, input: SelectionInput):
       return selectCustom(ctx, input, exposure);
     case 'mock':
       return selectMock(ctx, input, exposure);
+    case 'story':
+      return selectStory(ctx, input, exposure);
   }
 }
 
 /** Inventory facts for the practice hub, without starting a session. */
 export async function mockInventory(examVersionId: string) {
   const { version, domains } = await loadBlueprint(examVersionId);
-  const all = await latestPublishedByFamily(examVersionId);
+  const all = new Map([...(await latestPublishedByFamily(examVersionId))].filter(([, q]) => examStyle(q)));
   const allocation = allocateBlueprint(version.questionCount, domains.map((d) => d.weightPercent));
   const available = domains.map((d) => [...all.values()].filter((q) => q.domainId === d._id).length);
   return {

@@ -49,8 +49,8 @@
       [
         "expo-audio",
         {
-          "microphonePermission": false,
-          "recordAudioAndroid": false,
+          "microphonePermission": "CertPath uses the microphone only while you speak an answer, to turn it into text.",
+          "recordAudioAndroid": true,
           "enableBackgroundPlayback": false
         }
       ],
@@ -77,6 +77,13 @@
               }
             }
           ]
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "CertPath uses the microphone only while you speak an answer, to turn it into text.",
+          "speechRecognitionPermission": "CertPath uses your device's speech recognition to turn a spoken answer into text so it can be checked. CertPath doesn't keep the audio."
         }
       ]
     ],

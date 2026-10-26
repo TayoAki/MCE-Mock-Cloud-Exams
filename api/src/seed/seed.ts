@@ -19,6 +19,7 @@ import { hashPassword } from '../auth/passwords.js';
 import type { Role } from '../models/index.js';
 import { uuid } from '../lib/ids.js';
 import { DOMAINS, REVIEW_NOTE, UNITS, type SeedQuestion } from './bank.js';
+import { addFormatContent } from './formats.js';
 
 const PILOT_SLUG = 'databricks-de-associate';
 /** The plan's five original sample items keep their published option order (A, B, B, A, D scores 3/5). */
@@ -186,6 +187,9 @@ export async function seedDatabase(options: SeedOptions = {}) {
       await ExamVersion.updateOne({ _id: examVersionId }, { $set: { status: 'published', publishedAt: now, publishedBy: FIXTURE_REVIEWER_ID } });
     }
   }
+
+  // Newer formats and stories arrive additively, so existing databases pick them up on the next start.
+  await addFormatContent(examVersionId, { publish, reviewerId: FIXTURE_REVIEWER_ID, now });
 
   const result: { examVersionId: string; adminId?: string; demoUserId?: string } = { examVersionId };
   if (options.accounts) {

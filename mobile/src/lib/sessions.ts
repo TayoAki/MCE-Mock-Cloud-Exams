@@ -9,6 +9,7 @@ export interface StartOptions {
   enrollment_id: string | undefined;
   mode: SessionMode;
   lesson_id?: string;
+  story_id?: string;
   domain_ids?: string[];
   question_count?: number;
 }
@@ -27,7 +28,7 @@ export function useStartSession() {
     setError(null);
     try {
       const session = await post<Session>('/sessions', { ...options, client_session_id: newId() });
-      router.push(`/session/${session.id}`);
+      router.push(session.mode === 'story' ? `/story/${session.id}` : `/session/${session.id}`);
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(0, 'error', 'Something went wrong');
       if (err.code === 'plus_required') router.push({ pathname: '/premium', params: { feature: String(err.details?.feature ?? '') } });

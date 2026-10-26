@@ -1,7 +1,10 @@
 /** Response shapes from the CertPath API (api/src/routes). */
 
 export type FeatureKey = 'full_bank' | 'custom_quiz' | 'mocks' | 'ai_explain';
-export type SessionMode = 'lesson' | 'quick' | 'weakest' | 'missed' | 'timed' | 'custom' | 'mock' | 'review' | 'checkpoint';
+export type SessionMode = 'lesson' | 'quick' | 'weakest' | 'missed' | 'timed' | 'custom' | 'mock' | 'review' | 'checkpoint' | 'story';
+
+/** single/multiple: choose; order: tap into sequence; match: pair items; type: type or say a short answer. */
+export type AnswerType = 'single' | 'multiple' | 'order' | 'match' | 'type';
 
 export interface Profile {
   id: string;
@@ -97,7 +100,10 @@ export interface Path {
 
 export interface Feedback {
   correct: boolean;
+  /** Choices, the correct sequence for order questions, or "A=2" pairs for match. */
   correct_options: string[];
+  /** The model answer for typed questions. */
+  expected_answer?: string | null;
   rationale: string;
   sources: string[];
 }
@@ -107,12 +113,29 @@ export interface SessionItem {
   question_version_id: string;
   position: number;
   prompt: string;
-  answer_type: 'single' | 'multiple';
+  answer_type: AnswerType;
   options: { key: string; text: string }[];
+  /** The right-hand column of a match question. */
+  match_targets?: { key: string; text: string }[];
+  /** 'listen' reads the prompt aloud first. */
+  presentation?: 'text' | 'listen';
+  input_hint?: string | null;
   objective_title: string;
   domain_title: string;
   repeat: boolean;
-  submission: { attempt_id: string; selected_options: string[]; submitted_at: string; feedback: Feedback | null } | null;
+  submission: { attempt_id: string; selected_options: string[]; typed_answer?: string | null; submitted_at: string; feedback: Feedback | null } | null;
+}
+
+export type StoryPart = { kind: 'line'; speaker: string | null; text: string } | { kind: 'question'; session_item_id: string };
+
+export interface StorySummary {
+  id: string;
+  title: string;
+  summary: string;
+  characters: { name: string; role: string }[];
+  question_count: number;
+  completed: boolean;
+  active_session_id: string | null;
 }
 
 export interface DomainResult {
@@ -294,6 +317,7 @@ export interface Session {
   feedback_timing: 'per_answer' | 'after_submit';
   items: SessionItem[];
   completion: Completion | null;
+  story?: { id: string; title: string; characters: { name: string; role: string }[]; parts: StoryPart[] } | null;
 }
 
 export interface AnswerReceipt {
@@ -395,8 +419,11 @@ export interface SessionFeedback {
     session_item_id: string;
     position: number;
     prompt: string;
+    answer_type?: AnswerType;
     options: { key: string; text: string }[];
+    match_targets?: { key: string; text: string }[];
     selected_options: string[];
+    typed_answer?: string | null;
     attempt_id: string | null;
     answered: boolean;
     feedback: Feedback;

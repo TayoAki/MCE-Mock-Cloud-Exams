@@ -294,7 +294,7 @@ export function CelebrationPlayer() {
   }, [skippedIds]);
   const queue = unplayed.filter((c) => !skipped.includes(c));
 
-  const blocked = status !== 'signedIn' || held || pathname === '/' || pathname.startsWith('/session') || pathname.startsWith('/onboarding');
+  const blocked = status !== 'signedIn' || held || pathname === '/' || pathname.startsWith('/session') || pathname.startsWith('/story') || pathname.startsWith('/onboarding');
   const moment = blocked ? null : nextMoment(queue);
   if (!moment) return null;
 

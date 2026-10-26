@@ -10,6 +10,7 @@ const NAV = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/exams', label: 'Exams & blueprints' },
   { to: '/questions', label: 'Question bank' },
+  { to: '/stories', label: 'Stories' },
   { to: '/issues', label: 'Issue reports', badge: 'issues' as const },
   { to: '/learners', label: 'Learners' },
   { to: '/outcomes', label: 'Exam outcomes' },
