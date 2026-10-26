@@ -237,3 +237,12 @@ export interface StaffRow {
 
 /** The seed's system reviewer: marks dev fixtures, never a human review. */
 export const FIXTURE_REVIEWER_ID = '00000000-0000-4000-8000-00000000f1f0';
+
+export interface ReminderTemplateStat {
+  key: string;
+  urgent: boolean;
+  example: { title: string; body: string };
+  sent: number;
+  converted: number;
+  rate: number | null;
+}

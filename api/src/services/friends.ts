@@ -16,6 +16,7 @@ import { GEMS, MAX_FRIEND_STREAKS } from '../lib/rules.js';
 import { addDays, daysBetween, effectiveTimezone, localDate } from '../lib/time.js';
 import { awardAchievement } from './achievements.js';
 import { leagueWeek, publicName } from './leagues.js';
+import { queueNudgePush } from './notifications.js';
 import { celebrate, earnGems } from './wallet.js';
 
 /**
@@ -166,6 +167,7 @@ export async function sendHighFive(user: UserRecord, toId: string, kind: 'high_f
   });
   if (!created) throw conflict('already_sent', kind === 'nudge' ? 'You already nudged them today' : 'You already high-fived them today');
   if (kind === 'high_five') await tx(() => awardAchievement(user._id, 'high_five_10').then(() => undefined));
+  if (kind === 'nudge') await queueNudgePush(toId, publicName(user), now);
   return { sent: true, kind };
 }
 

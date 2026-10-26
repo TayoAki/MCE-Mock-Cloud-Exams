@@ -30,9 +30,9 @@ export const EVENT_PROPERTIES = {
   paywall_viewed: ['surface'],
   circle_invite_requested: [],
   // Worker
-  reminder_suppressed: ['reason'],
-  reminder_sent: [],
-  reminder_failed: ['reason'],
+  reminder_suppressed: ['reason', 'kind'],
+  reminder_sent: ['kind', 'template'],
+  reminder_failed: ['reason', 'kind', 'template'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type EventName = keyof typeof EVENT_PROPERTIES;

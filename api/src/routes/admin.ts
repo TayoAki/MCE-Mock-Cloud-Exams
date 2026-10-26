@@ -5,6 +5,7 @@ import { QuestionFamily, QuestionVersion } from '../models/index.js';
 import { dateParam, idParam, parseBody, parseQuery, uuidParam } from '../lib/http.js';
 import * as content from '../services/content-admin.js';
 import * as ops from '../services/admin-ops.js';
+import { reminderStats } from '../services/reminders.js';
 
 /** Private content-review and operations interface. Staff only. */
 export const adminRouter = Router();
@@ -13,6 +14,11 @@ const adminOnly = requireRole('admin');
 
 adminRouter.get('/admin/overview', async (_req, res) => {
   res.json({ ...(await ops.overview()), events: await ops.eventCounts() });
+});
+
+/** How each reminder template performs: sends and study days within six hours, across all learners. */
+adminRouter.get('/admin/reminders', async (_req, res) => {
+  res.json({ templates: await reminderStats() });
 });
 
 // ---------- Catalog and blueprint ----------

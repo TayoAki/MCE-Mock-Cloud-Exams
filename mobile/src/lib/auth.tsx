@@ -4,6 +4,7 @@ import { post, setAuthToken, setUnauthorizedHandler } from './api';
 import { secureStorage } from './secure-storage';
 import { deviceTimezone } from './timezone';
 import type { Profile } from './types';
+import { syncStreakWidget } from './widget';
 
 const TOKEN_KEY = 'certpath.token';
 
@@ -27,6 +28,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await secureStorage.remove(TOKEN_KEY);
     setAuthToken(null);
     queryClient.clear();
+    // The widget must not keep showing a signed-out learner's streak.
+    syncStreakWidget({ signedIn: false, streak: 0, studiedToday: false, freezes: 0, questsDone: 0, questsTotal: 3 });
     setStatus('signedOut');
   }, [queryClient]);
 

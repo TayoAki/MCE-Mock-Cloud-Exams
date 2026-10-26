@@ -1,7 +1,20 @@
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
+import { router, type Href } from 'expo-router';
+import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { patch, post } from './api';
+
+const ROUTES = new Set(['/learn', '/friends', '/streak', '/quests', '/league']);
+
+/** Opens the screen a tapped reminder or friend's nudge points to. */
+export function useNotificationRouting() {
+  const response = Notifications.useLastNotificationResponse();
+  useEffect(() => {
+    const route = response?.notification.request.content.data?.route;
+    if (typeof route === 'string' && ROUTES.has(route)) router.push(route as Href);
+  }, [response]);
+}
 
 /**
  * Reminders are off until the learner opts in after receiving value. Denying

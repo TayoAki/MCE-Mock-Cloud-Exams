@@ -17,6 +17,7 @@ import { HttpError, conflict, notFound } from '../lib/errors.js';
 import { PRACTICE_SCORE_NOTE, QUALIFYING_ITEMS, XP, displayedStreak } from '../lib/rules.js';
 import { effectiveTimezone, localDate } from '../lib/time.js';
 import { afterCompletion, type EngagementSummary } from './engagement.js';
+import { creditReminder } from './reminders.js';
 import { applyGradedAttempt, gradeSelection, grantReward } from './grading.js';
 import { creditDay, syncStreak } from './streaks.js';
 
@@ -206,7 +207,11 @@ export async function finalizeSession(
     if (completion.mode === 'mock') {
       track('mock_finalized', { userId, sessionId, properties: { ...props, sample: completion.sample, fresh_count: completion.fresh_count } });
     }
-    if (completion.study_day_credited) track('study_day_credited', { userId, sessionId, properties: { current_streak: completion.current_streak } });
+    if (completion.study_day_credited) {
+      track('study_day_credited', { userId, sessionId, properties: { current_streak: completion.current_streak } });
+      // Teaches the reminder bandit which wording brought the learner back.
+      if (userId) await creditReminder(userId).catch(() => null);
+    }
   }
   return completion;
 }

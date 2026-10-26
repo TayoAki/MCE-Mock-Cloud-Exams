@@ -30,6 +30,8 @@ meRouter.patch('/me/preferences', requireAuth, async (req, res) => {
       quiet_start: hhmm.optional(),
       quiet_end: hhmm.optional(),
       weekly_circle_summary: z.boolean().optional(),
+      smart_timing: z.boolean().optional(),
+      streak_saver: z.boolean().optional(),
       display_name: z.string().min(1).max(60).optional(),
     }),
   );

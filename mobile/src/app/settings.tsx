@@ -117,13 +117,32 @@ export default function Settings() {
         {prefs.reminders_enabled ? (
           <>
             <View className="flex-row flex-wrap gap-2">
-              {TIMES.map((t) => (
-                <Pressable key={t} accessibilityRole="radio" aria-checked={prefs.daily_local_time === t} onPress={() => update('/me/preferences', { daily_local_time: t })} className={`min-h-[44px] justify-center rounded-full border px-4 ${prefs.daily_local_time === t ? 'border-primary bg-primary-tint' : 'border-border bg-surface'}`}>
-                  <Text className="text-ink text-[14px]">{t}</Text>
-                </Pressable>
-              ))}
+              <Pressable accessibilityRole="radio" accessibilityLabel="Smart: when you usually study" aria-checked={prefs.smart_timing} onPress={() => update('/me/preferences', { smart_timing: true })} className={`min-h-[44px] flex-row items-center gap-1 justify-center rounded-full border px-4 ${prefs.smart_timing ? 'border-primary bg-primary-tint' : 'border-border bg-surface'}`}>
+                <Icon name="sparkles" size={14} color={colors.primary} />
+                <Text className="text-ink text-[14px]">Smart</Text>
+              </Pressable>
+              {TIMES.map((t) => {
+                const on = !prefs.smart_timing && prefs.daily_local_time === t;
+                return (
+                  <Pressable key={t} accessibilityRole="radio" aria-checked={on} onPress={() => update('/me/preferences', { daily_local_time: t, smart_timing: false })} className={`min-h-[44px] justify-center rounded-full border px-4 ${on ? 'border-primary bg-primary-tint' : 'border-border bg-surface'}`}>
+                    <Text className="text-ink text-[14px]">{t}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
-            <Small>{`Quiet hours ${prefs.quiet_start}–${prefs.quiet_end}. No reminder once you've studied that day.`}</Small>
+            <Small>
+              {prefs.smart_timing
+                ? `Smart picks a time just before you usually study, and learns which reminders help you most. Until it knows your routine, it uses ${prefs.daily_local_time}.`
+                : `Quiet hours ${prefs.quiet_start}–${prefs.quiet_end}. No reminder once you've studied that day.`}
+            </Small>
+            <Divider />
+            <View className="flex-row items-center justify-between min-h-[44px]">
+              <View className="flex-1 pr-3">
+                <Text className="text-ink text-[15px] font-bold">Streak saver</Text>
+                <Small>One last call in the evening if your streak is about to end.</Small>
+              </View>
+              <Switch accessibilityLabel="Streak saver" value={prefs.streak_saver} onValueChange={(on) => update('/me/preferences', { streak_saver: on })} trackColor={{ true: colors.primary, false: colors.locked }} />
+            </View>
           </>
         ) : null}
       </Card>

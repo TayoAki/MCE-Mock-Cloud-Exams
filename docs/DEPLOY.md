@@ -44,6 +44,7 @@ The watch paths stop a change in one app from rebuilding the others.
 | `STORE_SANDBOX` | `false` |
 | `CORS_ORIGINS` | The web and admin URLs, comma-separated |
 | `INVITE_URL_BASE` | `https://<web domain>/join`, so circle invites open the web app |
+| `EXPO_PUSH_ENABLED` | `true` once the TestFlight build has push set up (see below). Until then reminders are planned but not delivered |
 | `ANTHROPIC_API_KEY` | Optional. With it, "Explain another way" generates explanations with Claude, capped by `AI_DAILY_CALLS_PER_USER` (20) and `AI_DAILY_CALLS_GLOBAL` (2000). Without it, learners see the reviewed explanation |
 
 **web** and **admin**
@@ -66,6 +67,16 @@ cd mobile && EXPO_PUBLIC_API_URL=https://<api domain>/v1 npx expo start --tunnel
 ```
 
 Store builds (EAS) need the same variable.
+
+## TestFlight builds
+
+```bash
+cd mobile
+npx eas-cli@latest build --platform ios --profile production
+npx eas-cli@latest submit --platform ios --latest
+```
+
+The app includes an iOS home-screen and Lock Screen widget (`src/widgets/StreakWidget.tsx`), so the build has a second target (`dev.certpath.app.widgets`) and an App Group (`group.dev.certpath.app`). The first build after adding it asks to register the extra bundle identifier and enable App Groups; let EAS do both. Push reminders need the push key EAS offers to create on the same run. Then set `EXPO_PUSH_ENABLED=true` on the API.
 
 ## Turning Plus on later
 

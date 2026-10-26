@@ -161,13 +161,25 @@ export async function enrollmentList(userId: string) {
   }));
 }
 
-function toPreferences(p: { remindersEnabled: boolean; dailyLocalTime?: string | null; quietStart?: string | null; quietEnd?: string | null; weeklyCircleSummary?: boolean | null } | null) {
+function toPreferences(
+  p: {
+    remindersEnabled: boolean;
+    dailyLocalTime?: string | null;
+    quietStart?: string | null;
+    quietEnd?: string | null;
+    weeklyCircleSummary?: boolean | null;
+    smartTiming?: boolean | null;
+    streakSaver?: boolean | null;
+  } | null,
+) {
   return {
     reminders_enabled: p?.remindersEnabled ?? false,
     daily_local_time: p?.dailyLocalTime ?? '21:00',
     quiet_start: p?.quietStart ?? '23:00',
     quiet_end: p?.quietEnd ?? '08:00',
     weekly_circle_summary: p?.weeklyCircleSummary ?? false,
+    smart_timing: p?.smartTiming ?? true,
+    streak_saver: p?.streakSaver ?? true,
   };
 }
 
@@ -179,6 +191,8 @@ export interface PreferencesInput {
   quiet_start?: string;
   quiet_end?: string;
   weekly_circle_summary?: boolean;
+  smart_timing?: boolean;
+  streak_saver?: boolean;
   display_name?: string;
 }
 
@@ -218,6 +232,8 @@ export async function updatePreferences(user: UserRecord, input: PreferencesInpu
   if (input.quiet_start !== undefined) prefSet.quietStart = input.quiet_start;
   if (input.quiet_end !== undefined) prefSet.quietEnd = input.quiet_end;
   if (input.weekly_circle_summary !== undefined) prefSet.weeklyCircleSummary = input.weekly_circle_summary;
+  if (input.smart_timing !== undefined) prefSet.smartTiming = input.smart_timing;
+  if (input.streak_saver !== undefined) prefSet.streakSaver = input.streak_saver;
   await NotificationPreference.updateOne({ _id: user._id }, { $set: prefSet }, { upsert: true, runValidators: true });
   if (input.reminders_enabled === false) {
     await NotificationJob.updateMany({ userId: user._id, status: 'queued' }, { $set: { status: 'cancelled', reason: 'opted_out' } });

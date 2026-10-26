@@ -107,7 +107,7 @@ The backoffice covers the plan's content workflow: draft → human review → pu
 These are the plan's open items, kept explicit rather than faked:
 
 - **Store billing.** No StoreKit or Play Billing purchase flow, and no server-side Apple/Google receipt verification (it returns 501). Pricing is illustrative. The sandbox verifier exercises the entitlement logic.
-- **Push delivery** is implemented through Expo Push behind `EXPO_PUSH_ENABLED`, but needs an EAS project and a development build, and hasn't been tested on a device.
+- **Push delivery** is implemented through Expo Push behind `EXPO_PUSH_ENABLED`. Reminder wording is picked per learner by a bandit (see docs/API.md). It needs an EAS build with push credentials and hasn't been tested on a device yet. The same goes for the iOS streak widget, whose layout was only checked by rendering it through the widget runtime here.
 - **On-device testing.** The app was verified on web and by bundling for iOS and Android, not on a simulator or phone. Native-only modules (SecureStore, notifications, haptics) haven't been exercised at runtime, and there is no VoiceOver or TalkBack audit.
 - **Phase 2 extras:** streak freezes, voice explanations, and circle owner transfer. AWS and Fabric banks.
 - **Operations:** workers and rate limits run in-process (single instance), sign-in uses a 30-day revocable JWT rather than refresh-token rotation, and there are no migrations, backups, or production deployment.

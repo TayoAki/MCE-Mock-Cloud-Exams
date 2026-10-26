@@ -10,6 +10,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CelebrationPlayer } from '@/components/CelebrationPlayer';
 import { ApiError } from '@/lib/api';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { useNotificationRouting } from '@/lib/notifications';
+import { useStreakWidgetSync } from '@/lib/widget-sync';
 import { colors } from '@/lib/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -24,6 +26,12 @@ function makeQueryClient() {
       },
     },
   });
+}
+
+function SignedInEffects() {
+  useNotificationRouting();
+  useStreakWidgetSync();
+  return null;
 }
 
 function Navigator() {
@@ -46,6 +54,7 @@ function Navigator() {
       <Stack.Screen name="account" options={{ presentation: 'modal' }} />
     </Stack>
     <CelebrationPlayer />
+    {status === 'signedIn' ? <SignedInEffects /> : null}
     </View>
   );
 }

@@ -2,7 +2,38 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { api } from '../api';
 import { Card, ErrorBox, Loading, PageHeader, Ratio, Stat, Table, Td } from '../components/ui';
-import type { Overview } from '../types';
+import type { Overview, ReminderTemplateStat } from '../types';
+
+/** The reminder bandit's arms, best converting first. Rates under 20 sends are too noisy to read much into. */
+function ReminderCard() {
+  const { data } = useQuery({ queryKey: ['reminders'], queryFn: () => api.get<{ templates: ReminderTemplateStat[] }>('/admin/reminders') });
+  if (!data) return null;
+  const rows = [...data.templates].sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1) || b.sent - a.sent);
+  return (
+    <Card title="Reminder wording (bandit)" className="mt-4" padded={false}>
+      <Table head={['Template', 'Example', 'Sent', 'Studied within 6h', 'Rate']}>
+        {rows.map((t) => (
+          <tr key={t.key}>
+            <Td className="font-mono text-xs">
+              {t.key}
+              {t.urgent ? <span className="ml-1 text-muted">· saver</span> : null}
+            </Td>
+            <Td>
+              <div className="font-medium">{t.example.title}</div>
+              <div className="text-xs text-muted">{t.example.body}</div>
+            </Td>
+            <Td className="tabular-nums">{t.sent}</Td>
+            <Td className="tabular-nums">{t.converted}</Td>
+            <Td className="tabular-nums">{t.rate === null ? '—' : `${Math.round(t.rate * 100)}%${t.sent < 20 ? ' (few sends)' : ''}`}</Td>
+          </tr>
+        ))}
+      </Table>
+      <p className="px-4 py-3 text-xs text-muted">
+        Each reminder's wording is picked per learner by Thompson sampling over these templates, using everyone's results as a prior and the learner's own history on top. Recently used wording is penalised so it doesn't repeat. Only templates whose facts are true for the learner compete.
+      </p>
+    </Card>
+  );
+}
 
 export function DashboardPage() {
   const { data, error, isLoading } = useQuery({ queryKey: ['overview'], queryFn: () => api.get<Overview>('/admin/overview') });
@@ -81,6 +112,8 @@ export function DashboardPage() {
           <p className="mt-3 text-xs text-muted">Outcomes are self-reported unless verified, and reflect only learners who chose to report.</p>
         </Card>
       </div>
+
+      <ReminderCard />
 
       <Card title="Events (staging store)" className="mt-4" padded={false}>
         {data.events.length === 0 ? (

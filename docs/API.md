@@ -26,7 +26,7 @@ Base path `/v1`. JSON in and out, snake_case fields. The design contract is `doc
 | POST | `/auth/login` | — | `{email, password}` → `{token, user}` |
 | POST | `/auth/logout-all` | user | Revokes every token for the user |
 | GET | `/me` | user | Profile, streak (current, longest, this week's credited days), XP, `plus_enabled`, active entitlements, preview used, preferences, enrollments |
-| PATCH | `/me/preferences` | user | `timezone` (IANA; applies from next local midnight once any study is credited, once per day), `daily_goal_minutes` 5/10/15, `reminders_enabled`, `daily_local_time`, `quiet_start`, `quiet_end`, `weekly_circle_summary`, `display_name` |
+| PATCH | `/me/preferences` | user | `timezone` (IANA; applies from next local midnight once any study is credited, once per day), `daily_goal_minutes` 5/10/15, `reminders_enabled`, `daily_local_time`, `quiet_start`, `quiet_end`, `weekly_circle_summary`, `smart_timing` (remind half an hour before the learner usually studies, once there are three recent sessions; default on), `streak_saver` (a last-call reminder at 22:00, or an hour before quiet hours, when a streak is at stake; default on), `display_name` |
 | GET | `/me/entitlements` | user | Active entitlements |
 | POST | `/me/preview` | account | `{accept_terms: true, client_request_id}`. One no-card, nonrenewing 14-day preview per account. 409 `plus_unavailable` while Plus is off |
 | POST / DELETE | `/me/push-tokens` | user | Register or remove an Expo push token |
@@ -101,6 +101,7 @@ Streak rules: a freeze, the weekend amulet or a repair protects a missed date, w
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/admin/overview` | Seven-day metrics with denominators and event counts |
+| GET | `/admin/reminders` | Each reminder template with an example, sends, study days within six hours of a send, and the rate. The reminder bandit picks wording per learner from these (see below) |
 | GET | `/admin/exams` | Exams with versions |
 | PATCH | `/admin/exams/:id` | Admin. Status, title, subtitle |
 | POST | `/admin/exams/:id/versions` | Admin. New draft blueprint |
@@ -123,3 +124,14 @@ Streak rules: a freeze, the weekend amulet or a repair protects a missed date, w
 | GET / POST | `/admin/staff` | List staff; admins create reviewers or admins |
 | GET / PATCH | `/admin/outcomes[/:id]` | Outcome verification (PATCH is admin) |
 | GET | `/admin/audit` | Staff actions, filterable by entity |
+
+## Reminder wording
+
+Each push reminder's words are chosen per learner when it is sent, by a Thompson-sampling bandit over the templates in `api/src/services/reminders.ts`:
+
+- Only templates whose facts are true right now compete. For example, "Keep your 6-day streak alive" needs a streak, "Sam studied today" needs a friend streak partner who studied, and "So close: get 8 answers right" needs a quest that's partly done.
+- Every template's results across all learners form a Beta prior, capped at 20 pseudo-sends. The learner's own sends and study days update it, and one draw per template picks the winner.
+- A template sent to the learner in the last day scores near zero, recovering to half after a day and three quarters after two, so wording doesn't repeat.
+- A send converts when the learner earns a study day within six hours.
+- The evening streak saver only uses urgent templates: streak, milestone, wager, demotion zone and friend waiting.
+- Friends' nudges are pushed immediately, at most once a day per learner, outside quiet hours and only to learners who turned reminders on.

@@ -69,6 +69,10 @@ const notificationPreferenceSchema = new Schema(
     quietStart: { type: String, match: TIME_RE, default: '23:00' },
     quietEnd: { type: String, match: TIME_RE, default: '08:00' },
     weeklyCircleSummary: { type: Boolean, default: false },
+    /** Send at the time this learner usually studies instead of `dailyLocalTime`. */
+    smartTiming: { type: Boolean, default: true },
+    /** A second, last-call reminder in the evening when a streak is about to end. */
+    streakSaver: { type: Boolean, default: true },
     updatedAt: { type: Date, default: Date.now },
   },
   opts,
@@ -92,17 +96,37 @@ const notificationJobSchema = new Schema(
   {
     _id: uuidId,
     userId: { type: String, required: true },
-    kind: { type: String, required: true, enum: ['daily_goal', 'streak_at_risk', 'circle_summary'] },
+    kind: { type: String, required: true, enum: ['daily_goal', 'streak_at_risk', 'circle_summary', 'friend_nudge'] },
     studyDate: { type: String, required: true, match: DATE_RE },
     scheduledAt: { type: Date, required: true },
     status: { type: String, required: true, enum: ['queued', 'cancelled', 'sent', 'failed'], default: 'queued' },
     dedupeKey: { type: String, required: true, unique: true },
     reason: { type: String, default: null },
     providerMessageId: { type: String, default: null },
+    /** The wording the bandit picked at send time, kept so a later study day can credit it. */
+    templateKey: { type: String, default: null },
+    title: { type: String, default: null },
+    body: { type: String, default: null },
+    /** Copy for a friend's nudge, fixed when it is queued. */
+    payload: { type: Schema.Types.Mixed, default: null },
     sentAt: { type: Date, default: null },
+    convertedAt: { type: Date, default: null },
   },
   opts,
 );
 notificationJobSchema.index({ status: 1, scheduledAt: 1 });
 notificationJobSchema.index({ userId: 1, studyDate: 1 });
+notificationJobSchema.index({ userId: 1, sentAt: -1 });
 export const NotificationJob = model('NotificationJob', notificationJobSchema);
+
+/** Running results for one reminder template across all learners: the bandit's shared prior. */
+const reminderArmSchema = new Schema(
+  {
+    _id: { type: String, required: true }, // template key
+    sent: { type: Number, required: true, default: 0 },
+    converted: { type: Number, required: true, default: 0 },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  opts,
+);
+export const ReminderArm = model('ReminderArm', reminderArmSchema);

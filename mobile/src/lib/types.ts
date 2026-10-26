@@ -28,6 +28,10 @@ export interface Preferences {
   quiet_start: string;
   quiet_end: string;
   weekly_circle_summary: boolean;
+  /** Remind at the time this learner usually studies instead of `daily_local_time`. */
+  smart_timing: boolean;
+  /** A last-call reminder in the evening when a streak is at stake. */
+  streak_saver: boolean;
 }
 
 export interface EnrollmentSummary {

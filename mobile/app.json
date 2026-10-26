@@ -54,7 +54,31 @@
           "enableBackgroundPlayback": false
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-widgets",
+        {
+          "groupIdentifier": "group.dev.certpath.app",
+          "bundleIdentifier": "dev.certpath.app.widgets",
+          "widgets": [
+            {
+              "name": "StreakWidget",
+              "displayName": "CertPath streak",
+              "description": "Your study streak, and whether today still needs a lesson.",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "accessoryCircular",
+                  "accessoryRectangular",
+                  "accessoryInline"
+                ],
+                "initialLayout": "./src/widgets/StreakWidget.tsx"
+              }
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "reactCompiler": true
