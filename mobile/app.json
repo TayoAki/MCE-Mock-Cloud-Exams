@@ -13,7 +13,8 @@
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
-      }
+      },
+      "infoPlist": {}
     },
     "android": {
       "package": "dev.certpath.app",
@@ -48,6 +49,17 @@
     ],
     "experiments": {
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "949ac733-a079-44ce-8090-3e019fc63fe5"
+      }
+    },
+    "owner": "tayom"
   }
 }
