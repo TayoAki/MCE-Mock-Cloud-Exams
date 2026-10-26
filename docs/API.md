@@ -41,6 +41,7 @@ Base path `/v1`. JSON in and out, snake_case fields. The design contract is `doc
 | GET / POST | `/enrollments` | user | POST `{exam_version_id, exam_date?, client_request_id}`; planned exams get a 409 `exam_not_available` |
 | PATCH | `/enrollments/:id` | owner | `{exam_date?, status?: active\|paused}`. Pausing cancels queued reminders |
 | GET | `/enrollments/:id/path` | owner | Ordered lessons with `locked/available/in_progress/completed`, units, `current_lesson_id` and `active_session_id` |
+| GET | `/enrollments/:id/score` | owner | CertPath Score (0–100) with `band`, `delta_7d`, 30-day `history`, per-domain scores, `strongest`, `focus`, `method` and `note`. Each objective is first-try accuracy on new questions, smoothed while evidence is thin ((correct + 1) / (total + 2)), times coverage that reaches full weight at five questions; domains are weighted like the blueprint. Practice evidence, not a pass prediction |
 | GET | `/enrollments/:id/stories` | owner | Published stories with `question_count`, `completed` and `active_session_id` |
 | GET | `/enrollments/:id/practice` | owner | Due review count, missed count, mock inventory (`full_form_available`, sample size), features, active sessions |
 | GET | `/enrollments/:id/reviews` | owner | Due and upcoming concepts with stage and due time |
@@ -81,6 +82,7 @@ Everything is decided and stored by the server; the app only displays it. Number
 
 | Method | Path | Notes |
 |---|---|---|
+| GET | `/me/recap` | `?period=month&value=YYYY-MM` or `?period=year&value=YYYY` (defaults: this month, or last month during the first week). Study days, longest run, questions, accuracy, XP, gems, minutes, lessons, stories, mocks, best day, top domain, a learner type (night owl, early bird, lunch-break learner, weekend warrior, steady builder, explorer), badges, best league finish, high-fives, the score's start and end, and `share_text` |
 | GET | `/me/engagement` | Gems, freezes (max 2), weekend amulet, wager, XP boost, repair offer, level, league tier, shop prices. Applies freezes or the amulet to missed days first |
 | GET | `/me/quests` | Today's three quests (sized to the daily goal), the chest, and the monthly challenge (30 quests) |
 | POST | `/me/quests/chest` | Opens today's chest once all three quests are done: gems, a 15-minute double-XP boost, or a streak freeze. Repeats return the same reward. 409 `quests_incomplete` |

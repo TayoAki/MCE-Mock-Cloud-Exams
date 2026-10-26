@@ -6,6 +6,7 @@ import type {
   Badge,
   Celebration,
   Circle,
+  CertScore,
   CircleActivity,
   Engagement,
   Exam,
@@ -16,6 +17,7 @@ import type {
   PracticeSummary,
   Progress,
   QuestsView,
+  Recap,
   Reviews,
   Session,
   StorySummary,
@@ -73,6 +75,19 @@ export function useCircles() {
 
 export function useCircle(circleId?: string) {
   return useQuery({ queryKey: ['circle', circleId], queryFn: () => get<Circle>(`/circles/${circleId}`), enabled: !!circleId });
+}
+
+/** CertPath Score with its 30-day trend and domain breakdown. */
+export function useScore(enrollmentId?: string) {
+  return useQuery({ queryKey: ['score', enrollmentId], queryFn: () => get<CertScore>(`/enrollments/${enrollmentId}/score`), enabled: !!enrollmentId });
+}
+
+export function useRecap(period: 'month' | 'year', value?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['recap', period, value ?? 'default'],
+    queryFn: () => get<Recap>(`/me/recap?period=${period}${value ? `&value=${value}` : ''}`),
+    enabled: useSignedIn() && enabled,
+  });
 }
 
 export function useStories(enrollmentId?: string) {
@@ -135,7 +150,7 @@ export function useRefreshLearning() {
   const queryClient = useQueryClient();
   return () =>
     Promise.all(
-      ['me', 'path', 'practice', 'reviews', 'progress', 'sessions', 'circle', 'stories', 'engagement', 'quests', 'achievements', 'league', 'friend-streaks', 'circle-activity'].map(
+      ['me', 'path', 'practice', 'reviews', 'progress', 'sessions', 'circle', 'stories', 'score', 'recap', 'engagement', 'quests', 'achievements', 'league', 'friend-streaks', 'circle-activity'].map(
         (key) => queryClient.invalidateQueries({ queryKey: [key] }),
       ),
     );

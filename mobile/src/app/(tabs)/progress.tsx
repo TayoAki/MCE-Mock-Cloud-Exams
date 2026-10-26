@@ -1,11 +1,13 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { DomainBar } from '@/components/DomainBar';
 import { LevelBar } from '@/components/gamify';
-import { Banner, Body, Button, Card, ErrorState, Eyebrow, LoadingState, NavRow, Pill, Screen, Small, Title } from '@/components/ui';
-import { useAchievements, useCurrentEnrollment, useEngagement, useExams, useProgress } from '@/lib/queries';
+import { DeltaPill, ScoreRing } from '@/components/insights';
+import { Banner, Body, Button, Card, ErrorState, Eyebrow, Icon, LoadingState, NavRow, Pill, Screen, Small, Title } from '@/components/ui';
+import { useAchievements, useCurrentEnrollment, useEngagement, useExams, useProgress, useScore } from '@/lib/queries';
+import { colors } from '@/lib/theme';
 import { useStartSession } from '@/lib/sessions';
 
 /** S11: coverage and first-seen evidence with denominators. No pass probability. */
@@ -15,16 +17,23 @@ export default function ProgressTab() {
   const exams = useExams();
   const engagement = useEngagement();
   const achievements = useAchievements();
+  const score = useScore(enrollment?.id);
   const { start, pending, error } = useStartSession();
 
   useFocusEffect(
     useCallback(() => {
-      if (enrollment?.id) progress.refetch();
+      if (enrollment?.id) {
+        progress.refetch();
+        score.refetch();
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [enrollment?.id]),
   );
 
   const p = progress.data;
+  // The first week of a month recaps the month before.
+  const now = new Date();
+  const monthName = new Date(now.getFullYear(), now.getMonth() - (now.getDate() <= 7 ? 1 : 0), 1).toLocaleDateString(undefined, { month: 'long' });
   const exam = exams.data?.find((e) => e.id === enrollment?.exam_id);
   const enoughOverall = p ? p.first_seen_total >= p.min_ranking_sample : false;
   const pct = p && p.first_seen_total ? Math.round((p.first_seen_correct / p.first_seen_total) * 100) : 0;
@@ -40,6 +49,25 @@ export default function ProgressTab() {
       </View>
       {progress.isLoading ? <LoadingState /> : null}
       {progress.error ? <ErrorState error={progress.error} onRetry={() => progress.refetch()} /> : null}
+      {score.data ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`CertPath Score ${score.data.score} of 100, ${score.data.band}. Details`}
+          onPress={() => router.push('/score')}
+          className="flex-row items-center gap-4 rounded-[20px] bg-surface border border-border p-4 active:bg-primary-tint"
+        >
+          <ScoreRing score={score.data.score} size={84} stroke={9} />
+          <View className="flex-1 gap-1">
+            <Text className="text-primary text-xs font-bold uppercase tracking-wider">CertPath Score</Text>
+            <Text className="text-ink text-[20px] font-extrabold">{score.data.band}</Text>
+            <View className="flex-row">
+              <DeltaPill delta={score.data.delta_7d} />
+            </View>
+            <Small>Practice evidence, not a pass prediction.</Small>
+          </View>
+          <Icon name="chevron-forward" size={18} color={colors.muted} />
+        </Pressable>
+      ) : null}
       {p ? (
         <>
           <View className="flex-row gap-3">
@@ -101,6 +129,8 @@ export default function ProgressTab() {
             onPress={() => router.push('/achievements')}
           />
           <NavRow icon="flame-outline" title="Streak" subtitle={`${me?.streak.current ?? 0} days · freezes, amulet and wagers`} onPress={() => router.push('/streak')} />
+          <NavRow icon="sparkles-outline" title={`${monthName} recap`} subtitle="Your month in practice, card by card" onPress={() => router.push('/recap?period=month')} />
+          <NavRow icon="calendar-outline" title={`${new Date().getFullYear()} in review`} subtitle="Study days, questions, your learner type" onPress={() => router.push(`/recap?period=year&value=${new Date().getFullYear()}`)} />
           <NavRow icon="diamond-outline" title="Shop" subtitle={engagement.data ? `${engagement.data.gems} gems to spend` : undefined} onPress={() => router.push('/shop')} />
 
           <Card tone="mint" className="gap-2">

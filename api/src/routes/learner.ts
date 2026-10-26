@@ -14,6 +14,7 @@ import { missedCount, ownedEnrollment, progressReport, reviewQueue } from '../se
 import { listActiveSessions } from '../services/sessions.js';
 import { mockInventory } from '../services/selection.js';
 import { listStories } from '../services/stories.js';
+import { scoreView } from '../services/insights.js';
 
 export const learnerRouter = Router();
 
@@ -82,6 +83,11 @@ learnerRouter.get('/enrollments/:id/reviews', requireAuth, async (req, res) => {
 
 learnerRouter.get('/enrollments/:id/progress', requireAuth, async (req, res) => {
   res.json(await progressReport(currentUser(req)._id, idParam(req)));
+});
+
+/** CertPath Score: blueprint-weighted practice evidence with a 30-day trend. Not a pass prediction. */
+learnerRouter.get('/enrollments/:id/score', requireAuth, async (req, res) => {
+  res.json(await scoreView(currentUser(req)._id, idParam(req)));
 });
 
 /** Short workplace stories with questions inline, and whether each is finished or in progress. */

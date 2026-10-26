@@ -28,6 +28,7 @@ import {
   PushToken,
   QuestionExposure,
   ReviewQueue,
+  ScoreSnapshot,
   RewardLedger,
   StoreEvent,
   StreakState,
@@ -50,7 +51,7 @@ export async function deleteUserData(userId: string) {
     await (model as typeof Attempt).deleteMany({ userId });
   }
   await StreakState.deleteOne({ _id: userId });
-  for (const model of [GemLedger, ProtectedDay, DailyQuestSet, Achievement, Celebration, LeagueMember] as const) {
+  for (const model of [GemLedger, ProtectedDay, DailyQuestSet, Achievement, Celebration, LeagueMember, ScoreSnapshot] as const) {
     await (model as typeof GemLedger).deleteMany({ userId });
   }
   await EngagementProfile.deleteOne({ _id: userId });

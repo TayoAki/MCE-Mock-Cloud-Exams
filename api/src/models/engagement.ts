@@ -225,3 +225,18 @@ const highFiveSchema = new Schema(
 highFiveSchema.index({ fromId: 1, toId: 1, kind: 1, date: 1 }, { unique: true });
 highFiveSchema.index({ toId: 1, createdAt: -1 });
 export const HighFive = model('HighFive', highFiveSchema);
+
+/** One CertPath Score per enrollment per learner-local day, for the trend line. */
+const scoreSnapshotSchema = new Schema(
+  {
+    userId: { type: String, required: true },
+    enrollmentId: { type: String, required: true },
+    date: { type: String, required: true, match: DATE_RE },
+    score: { type: Number, required: true, min: 0, max: 100 },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  opts,
+);
+scoreSnapshotSchema.index({ enrollmentId: 1, date: 1 }, { unique: true });
+scoreSnapshotSchema.index({ userId: 1, date: 1 });
+export const ScoreSnapshot = model('ScoreSnapshot', scoreSnapshotSchema);

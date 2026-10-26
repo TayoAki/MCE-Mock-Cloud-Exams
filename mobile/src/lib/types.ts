@@ -440,3 +440,41 @@ export interface Circle {
   members: { display_name: string; study_days: number; is_you: boolean; role: 'owner' | 'member' }[];
   note: string;
 }
+
+export interface CertScore {
+  score: number;
+  band: string;
+  max: number;
+  /** Change since the latest score at least a week old. */
+  delta_7d: number | null;
+  history: { date: string; score: number }[];
+  domains: { domain_id: string; title: string; weight_percent: number; score: number; objectives_practiced: number; objectives_total: number }[];
+  strongest: string | null;
+  focus: { domain_id: string; title: string } | null;
+  method: string;
+  note: string;
+}
+
+export interface Recap {
+  period: { kind: 'month' | 'year'; label: string; start: string; end: string };
+  empty: boolean;
+  study_days: number;
+  days_in_period: number;
+  longest_streak: number;
+  answered: number;
+  accuracy: number | null;
+  xp: number;
+  gems: number;
+  minutes: number;
+  lessons: number;
+  stories: number;
+  mocks: number;
+  best_day: { date: string; xp: number } | null;
+  top_domain: string | null;
+  persona: { key: string; title: string; body: string };
+  badges: string[];
+  league: { best_rank: number; tier: LeagueTier; promotions: number } | null;
+  high_fives: number;
+  score: { start: number; end: number } | null;
+  share_text: string;
+}

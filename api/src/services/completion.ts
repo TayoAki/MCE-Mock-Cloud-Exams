@@ -20,6 +20,7 @@ import { PRACTICE_SCORE_NOTE, QUALIFYING_ITEMS, XP, displayedStreak } from '../l
 import { effectiveTimezone, localDate } from '../lib/time.js';
 import { afterCompletion, type EngagementSummary } from './engagement.js';
 import { creditReminder } from './reminders.js';
+import { recordScoreSnapshot } from './insights.js';
 import { applyGradedAttempt, grantReward } from './grading.js';
 import { gradeAnswer } from '../lib/answers.js';
 import { creditDay, syncStreak } from './streaks.js';
@@ -206,7 +207,10 @@ export async function finalizeSession(
   });
 
   if (fresh) {
-    const userId = opts.userId ?? (await PracticeSession.findById(sessionId).select({ userId: 1 }).lean())?.userId;
+    const owner = await PracticeSession.findById(sessionId).select({ userId: 1, enrollmentId: 1 }).lean();
+    const userId = opts.userId ?? owner?.userId;
+    // The score's trend line gets today's value; a failure here never affects the completion.
+    if (userId && owner) await recordScoreSnapshot(userId, owner.enrollmentId).catch(() => null);
     const props = { mode: completion.mode, status: completion.status, correct: completion.correct, total: completion.total };
     track('session_completed', { userId, sessionId, properties: { ...props, qualifying: completion.answered >= QUALIFYING_ITEMS } });
     if (completion.mode === 'mock') {

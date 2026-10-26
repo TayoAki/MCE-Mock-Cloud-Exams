@@ -9,7 +9,7 @@ import { QuestsSummary } from '@/components/gamify';
 import { Pulse, SPRING, pop as popTo } from '@/components/motion';
 import { Banner, Body, Button, Eyebrow, ErrorState, Icon, LoadingState, NavRow, Small, Title } from '@/components/ui';
 import { feedback as play } from '@/lib/feedback';
-import { useCurrentEnrollment, useExams, usePath, usePractice, useQuests } from '@/lib/queries';
+import { useCurrentEnrollment, useExams, usePath, usePractice, useQuests, useRecap } from '@/lib/queries';
 import { useStartSession } from '@/lib/sessions';
 import { colors } from '@/lib/theme';
 import type { LessonNode } from '@/lib/types';
@@ -79,6 +79,9 @@ export default function Learn() {
   const path = usePath(enrollment?.id);
   const practice = usePractice(enrollment?.id);
   const quests = useQuests();
+  // In the first week of a month, last month's recap gets a banner if there was anything to recap.
+  const firstWeek = new Date().getDate() <= 7;
+  const recap = useRecap('month', undefined, firstWeek);
   const { start, pending, error: startError } = useStartSession();
   const reduced = useReducedMotion();
   const { height } = useWindowDimensions();
@@ -140,6 +143,9 @@ export default function Learn() {
 
             {enrollment?.status === 'paused' ? <Banner tone="warn" title="Study reminders are paused">Your path is still here whenever you want it.</Banner> : null}
             {enrollment?.status === 'passed' ? <Banner tone="success" title="Congratulations on your exam">Keep practising, or start a new certification when one is available.</Banner> : null}
+            {firstWeek && recap.data && !recap.data.empty ? (
+              <NavRow icon="sparkles" title={`Your ${recap.data.period.label.split(' ')[0]} recap is ready`} subtitle={`${recap.data.study_days} study days · ${recap.data.answered} questions`} onPress={() => router.push('/recap?period=month')} />
+            ) : null}
             {quests.data ? <QuestsSummary quests={quests.data.quests} chestReady={quests.data.chest.available} onPress={() => router.push('/quests')} /> : null}
             {due > 0 ? <NavRow icon="refresh" title={`${due} ${due === 1 ? 'review' : 'reviews'} due today`} subtitle="A little review, a stronger memory" onPress={() => router.push('/review')} /> : null}
 

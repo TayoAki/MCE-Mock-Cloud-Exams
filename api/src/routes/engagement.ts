@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { currentUser, requireAuth } from '../auth/middleware.js';
-import { idParam, parseBody, uuidParam } from '../lib/http.js';
+import { idParam, parseBody, parseQuery, uuidParam } from '../lib/http.js';
 import { idempotent } from '../lib/idempotency.js';
 import { inviteLimiter, writeLimiter } from '../lib/rate-limit.js';
 import { SHOP_PRICES, type ShopItem } from '../lib/rules.js';
@@ -11,6 +11,7 @@ import { leagueView, setLeagueHidden } from '../services/leagues.js';
 import { openChest, questsView } from '../services/quests.js';
 import { engagementView, purchase } from '../services/shop.js';
 import { markCelebrationsSeen, unseenCelebrations } from '../services/wallet.js';
+import { recap } from '../services/insights.js';
 
 /** Gems, quests, badges, streak protection, leagues and friends. */
 export const engagementRouter = Router();
@@ -39,6 +40,12 @@ engagementRouter.post('/me/celebrations/seen', requireAuth, async (req, res) => 
   const body = parseBody(req, z.strictObject({ ids: z.array(uuidParam).min(1).max(50) }));
   await markCelebrationsSeen(currentUser(req)._id, body.ids);
   res.status(204).end();
+});
+
+/** A month (?period=month&value=2026-10) or year (?period=year&value=2026) in review. */
+engagementRouter.get('/me/recap', requireAuth, async (req, res) => {
+  const query = parseQuery(req, z.object({ period: z.enum(['month', 'year']).default('month'), value: z.string().max(7).optional() }));
+  res.json(await recap(currentUser(req)._id, query.period, query.value));
 });
 
 engagementRouter.get('/shop', requireAuth, async (req, res) => {
