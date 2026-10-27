@@ -1,3 +1,717 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "lakeflow-connect-scd2-history-tracking",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer ingests the Salesforce Account object with a Lakeflow Connect pipeline that uses the default settings. Finance now needs the destination table to keep every earlier version of an account's billing address, with the current version clearly marked. Which pipeline setting provides this?",
+      "options": [
+        {
+          "text": "Turn history tracking on by setting scd_type to SCD_TYPE_2 for the table",
+          "correct": true,
+          "why": "History tracking is off (SCD type 1) by default, which overwrites rows as they change. With SCD_TYPE_2 the pipeline keeps the old row, adds the update as a new row and marks the old one inactive, so every version stays queryable."
+        },
+        {
+          "text": "Keep the default, since SCD type 1 never deletes data from the destination",
+          "average": true,
+          "why": "SCD type 1 does keep data for tables or columns deleted in the source, but it overwrites rows as they are updated, so earlier billing addresses are lost."
+        },
+        {
+          "text": "Schedule a nightly full refresh so each run keeps a snapshot",
+          "why": "A full refresh clears the table's data and state and reprocesses every record, so it replaces the table rather than accumulating snapshots, and it removes earlier row versions."
+        },
+        {
+          "text": "Shorten the pipeline schedule to every five minutes",
+          "why": "Running more often captures changes sooner, but with SCD type 1 each change still overwrites the previous row, so no history builds up."
+        }
+      ],
+      "in_practice": "History tracking lets finance answer 'what was the billing address when this invoice went out?' straight from the ingested table, at the cost of a table that grows with every change instead of holding one row per account.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/scd",
+      "evidence": "Turn history tracking off (SCD type 1) to overwrite outdated records as they're updated and deleted in the source. Turn history tracking on (SCD type 2) to maintain a history of those changes. ... SCD_TYPE_1: History tracking off; SCD_TYPE_2: History tracking on"
+    },
+    {
+      "family": "lakeflow-connect-delete-pipeline-drops-tables",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer plans to delete a Lakeflow Connect ingestion pipeline that writes Workday reports into a Unity Catalog schema, then build a replacement next week. Analysts query the destination tables every day. What happens to those tables when the pipeline is deleted?",
+      "options": [
+        {
+          "text": "They are dropped along with the ingestion pipeline",
+          "correct": true,
+          "why": "Destination tables are dropped when the ingestion pipeline that manages them is deleted, so deleting first leaves analysts with nothing to query until a new pipeline reingests the data."
+        },
+        {
+          "text": "They remain as ordinary Delta tables that stop updating",
+          "average": true,
+          "why": "Assuming tables outlive their pipeline is common, but Lakeflow Connect drops the destination tables when the ingestion pipeline is deleted."
+        },
+        {
+          "text": "They remain, but read-only until another pipeline claims them",
+          "why": "No claiming mechanism applies; the tables are dropped with the pipeline rather than kept in a read-only state."
+        },
+        {
+          "text": "They move into the event log schema as an archive",
+          "why": "The event log location stores pipeline events, not copies of destination tables; deleting the pipeline drops the tables."
+        }
+      ],
+      "in_practice": "Build and validate the replacement pipeline into a new schema first, then switch consumers and delete the old one; deleting first can leave dashboards empty for the hours a full reingestion of large reports takes.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/faq",
+      "evidence": "What happens to the destination tables when an ingestion pipeline is deleted? The destination tables are dropped when the ingestion pipeline is deleted."
+    },
+    {
+      "family": "lakeflow-connect-new-source-column",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A Lakeflow Connect pipeline ingests all columns of the ServiceNow incident table into Unity Catalog, with no column list specified. A ServiceNow admin adds a new field, resolution_code, to the table. What happens on the pipeline's next run?",
+      "options": [
+        {
+          "text": "The column is added and ingested; rows loaded earlier have it empty",
+          "correct": true,
+          "why": "For connectors with automated schema evolution, a new source column is ingested automatically on the next run, and rows that arrived before the schema change are left empty in that column."
+        },
+        {
+          "text": "The run fails until someone triggers a full refresh of the table",
+          "average": true,
+          "why": "Some schema changes, such as those the SQL Server connector can't apply, need a full refresh, but the ServiceNow connector handles new columns automatically, so the run continues."
+        },
+        {
+          "text": "The column is ignored until someone adds it to a column list",
+          "why": "Listing columns is an opt-out: when all columns are ingested without a list, new columns are picked up automatically."
+        },
+        {
+          "text": "The column is added and backfilled for every historical row",
+          "why": "A schema change doesn't trigger a backfill; values for rows ingested before the column appeared stay empty."
+        }
+      ],
+      "in_practice": "Automatic column adds keep pipelines running through routine SaaS customizations, but reports should treat empty values in a new column as 'not captured yet' rather than as real blanks.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/faq",
+      "evidence": "For connectors that support automated schema evolution, when a new column appears in the source, Databricks automatically ingests it on the next run of your pipeline. For any row in the column that appeared prior to the schema change, Databricks leaves the value empty."
+    },
+    {
+      "family": "lakeflow-connect-use-connection-privilege",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "An admin has created a Unity Catalog connection to Salesforce in Catalog Explorer. A non-admin data engineer must now create an ingestion pipeline from that connection with Declarative Automation Bundles, writing into the existing schema sales.crm_raw, where the engineer already has USE CATALOG, USE SCHEMA and CREATE TABLE. Which additional privilege does the engineer need?",
+      "options": [
+        {
+          "text": "USE CONNECTION on the Salesforce connection",
+          "correct": true,
+          "why": "To build a pipeline from an existing connection, a user needs USE CONNECTION or ALL PRIVILEGES on the connection object, alongside the catalog and schema privileges for the destination."
+        },
+        {
+          "text": "CREATE CONNECTION on the metastore",
+          "average": true,
+          "why": "CREATE CONNECTION is needed only to create a new connection; using the one the admin already made requires USE CONNECTION on it."
+        },
+        {
+          "text": "CREATE FOREIGN CATALOG on the Salesforce connection",
+          "why": "CREATE FOREIGN CATALOG lets a user build a Lakehouse Federation foreign catalog from a connection; managed ingestion pipelines don't need one."
+        },
+        {
+          "text": "MODIFY on the sales.crm_raw schema",
+          "why": "The destination needs USE CATALOG, plus USE SCHEMA and CREATE TABLE on the schema, which the engineer already has; the missing piece is on the connection."
+        }
+      ],
+      "in_practice": "Splitting the roles lets one admin own the Salesforce OAuth setup while many engineers create pipelines from the shared connection, without anyone else ever handling the credentials.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/salesforce-pipeline",
+      "evidence": "To use an existing connection, you must have USE CONNECTION privileges or ALL PRIVILEGES on the connection object. You must have USE CATALOG privileges on the target catalog. You must have USE SCHEMA and CREATE TABLE privileges on an existing schema or CREATE SCHEMA privileges on the target catalog."
+    },
+    {
+      "family": "lakeflow-connect-cdc-full-refresh-stays-queryable",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer must fully refresh a 2-billion-row SQL Server table that a Lakeflow Connect database connector ingests. The new snapshot will take several hours, and a finance dashboard queries the destination table throughout the day. What will the dashboard see while the refresh is in progress?",
+      "options": [
+        {
+          "text": "The existing rows, until the new snapshot is applied in one atomic update",
+          "correct": true,
+          "why": "For database connectors, the gateway takes a new snapshot while the destination table keeps its data and stays queryable; when the snapshot completes, it and the changes accumulated since are applied in a single update."
+        },
+        {
+          "text": "An empty table that fills in gradually as the snapshot loads",
+          "average": true,
+          "why": "That describes a naive truncate-and-reload; database connectors keep the existing data available until the completed snapshot is applied atomically."
+        },
+        {
+          "text": "The existing rows plus ongoing changes, applied as they arrive",
+          "why": "No updates, appends or deletes are applied while the snapshot is in progress; accumulated changes are applied together with the snapshot at the end."
+        },
+        {
+          "text": "A query error, because the table is locked until the refresh ends",
+          "why": "The table isn't locked; it remains available for queries with its pre-refresh data during the snapshot."
+        }
+      ],
+      "in_practice": "Because the swap is atomic, a refresh can be requested during business hours without an outage window; the trade-off is that the table's data is frozen, not updating, until the snapshot finishes.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/full-refresh",
+      "evidence": "During the snapshot process, the destination streaming table retains its existing data and remains available for queries. No updates, appends, or deletes are applied to the table while the snapshot is in progress. Atomic refresh: After the snapshot completes, Databricks automatically performs the full refresh in a single update."
+    },
+    {
+      "family": "lakeflow-connect-auto-full-refresh-policy",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer runs a Lakeflow Connect SQL Server ingestion pipeline. The source team occasionally renames columns or changes data types, and each time ingestion of the affected table stops until someone triggers a full refresh by hand. The team wants these tables to recover without manual intervention. What should the engineer configure?",
+      "options": [
+        {
+          "text": "An auto full refresh policy with enabled set to true",
+          "correct": true,
+          "why": "The auto full refresh policy triggers a full refresh when the pipeline hits unsupported DDL such as column renames, incompatible type changes or truncates; without it, someone must trigger the refresh manually."
+        },
+        {
+          "text": "Nothing, since renames are handled as a new column plus an inactive one",
+          "average": true,
+          "why": "That rename handling applies to connectors such as Salesforce; the SQL Server connector needs a full refresh of the affected table to continue, which the policy automates."
+        },
+        {
+          "text": "A full refresh window in the pipeline's ingestion definition",
+          "why": "A full refresh window only schedules when snapshot operations for a full refresh start; it doesn't trigger a refresh when an unsupported schema change occurs."
+        },
+        {
+          "text": "History tracking (SCD type 2) on the affected tables",
+          "why": "SCD type 2 keeps row history but doesn't let ingestion continue past unsupported DDL, and a full refresh erases that history anyway."
+        }
+      ],
+      "in_practice": "Auto full refresh trades an overnight manual fix for an automatic re-snapshot; set min_interval_hours so a burst of DDL doesn't trigger back-to-back snapshots of a large table, and remember it resets any SCD type 2 history.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/full-refresh",
+      "evidence": "an auto full refresh policy lets you automatically trigger a full refresh when the pipeline encounters unsupported DDL operations: Table truncate, Incompatible schema changes (for example, data type changes), Column renames ... Without auto full refresh enabled, you must manually trigger a full refresh when these operations occur."
+    },
+    {
+      "family": "lakeflow-connect-inactive-column-name-reuse",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A Lakeflow Connect pipeline ingests a SaaS object into Unity Catalog. A month ago the source admin deleted the field promo_code, and the destination table kept it. Yesterday the admin created a new, unrelated field that is also named promo_code, and today's pipeline run fails. Which action gets ingestion running again?",
+      "options": [
+        {
+          "text": "Fully refresh the table, or manually drop its inactive promo_code column",
+          "correct": true,
+          "why": "A deleted source column is marked inactive in the destination rather than dropped. When a new column with the same name appears, the pipeline fails, and a full refresh of the table or dropping the inactive column resolves it."
+        },
+        {
+          "text": "Rerun the pipeline, since the connector reactivates the existing column",
+          "average": true,
+          "why": "The connector doesn't reuse an inactive column for a new field with the same name; that name collision is exactly what makes the run fail."
+        },
+        {
+          "text": "Enable SCD type 2 so both promo_code versions can coexist",
+          "why": "History tracking versions rows, not columns, so it can't hold two different fields under one column name."
+        },
+        {
+          "text": "Rename the old column with ALTER STREAMING TABLE ... RENAME COLUMN",
+          "why": "ALTER on tables created by managed ingestion covers comments, column masks, row filters and tags, not renames; the documented fixes are a full refresh or dropping the inactive column."
+        }
+      ],
+      "in_practice": "A full refresh fixes the collision but reingests the whole object and resets any SCD type 2 history; dropping only the inactive column is the lighter fix when the old values are no longer needed.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/faq",
+      "evidence": "When a column is deleted from the source, Databricks doesn't delete it automatically. Instead, the connector uses a table property to set the deleted column to \"inactive\" in the destination. If another column later appears that has the same name, then the pipeline fails. In this case, you can trigger a full refresh of the table or manually drop the inactive column."
+    },
+    {
+      "family": "lakeflow-connect-staging-retention-full-refresh",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer paused the schedule of a Lakeflow Connect SQL Server ingestion pipeline, created this year, for six weeks during a downstream migration, while its ingestion gateway kept running. The team now resumes the schedule and needs the destination tables complete, with no missing changes. What should the engineer do?",
+      "options": [
+        {
+          "text": "Trigger a full refresh of the target tables",
+          "correct": true,
+          "why": "Staged data is scheduled for deletion after 25 days and removed after 30, so a pipeline that hasn't completed successfully for 25 days or longer can leave data gaps; a full refresh of the target tables avoids them."
+        },
+        {
+          "text": "Resume the schedule, since the gateway staged every change for the next run",
+          "average": true,
+          "why": "The gateway did capture changes, but staging data doesn't wait indefinitely: after 25 days it is scheduled for deletion, so six weeks of changes can't all be applied from staging."
+        },
+        {
+          "text": "Restart the gateway so it rereads six weeks of source change logs",
+          "why": "The gateway runs continuously precisely because the source truncates its change logs, so weeks-old changes generally can't be reread; restarting it mainly speeds up new-table discovery."
+        },
+        {
+          "text": "Switch the pipeline to continuous mode for a day to catch up",
+          "why": "Running more often can't recover staged changes that have already been purged; only a full refresh rebuilds the tables completely."
+        }
+      ],
+      "in_practice": "Treat a stalled ingestion pipeline as a clock: an alert after a few days of failed or paused runs costs little, while missing the 25-day mark means re-snapshotting large tables, which can take hours on a busy source.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/pipeline-maintenance",
+      "evidence": "Databricks automatically schedules volume staging data for deletion after 25 days and physically removes it after 30 days. An ingestion pipeline that has not completed successfully for 25 days or longer might result in data gaps in the destination tables. To avoid gaps, you must trigger a full refresh of the target tables."
+    },
+    {
+      "family": "jdbc-rest-dbutils-secrets-credentials",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's notebook, run nightly by a Lakeflow Job, reads a MySQL table with spark.read.format('jdbc'), and the database password is typed directly into a notebook cell. Which change follows Databricks guidance for supplying the credentials?",
+      "options": [
+        {
+          "text": "Read them at run time with dbutils.secrets.get from a secret scope",
+          "correct": true,
+          "why": "Databricks secrets keep credentials out of notebooks and plain text: the job reads them at run time with dbutils.secrets.get, and printed secret values are shown as [REDACTED]."
+        },
+        {
+          "text": "Move the user and password into the JDBC URL string",
+          "average": true,
+          "why": "Putting credentials in the URL only moves the plaintext into another string in the notebook; a secret scope keeps them out of the code entirely."
+        },
+        {
+          "text": "Store the password as the default value of a notebook widget",
+          "why": "A widget default is plain text in the notebook and the job definition, so anyone who can open either one can read it."
+        },
+        {
+          "text": "Save the password in a workspace file next to the notebook",
+          "why": "A workspace file is still plaintext that anyone with access to the folder can read; a secret scope is encrypted and access-controlled."
+        }
+      ],
+      "in_practice": "Moving a hard-coded password into a secret scope also makes rotation a single CLI call instead of an edit to every notebook that copied it.",
+      "source": "https://docs.databricks.com/aws/en/security/secrets/",
+      "evidence": "Rather than entering these values directly into notebooks or storing them in plain text, you can securely store them using Databricks secrets and reference them in your notebooks and jobs. ... if you set a variable to a secret value using dbutils.secrets.get() and then print that variable, that variable is replaced with [REDACTED]."
+    },
+    {
+      "family": "jdbc-rest-fetchsize-round-trips",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer reads a large Oracle table over JDBC in a scheduled notebook. The Oracle driver retrieves only 10 rows per network round trip by default, so the read spends most of its time waiting on round trips. Which read option should the engineer raise?",
+      "options": [
+        {
+          "text": "fetchSize",
+          "correct": true,
+          "why": "fetchSize sets how many rows the JDBC driver fetches per round trip, which helps drivers with a low default such as Oracle's 10 rows: ten times the fetch size means about a tenth of the round trips."
+        },
+        {
+          "text": "numPartitions",
+          "average": true,
+          "why": "numPartitions adds parallel queries against the database, but each one still fetches 10 rows per round trip, and too many concurrent queries can overwhelm the source."
+        },
+        {
+          "text": "batchsize",
+          "why": "batchsize sets how many rows are inserted per round trip when writing over JDBC; it applies only to writes, not reads."
+        },
+        {
+          "text": "queryTimeout",
+          "why": "queryTimeout limits how long the driver waits for a statement to execute; it doesn't change how many rows each round trip returns."
+        }
+      ],
+      "in_practice": "Fetch size trades memory for latency: values in the thousands often suit narrow rows, while very wide rows or long strings need a smaller value to avoid out-of-memory errors.",
+      "source": "https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html",
+      "evidence": "fetchsize: The JDBC fetch size, which determines how many rows to fetch per round trip. This can help performance on JDBC drivers which default to low fetch size (e.g. Oracle with 10 rows)."
+    },
+    {
+      "family": "jdbc-rest-pyspark-custom-datasource-rest",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform team wants analysts to read a partner's REST API with spark.read.format('partner_api').load(), the same way they use built-in sources, and wants it written in Python without JVM connector code. Which feature should a data engineer use?",
+      "options": [
+        {
+          "text": "A PySpark custom data source registered with spark.dataSource.register",
+          "correct": true,
+          "why": "The Python DataSource API lets you implement a reader in pure Python for systems Spark doesn't support natively, such as REST APIs, register it, and then use it like any built-in format, including from Spark SQL."
+        },
+        {
+          "text": "The built-in json format, loading the API's HTTPS URL as the path",
+          "average": true,
+          "why": "Spark's built-in formats cover sources such as JSON and CSV files and JDBC tables; they don't call REST endpoints, which is the gap custom data sources fill."
+        },
+        {
+          "text": "A JDBC Unity Catalog connection with the API's base URL as its url",
+          "why": "A JDBC connection needs a JDBC driver for a database; it can't turn an HTTP API into a Spark data source."
+        },
+        {
+          "text": "A Lakehouse Federation foreign catalog defined over the API",
+          "why": "Lakehouse Federation mirrors supported databases and external catalogs; a REST API isn't one of its sources."
+        }
+      ],
+      "in_practice": "Wrapping pagination, auth and retries in one registered source means each analyst writes a single read call instead of copying a long requests loop, and fixes to the API logic reach every notebook at once.",
+      "source": "https://docs.databricks.com/aws/en/pyspark/datasources",
+      "evidence": "Spark includes built-in support for standard formats such as Delta, Iceberg, Parquet, JSON, CSV, and JDBC, but not for many other systems like REST APIs ... you build connectors to these systems in pure Python, with no JVM-based connector development, and use them like any built-in Spark data source ... spark.dataSource.register(MyDataSourceClass)"
+    },
+    {
+      "family": "jdbc-rest-write-default-mode-error",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's Lakeflow Job exports a daily summary DataFrame to a PostgreSQL reporting table with df.write.format('jdbc') and the url, dbtable, user and password options, and no save mode. The first run created the table, but the second night's run fails because the table exists. Which change lets each run add that day's rows?",
+      "options": [
+        {
+          "text": "Add .mode('append') to the write",
+          "correct": true,
+          "why": "With no mode set, a write uses the default error-if-exists mode and throws when the target table already exists; append mode inserts the new rows into the existing table instead."
+        },
+        {
+          "text": "Add .option('truncate', 'true') to the write",
+          "average": true,
+          "why": "truncate only changes how overwrite mode replaces a table, truncating it instead of dropping it; with no mode set the write still fails, and with overwrite the earlier days would be lost."
+        },
+        {
+          "text": "Add .mode('overwrite') to the write",
+          "why": "Overwrite replaces the table's contents on each run, so only the latest day would remain instead of a growing history."
+        },
+        {
+          "text": "Add .option('numPartitions', 1) to the write",
+          "why": "numPartitions caps how many parallel connections write to the database; it doesn't change what happens when the target table already exists."
+        }
+      ],
+      "in_practice": "Append makes reruns non-idempotent: if a failed run is repaired after a partial write, that day's rows can land twice, so many teams delete the day's rows first or write to a staging table and merge on the database side.",
+      "source": "https://spark.apache.org/docs/latest/sql-data-sources-load-save-functions.html",
+      "evidence": "SaveMode.ErrorIfExists (default): When saving a DataFrame to a data source, if data already exists, an exception is expected to be thrown."
+    },
+    {
+      "family": "jdbc-rest-uc-jdbc-connection-write-back",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team must push a nightly table of churn scores from Unity Catalog into an operational PostgreSQL database that a CRM application reads. Security requires governed access through Unity Catalog, with the database credentials hidden from the engineers who run the job. Which approach meets these requirements?",
+      "options": [
+        {
+          "text": "Write with Spark through a JDBC Unity Catalog connection via databricks.connection",
+          "correct": true,
+          "why": "A JDBC Unity Catalog connection supports reads and writes through the Spark Data Source API, hides its credentials from querying users, and is the documented choice when you need to write to the source."
+        },
+        {
+          "text": "Create a Lakehouse Federation foreign catalog and INSERT INTO its table",
+          "average": true,
+          "why": "Query federation is read-only, so a foreign catalog over PostgreSQL can be queried but not written to."
+        },
+        {
+          "text": "Configure a Lakeflow Connect PostgreSQL pipeline to sync the table back",
+          "why": "Managed connectors ingest from the source into Databricks; they can't write back to the data source."
+        },
+        {
+          "text": "Pass the password as a job parameter to a notebook that writes over JDBC",
+          "why": "Job parameters are visible in the job definition and run details, so this exposes the credential to anyone who can view the job."
+        }
+      ],
+      "in_practice": "A nightly reverse-ETL push of a few hundred thousand scores fits the Spark JDBC writer well; keep the partition count modest so the write doesn't flood the CRM's database with concurrent connections.",
+      "source": "https://docs.databricks.com/aws/en/connect/jdbc-connection",
+      "evidence": "Connection credentials are hidden from the querying user. ... choose to use a JDBC Unity Catalog connection in the following scenarios: ... You need to write to the data source using Spark (query federation doesn't support writes)."
+    },
+    {
+      "family": "jdbc-rest-external-options-allowlist",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer switches a notebook to a JDBC Unity Catalog connection named erp_jdbc, which the platform team created without setting externalOptionsAllowList. Reading with .option('databricks.connection', 'erp_jdbc') and .option('dbtable', 'sales.orders') works, but adding .option('fetchSize', '5000') to speed up the read makes it fail. What explains the failure?",
+      "options": [
+        {
+          "text": "fetchSize isn't in the default allow list, so querying users can't set it",
+          "correct": true,
+          "why": "Querying users can set only the options in the connection's externalOptionsAllowList, which defaults to dbtable, query, partitionColumn, lowerBound, upperBound and numPartitions; the connection owner must add fetchSize or set it on the connection."
+        },
+        {
+          "text": "The engineer lacks the USE CONNECTION privilege on erp_jdbc",
+          "average": true,
+          "why": "The same read succeeds without fetchSize, so the engineer can already use the connection; the failure comes from the added option itself."
+        },
+        {
+          "text": "A fetchSize of 5000 exceeds the JDBC driver's 400 MiB memory limit",
+          "why": "The 400 MiB limit is a runtime memory ceiling that very large fetch sizes on wide rows can hit, but here the connection doesn't let users set fetchSize at all."
+        },
+        {
+          "text": "fetchSize must be set as a Spark configuration, not a read option",
+          "why": "fetchSize is a regular JDBC read option; what blocks it here is the connection's allow list, not where it is set."
+        }
+      ],
+      "in_practice": "The allow list is the platform team's guardrail: engineers can still tune partitioning per query, while the URL, credentials and driver settings that matter for the source stay fixed on the connection.",
+      "source": "https://docs.databricks.com/aws/en/connect/jdbc-connection",
+      "evidence": "Use externalOptionsAllowList to control which Spark data source options users can specify at query time. If not specified, the default is 'dbtable,query,partitionColumn,lowerBound,upperBound,numPartitions'. ... Only the options specified in the externalOptionsAllowList can be used by querying users."
+    },
+    {
+      "family": "jdbc-rest-bounds-dont-filter",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer reads a PostgreSQL events table over JDBC with partitionColumn event_id, lowerBound 1, upperBound 1000000 and numPartitions 10, intending to load only the first million events in parallel. The table has 80 million rows, and the resulting DataFrame contains all of them. Which change loads only the intended rows while keeping the parallel read?",
+      "options": [
+        {
+          "text": "Pass the filter as a dbtable subquery with an alias and keep the partition options",
+          "correct": true,
+          "why": "lowerBound and upperBound only set the partition stride, so every row is still read; a subquery such as (SELECT * FROM events WHERE event_id <= 1000000) AS e in dbtable filters at the source and works with partitionColumn."
+        },
+        {
+          "text": "Pass the filtered SELECT in the query option and keep the partition options",
+          "average": true,
+          "why": "Spark doesn't allow the query and partitionColumn options together; when the read must be partitioned, the subquery goes in dbtable instead."
+        },
+        {
+          "text": "Set numPartitions to 1 so Spark applies the bounds as a filter",
+          "why": "The bounds never filter rows, whatever the partition count; a single partition would only remove the parallelism."
+        },
+        {
+          "text": "Set pushDownPredicate to true so the bounds are applied in the database",
+          "why": "pushDownPredicate governs whether DataFrame filters are pushed to the database and is already true by default; the bounds aren't filters, so it doesn't affect them."
+        }
+      ],
+      "in_practice": "Reading the bounds as a filter is a classic way to pull an entire 80-million-row table when a nightly job needed one slice, multiplying source load, network transfer and runtime.",
+      "source": "https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html",
+      "evidence": "Notice that lowerBound and upperBound are just used to decide the partition stride, not for filtering the rows in table. So all rows in the table will be partitioned and returned. ... It is not allowed to specify query and partitionColumn options at the same time. When specifying partitionColumn option is required, the subquery can be specified using dbtable option instead"
+    },
+    {
+      "family": "choosing-saas-api-managed-connector",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer must bring ServiceNow incident records into Unity Catalog every hour. ServiceNow offers no file export the team can use, and the team has no capacity to maintain custom API code. Which ingestion method fits best?",
+      "options": [
+        {
+          "text": "The Lakeflow Connect managed ServiceNow connector",
+          "correct": true,
+          "why": "Lakeflow Connect has a managed ServiceNow connector with incremental ingestion, Unity Catalog governance and automated schema evolution, so no custom API code is needed."
+        },
+        {
+          "text": "A notebook that calls the ServiceNow REST API and lands JSON in a volume",
+          "average": true,
+          "why": "A custom API notebook works, but the team would own pagination, authentication, retries and API changes, which is exactly the upkeep a managed connector removes."
+        },
+        {
+          "text": "Auto Loader pointed at the ServiceNow instance URL",
+          "why": "Auto Loader ingests files from storage locations; it can't call a SaaS application's API."
+        },
+        {
+          "text": "A Lakehouse Federation foreign catalog over ServiceNow",
+          "why": "Lakehouse Federation queries supported databases and external catalogs in place; ServiceNow isn't one of its sources, and the goal is to ingest the data."
+        }
+      ],
+      "in_practice": "A managed connector turns an hourly SaaS feed into configuration: when ServiceNow changes its API or the admins add fields, Databricks maintains the connector instead of the team rewriting a scraper.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/servicenow",
+      "evidence": "The managed ServiceNow connector in Lakeflow Connect allows you to ingest data from ServiceNow into Databricks. ... Incremental ingestion Supported ... Unity Catalog governance Supported ... Automated schema evolution: New and deleted columns Supported"
+    },
+    {
+      "family": "choosing-sql-streaming-table-over-copy-into",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A team of SQL analysts loads files from cloud object storage into Unity Catalog with scheduled COPY INTO statements and wants a more scalable way to ingest incrementally without leaving SQL. Which approach does Databricks recommend?",
+      "options": [
+        {
+          "text": "A streaming table created with CREATE STREAMING TABLE over read_files",
+          "correct": true,
+          "why": "Databricks recommends CREATE STREAMING TABLE as the scalable SQL alternative to COPY INTO; the streaming table uses Auto Loader and handles each input row only once."
+        },
+        {
+          "text": "A materialized view over read_files, refreshed on a schedule",
+          "average": true,
+          "why": "Materialized views suit precomputed query results; for appending newly arrived files, streaming tables are the ingestion choice because each input row is processed only once."
+        },
+        {
+          "text": "A scheduled INSERT INTO ... SELECT FROM read_files",
+          "why": "A batch read_files query reads every matching file each time it runs, so without file tracking it reloads old files and creates duplicates."
+        },
+        {
+          "text": "COPY INTO with COPY_OPTIONS ('force' = 'true')",
+          "why": "force = true makes COPY INTO reload files it has already loaded, which adds duplicates rather than scalability."
+        }
+      ],
+      "in_practice": "Moving from COPY INTO to a streaming table keeps the SQL the analysts know while handing file discovery and checkpoints to Auto Loader, which matters once a folder grows from thousands of files to millions.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/",
+      "evidence": "SQL examples for incremental ingestion from cloud object storage use CREATE STREAMING TABLE syntax. It offers SQL users a scalable ingestion experience, therefore it's the recommended alternative to COPY INTO."
+    },
+    {
+      "family": "choosing-partner-existing-account",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A company already pays for an account with a data ingestion partner that appears in Partner Connect. A data engineer must connect that existing account to a Databricks workspace to load a marketing source that has no managed connector. How does Databricks recommend connecting it?",
+      "options": [
+        {
+          "text": "Connect manually by following the partner's connection guide",
+          "correct": true,
+          "why": "Partner Connect is optimized for setting up new partner accounts; for an existing account, Databricks recommends connecting manually using the steps in the partner's connection guide."
+        },
+        {
+          "text": "Click the partner's tile in Partner Connect to link the account",
+          "average": true,
+          "why": "The Partner Connect tile flow is built for new partner accounts, provisioning resources for a fresh trial, so it isn't the recommended path for an account the company already has."
+        },
+        {
+          "text": "Give the partner a workspace admin's personal access token",
+          "why": "A partner holding a user's token can do anything that user can; Databricks recommends OAuth, or tokens that belong to service principals, for automated tools."
+        },
+        {
+          "text": "Build a Lakeflow Connect custom connector before using the partner",
+          "why": "A custom connector is an alternative to a partner tool, not a prerequisite for one; the paid partner account can be connected directly."
+        }
+      ],
+      "in_practice": "Connecting the existing account keeps billing, history and pipeline settings in one place, instead of a second trial account that someone later has to reconcile or shut down.",
+      "source": "https://docs.databricks.com/aws/en/partner-connect/",
+      "evidence": "If you have an existing partner account, Databricks recommends connecting manually using the steps in the relevant connection guide. Partner Connect is optimized for setting up new partner accounts."
+    },
+    {
+      "family": "choosing-schema-drift-auto-loader",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer ingests a few hundred JSON files a day from Amazon S3 into a bronze table. File volume will stay modest, but the upstream application team adds or changes fields almost every sprint. The engineer is choosing between COPY INTO and Auto Loader. Which choice fits, and why?",
+      "options": [
+        {
+          "text": "Auto Loader, because it has better primitives for schema inference and evolution",
+          "correct": true,
+          "why": "At this volume either tool keeps up, so schema change decides it: Databricks guidance is that Auto Loader provides better primitives for schema inference and evolution when the schema evolves frequently."
+        },
+        {
+          "text": "COPY INTO, because it is meant for file counts in the thousands",
+          "average": true,
+          "why": "File count alone would allow COPY INTO here, but frequent schema change is the stated pressure, and that is where Auto Loader is the better fit."
+        },
+        {
+          "text": "COPY INTO, because only COPY INTO can add new columns to the target",
+          "why": "Auto Loader also evolves the schema, adding new columns through its schema evolution modes, so this isn't a COPY INTO-only capability."
+        },
+        {
+          "text": "Auto Loader, because COPY INTO can't load JSON files",
+          "why": "COPY INTO loads JSON as well as CSV, Parquet and other formats; the reason to prefer Auto Loader here is schema evolution."
+        }
+      ],
+      "in_practice": "Schema drift is a common cause of overnight ingestion failures; Auto Loader's inference, schema location and rescued data column turn a surprise field into a restart or a rescued value instead of a broken load.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/",
+      "evidence": "If you're going to ingest files in the order of thousands over time, you can use COPY INTO. ... If your data schema is going to evolve frequently, Auto Loader provides better primitive data types around schema inference and evolution."
+    },
+    {
+      "family": "choosing-kafka-sql-streaming-table",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "An analytics engineering team that works only in SQL must continuously ingest clickstream events from an Apache Kafka topic into a Unity Catalog bronze table. Which approach lets the team stream the topic using SQL?",
+      "options": [
+        {
+          "text": "A streaming table defined with SELECT * FROM STREAM read_kafka(...)",
+          "correct": true,
+          "why": "read_kafka reads Kafka from SQL, and streaming with SQL is supported in Lakeflow pipelines or with streaming tables in Databricks SQL, so a streaming table keeps consuming new events incrementally."
+        },
+        {
+          "text": "A scheduled INSERT INTO ... SELECT FROM read_kafka(...) query",
+          "average": true,
+          "why": "A batch read_kafka query reads the offset range it is given and keeps no progress between runs, so it isn't streaming and needs manual offset handling to avoid gaps or duplicates."
+        },
+        {
+          "text": "Auto Loader configured with the Kafka bootstrap servers",
+          "why": "Auto Loader ingests files from storage locations; Kafka topics are read with the kafka source or read_kafka, not cloudFiles."
+        },
+        {
+          "text": "A Lakeflow Connect query-based connector with offset as its cursor",
+          "why": "Query-based connectors poll relational databases through a cursor column; a Kafka topic isn't a database source for them."
+        }
+      ],
+      "in_practice": "A streaming table on read_kafka gives a SQL-only team an always-current bronze layer with checkpoints managed for them, instead of a Python streaming job that someone else must support.",
+      "source": "https://docs.databricks.com/aws/en/connect/streaming/kafka",
+      "evidence": "CREATE OR REFRESH STREAMING TABLE <table_name> AS SELECT * FROM STREAM read_kafka( ... In Databricks Runtime 13.3 LTS and above, Databricks also provides a SQL function for reading Kafka data. Streaming with SQL is supported only in Lakeflow pipelines or with streaming tables in Databricks SQL."
+    },
+    {
+      "family": "choosing-sftp-not-copy-into",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A SQL-focused data engineering team receives daily CSV files from a logistics partner on an SFTP server. The team planned a scheduled COPY INTO from an sftp:// path and wants the SFTP credentials governed in Unity Catalog. Which approach should the team use?",
+      "options": [
+        {
+          "text": "A streaming table that reads the sftp:// path with read_files and an SFTP connection",
+          "correct": true,
+          "why": "The Lakeflow Connect SFTP connector extends Auto Loader, so read_files in a streaming table ingests the files incrementally, authenticating through a Unity Catalog SFTP connection."
+        },
+        {
+          "text": "COPY INTO from the sftp:// path, authenticated by an SFTP connection",
+          "average": true,
+          "why": "SFTP isn't supported on other ingestion surfaces such as COPY INTO, spark.read or dbutils.ls; only the Auto Loader-based connector reads from it."
+        },
+        {
+          "text": "A scheduled notebook that runs spark.read.csv on the sftp:// path",
+          "why": "spark.read isn't a supported surface for SFTP either, and a batch read would also lose Auto Loader's incremental file tracking."
+        },
+        {
+          "text": "A Lakehouse Federation foreign catalog over the SFTP server",
+          "why": "Lakehouse Federation queries databases and external catalogs in place; it doesn't read files from an SFTP server."
+        }
+      ],
+      "in_practice": "Reading SFTP directly with Auto Loader removes the copy-to-S3 hop many teams script by hand, and gives exactly-once ingestion with schema inference instead of a cron script that re-copies files after failures.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/sftp",
+      "evidence": "The SFTP connector extends Auto Loader functionality to provide secure, incremental ingestion from SFTP servers with Unity Catalog governance. ... SFTP is not supported across other ingestion surfaces, including COPY INTO, spark.read, and dbutils.ls."
+    },
+    {
+      "family": "choosing-catalog-federation-glue",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A company is moving to Unity Catalog in phases. About 400 Parquet tables registered in AWS Glue over Amazon S3 are still written by existing Glue jobs. During the migration, a data engineer must let Databricks users query them under Unity Catalog access control and lineage, without copying data or changing the Glue jobs, at the lowest query cost. Which approach fits?",
+      "options": [
+        {
+          "text": "Catalog federation: a foreign catalog over the Glue metastore, read from S3",
+          "correct": true,
+          "why": "Catalog federation populates a Unity Catalog foreign catalog from the external catalog and reads the tables directly in object storage on Databricks compute only, which is more cost-effective and suits incremental migration."
+        },
+        {
+          "text": "Query federation, which pushes each query down to the source over JDBC",
+          "average": true,
+          "why": "Query federation is for external relational databases and runs queries partly on remote compute; Glue tables live in object storage, where catalog federation reads them more cheaply."
+        },
+        {
+          "text": "Auto Loader streams that copy each table's files into managed tables",
+          "why": "Copying the files duplicates the data and leaves two copies to reconcile while the Glue jobs keep writing, which the no-copy requirement rules out."
+        },
+        {
+          "text": "External volumes over each table's S3 path, queried with read_files",
+          "why": "Volumes govern access to files rather than tables, so users would lose the Glue table definitions and partition metadata that the jobs maintain."
+        }
+      ],
+      "in_practice": "Catalog federation lets a migration move table by table: Glue jobs keep writing, Databricks users already query through Unity Catalog, and each table can be converted later without a big-bang cutover.",
+      "source": "https://docs.databricks.com/aws/en/query-federation/catalog-federation",
+      "evidence": "With catalog federation, you directly access the foreign table in object storage. The query is only executed using Databricks compute and is therefore more cost-effective and performance-optimized. Catalog federation is used to federate to platforms that have catalog services and support open table formats like external Hive metastores, legacy Databricks Hive metastores, AWS Glue"
+    },
+    {
+      "family": "choosing-unsupported-db-jdbc-connection",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team must load hourly extracts from a niche in-house database into Unity Catalog with a scheduled notebook. The vendor provides only a JDBC driver JAR. Security requires that engineers who run the notebook never see the database password and that access be granted per user in Unity Catalog. Which approach meets these requirements?",
+      "options": [
+        {
+          "text": "A JDBC Unity Catalog connection that uses the vendor's driver JAR from a volume",
+          "correct": true,
+          "why": "A JDBC Unity Catalog connection is the documented choice for databases query federation doesn't support or that need a specific driver; it hides credentials from querying users and is granted per user with USE CONNECTION."
+        },
+        {
+          "text": "The driver installed on the cluster, with the password read via dbutils.secrets.get",
+          "average": true,
+          "why": "Secrets keep the password out of code, but users with read access to the scope can retrieve its contents, and access is managed through secret ACLs rather than Unity Catalog grants."
+        },
+        {
+          "text": "A Lakehouse Federation foreign catalog that loads the vendor's driver",
+          "why": "Query federation works only with its list of supported databases; bringing your own JDBC driver is what a JDBC connection is for."
+        },
+        {
+          "text": "A Lakeflow Connect query-based connector that loads the vendor's driver",
+          "why": "Query-based connectors support a fixed set of databases plus Lakehouse Federation sources, so a database reachable only through a custom driver isn't a source for them."
+        }
+      ],
+      "in_practice": "One governed JDBC connection replaces per-cluster driver installs and copied secrets; removing an engineer's access becomes a single REVOKE instead of rotating a shared password.",
+      "source": "https://docs.databricks.com/aws/en/connect/jdbc-connection",
+      "evidence": "Connection credentials are hidden from the querying user. ... choose to use a JDBC Unity Catalog connection in the following scenarios: Your database is not supported by query federation. You want to use a specific JDBC driver. ... GRANT USE CONNECTION ON CONNECTION <connection-name> TO <user-name>;"
+    }
+  ]
 }
