@@ -6,6 +6,7 @@
  *   npm run factory:validate -- --file jobs-1       # one bank file
  *   npm run factory:validate -- --drafts drafts/ingestion.copy-into-123.json
  *   npm run factory:validate -- --evidence          # also check each evidence quote against its page
+ *   npm run factory:validate -- --overlap           # list items that rest on nearly the same evidence
  *
  * Exits non-zero when any item has an error.
  */
@@ -13,7 +14,7 @@ import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Item } from '../src/seed/questions/schema.js';
-import { blueprint, checkBank } from './checks.js';
+import { blueprint, checkBank, similarity } from './checks.js';
 import { CACHE_DIR, cacheName, htmlToMarkdown } from './scrape.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -92,6 +93,20 @@ async function main() {
     const weak = support.filter((s) => s.support < 0.75).sort((a, b) => a.support - b.support);
     console.log(`\nEvidence: ${support.length - weak.length}/${support.length} items' evidence is found on their source page`);
     for (const w of weak) console.log(`  check ${w.family}: ${Math.round(w.support * 100)}% of the evidence words appear on ${w.source}`);
+  }
+  if (args.includes('--overlap')) {
+    // Two items quoting nearly the same sentence often test the same fact. It is
+    // a prompt to compare them, not an error: one sentence can support two angles.
+    const pairs: string[] = [];
+    for (const [a, x] of report.items.entries()) {
+      for (const y of report.items.slice(a + 1)) {
+        if (relevant && !relevant.has(x.family) && !relevant.has(y.family)) continue;
+        const score = similarity(x.evidence, y.evidence);
+        if (score >= 0.8) pairs.push(`  ${Math.round(score * 100)}%  ${x.family}  ~  ${y.family}`);
+      }
+    }
+    console.log(`\nEvidence overlap: ${pairs.length} pair${pairs.length === 1 ? '' : 's'} to compare (same fact?)`);
+    for (const p of pairs) console.log(p);
   }
   const errors = findings.filter((f) => f.level === 'error').length;
   const warnings = findings.length - errors;
