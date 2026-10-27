@@ -1,1 +1,686 @@
-{"items": []}
+{
+  "items": [
+    {
+      "family": "git-commit-push-single-action",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer edits two notebooks in a Databricks Git folder and opens the Git dialog to save the work to the remote feature branch. How does the Git folders UI handle committing and pushing?",
+      "options": [
+        {
+          "text": "It commits and pushes in one Commit & Push action that requires a commit message",
+          "correct": true,
+          "why": "In the Git dialog you add a required commit message and click Commit & Push, which commits to the working branch and pushes it to the remote repository in a single action."
+        },
+        {
+          "text": "It saves commits locally until you push them later with a separate Push action",
+          "average": true,
+          "why": "Stacking several local commits before pushing is a Git CLI capability. The Git folders UI commits and pushes together, so no local-only commit waits for a later push."
+        },
+        {
+          "text": "It commits automatically each time a notebook is saved, without a message",
+          "why": "Saving a notebook does not create a commit. The UI highlights changed files, and you must enter a commit message before Commit & Push."
+        },
+        {
+          "text": "It requires exporting the notebooks and committing them from a local Git client",
+          "why": "Git folders are a visual Git client inside the workspace, so commits and pushes run from the Git dialog without exporting files to a local clone."
+        }
+      ],
+      "in_practice": "One-step Commit & Push keeps the remote branch current, so teammates and CI always see the latest work; engineers who need to stage or squash several commits first use a Git folder with Git CLI access in the web terminal.",
+      "source": "https://docs.databricks.com/aws/en/repos/git-operations-with-repos",
+      "evidence": "Add a required commit message for the changes, and click Commit & Push to push the changes to the remote Git repository. ... the workspace UI commits and pushes in a single action."
+    },
+    {
+      "family": "git-create-branch-from-base",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer needs to start a hotfix in a Databricks Git folder from the team's `release` branch instead of `main`. What does Create Branch in the Git dialog ask the engineer to provide?",
+      "options": [
+        {
+          "text": "A name for the new branch and the base branch to create it from",
+          "correct": true,
+          "why": "Create Branch asks for a name and lets you select the base branch, so the hotfix can start from release rather than main."
+        },
+        {
+          "text": "Only a name, because new branches always start from the default branch",
+          "average": true,
+          "why": "Assuming every branch forks from main is common, but the dialog has you select the base branch explicitly, so any existing branch can be the starting point."
+        },
+        {
+          "text": "A name and a reviewer who must approve the new branch",
+          "why": "Creating a branch involves no reviewer. Review happens later, in a pull request opened on the Git provider."
+        },
+        {
+          "text": "A name and a commit message that describes the branch",
+          "why": "A commit message is needed when you commit and push changes, not when you create a branch."
+        }
+      ],
+      "in_practice": "Branching a hotfix from release keeps unreleased main changes out of an urgent production patch, so a one-line fix doesn't ship together with weeks of untested work.",
+      "source": "https://docs.databricks.com/aws/en/repos/git-operations-with-repos",
+      "evidence": "To create a new branch: Open the Git dialog. Click Create Branch. Enter a name for the new branch and select the base branch. Click Create."
+    },
+    {
+      "family": "git-switch-branch-uncommitted-changes",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer has uncommitted edits to a notebook on branch `feature-a` in a Databricks Git folder and switches to branch `feature-b` from the branch dropdown in the Git dialog. The edits don't conflict with `feature-b`. What happens to them?",
+      "options": [
+        {
+          "text": "They carry over and show as uncommitted changes on `feature-b`",
+          "correct": true,
+          "why": "Uncommitted changes on the current branch carry over to the new branch as uncommitted changes when they don't conflict with its code. Discard them before or after switching if you don't want them there."
+        },
+        {
+          "text": "They stay parked on `feature-a` and return when the engineer switches back",
+          "average": true,
+          "why": "Git folders don't park uncommitted edits on the old branch. Non-conflicting edits move with you to the branch you switch to, so they can end up in the wrong commit if you don't check."
+        },
+        {
+          "text": "They are committed to `feature-a` automatically before the switch",
+          "why": "Switching branches never creates a commit. A commit always takes a commit message and an explicit Commit & Push."
+        },
+        {
+          "text": "They are discarded, because switching resets the working copy",
+          "why": "Edits are discarded only when you choose to discard them. Without a conflict, they carry over to the new branch."
+        }
+      ],
+      "in_practice": "Checking the changed-files list after every switch keeps half-finished work from one feature from slipping into another branch's pull request and confusing reviewers.",
+      "source": "https://docs.databricks.com/aws/en/repos/git-operations-with-repos",
+      "evidence": "Uncommitted changes on the current branch carry over and show as uncommitted changes on the new branch, if the uncommitted changes don't conflict with code on the new branch."
+    },
+    {
+      "family": "git-pull-request-protected-main",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer finishes a change in a Databricks Git folder, but the team's Git provider protects `main`: changes must merge through a reviewed pull request. The engineer's Commit & Push to `main` is rejected. Which workflow should the engineer follow?",
+      "options": [
+        {
+          "text": "Create a feature branch, Commit & Push to it, then open a pull request in the Git provider",
+          "correct": true,
+          "why": "When you can't commit to the default branch, the documented path is to create a new branch and use your Git provider's interface to create a pull request and merge it into the default branch."
+        },
+        {
+          "text": "Create a feature branch, then use Merge in the Git dialog to merge it into `main`",
+          "average": true,
+          "why": "Merge in a Git folder runs git merge and pushes the result to the remote. It opens no pull request, so it skips the review that the protected branch requires."
+        },
+        {
+          "text": "Ask a workspace admin for CAN MANAGE on the Git folder, then push again",
+          "why": "Workspace permissions control who can use the Git folder in Databricks. Branch protection is enforced by the Git provider, so a Databricks permission can't bypass it."
+        },
+        {
+          "text": "Reset `main` to the feature branch from the Git dialog's kebab menu",
+          "why": "Reset in a Git folder is git reset --hard plus git push --force. It rewrites the branch's history instead of producing a reviewable pull request."
+        }
+      ],
+      "in_practice": "A reviewed pull request leaves an audit trail and gives CI a chance to validate the change before it reaches the branch that production deploys from.",
+      "source": "https://docs.databricks.com/aws/en/repos/git-operations-with-repos",
+      "evidence": "If you don't have permission to commit to the default branch, create a new branch and use your Git provider's interface to create a pull request and merge it into the default branch."
+    },
+    {
+      "family": "git-separate-folder-per-developer",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team of two shares one Databricks Git folder under `/Workspace/Shared` for a sales pipeline. Every week one engineer opens a notebook and finds code from another branch, and a commit lands on the wrong branch. What change prevents this?",
+      "options": [
+        {
+          "text": "Each engineer clones the repository into their own Git folder and works on their own branch",
+          "correct": true,
+          "why": "The recommended pattern is one Git folder per team member, each on their own development branch, with only one user performing Git operations on each folder."
+        },
+        {
+          "text": "Keep the shared Git folder but give each engineer a separate branch inside it",
+          "average": true,
+          "why": "A Git folder has one current branch, and changing it changes it for everyone using that folder. Separate branches only isolate work when each engineer also has a separate Git folder."
+        },
+        {
+          "text": "Move the shared folder into one engineer's home folder and share it with the other",
+          "why": "Moving the folder changes its owner, not the problem: two people still run Git operations on one folder that has a single current branch."
+        },
+        {
+          "text": "Enable sparse checkout so each engineer sees only the directories they edit",
+          "why": "Sparse checkout clones a subset of directories to handle large repositories. It doesn't give each user a separate branch."
+        }
+      ],
+      "in_practice": "Per-user Git folders let engineers work in parallel, with conflicts showing up in a pull request rather than as unexplained code changes in the middle of debugging a failed run.",
+      "source": "https://docs.databricks.com/aws/en/repos/git-operations-with-repos",
+      "evidence": "Each team member has their own Git folder mapped to the remote Git repository, where they work in their own development branch. Only one user performs Git operations on each Git folder."
+    },
+    {
+      "family": "git-switch-branch-recreates-assets",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer shares the URL of a notebook in a Databricks Git folder with several analysts, who bookmark it. Later the engineer switches the folder to a branch that doesn't contain the notebook, then switches back the next day. The notebook is visible again, but the analysts' bookmarks no longer open it. What explains this?",
+      "options": [
+        {
+          "text": "The switch deleted the notebook, and switching back recreated it with a new ID and URL",
+          "correct": true,
+          "why": "Switching to a branch that lacks an asset can delete it from the workspace, and switching back recreates it with a new ID and URL. The change can't be reversed, so old links stay broken."
+        },
+        {
+          "text": "The switch revoked the analysts' access, and sharing the notebook again restores the bookmarks",
+          "average": true,
+          "why": "Re-sharing doesn't revive the old link: the notebook that came back is a new object with a new ID and URL, so bookmarks to the old one still fail."
+        },
+        {
+          "text": "Workspace URLs include the branch name, so links break whenever the branch changes",
+          "why": "The links broke because the notebook was deleted and recreated as a new asset with a new URL, not because the URL tracks the checked-out branch."
+        },
+        {
+          "text": "The notebook went to Trash during the switch, and restoring it revives the bookmarks",
+          "why": "The docs state that the deletion and recreation caused by switching branches can't be reversed; the visible notebook is already a recreated copy."
+        }
+      ],
+      "in_practice": "Before switching a folder others rely on, confirm shared assets exist on the target branch; for widely shared notebooks, a production Git folder that only automation updates avoids breaking links for every consumer.",
+      "source": "https://docs.databricks.com/aws/en/repos/git-operations-with-repos",
+      "evidence": "Switching branches might delete workspace assets when the new branch doesn't contain these assets. Switching back to the current branch recreates the deleted assets with new IDs and URLs. This change can't be reversed."
+    },
+    {
+      "family": "bundle-config-per-target-variable-values",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer declares a custom variable `catalog` in a bundle's top-level `variables` mapping. It must resolve to `dev_sales` in the `dev` target and `prod_sales` in the `prod` target, with the job definitions left unchanged. Where should the engineer set these two values?",
+      "options": [
+        {
+          "text": "In a `variables` mapping inside each target under `targets`",
+          "correct": true,
+          "why": "A variable's value can be set per target with a variables mapping inside the targets mapping, so the same job definitions resolve to dev_sales in dev and prod_sales in prod."
+        },
+        {
+          "text": "In two top-level variables named `catalog_dev` and `catalog_prod`",
+          "average": true,
+          "why": "Two variables duplicate one setting and force each job to reference a different name per environment, which breaks the goal of leaving the job definitions unchanged."
+        },
+        {
+          "text": "In the variable's `default`, listing one value for each target",
+          "why": "The default is the single fallback used when no other source sets a value. It doesn't map values to targets."
+        },
+        {
+          "text": "In the `bundle` mapping, under a separate bundle name per target",
+          "why": "The bundle mapping holds settings such as the bundle name. Per-target variable values belong in each target's variables mapping."
+        }
+      ],
+      "in_practice": "One job definition with per-target values means promoting from dev to prod changes only data such as catalog names, never pipeline logic, so reviewers read a single definition.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/variables",
+      "evidence": "Provide the variable's value within your bundle configuration files using the variables mapping within the targets mapping ... For example, to set values for the variables ... for two separate targets: targets: dev: variables: ... prod: variables: ..."
+    },
+    {
+      "family": "bundle-config-bundle-target-substitution",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants a pipeline in a bundle to publish to a schema named after the target it is deployed to, such as `sales_dev` or `sales_prod`, without writing a separate value for each target. Which value should the pipeline's `schema` setting use?",
+      "options": [
+        {
+          "text": "`sales_${bundle.target}`",
+          "correct": true,
+          "why": "The ${bundle.target} substitution resolves to the name of the target being deployed, so one setting yields sales_dev in dev and sales_prod in prod."
+        },
+        {
+          "text": "`sales_${workspace.current_user.short_name}`",
+          "average": true,
+          "why": "That substitution resolves to the deploying user's short name. It suits personal dev schemas, but it produces the same name in every target that user deploys to."
+        },
+        {
+          "text": "`sales_${bundle.name}`",
+          "why": "The bundle name is the same in every target, so dev and prod would both write to one schema."
+        },
+        {
+          "text": "`sales_${var.target}`",
+          "why": "The ${var.<name>} syntax reads a custom variable. Unless a variable named target is declared and set for each target, it doesn't resolve to the target name."
+        }
+      ],
+      "in_practice": "Deriving names from the target means a dev deploy can't write into the prod schema by accident, which removes a common cause of promotion-day incidents.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/variables",
+      "evidence": "Because the pipeline's schema is set to pipeline_bundle_${bundle.target}, ${resources.pipelines.my_pipeline.schema} resolves to pipeline_bundle_dev when you deploy to the dev target."
+    },
+    {
+      "family": "bundle-config-lookup-warehouse-id",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's bundle deploys a job whose SQL task must run on the SQL warehouse named `reporting-wh`. The warehouse exists in both the test and prod workspaces under that name, but it has a different ID in each. Which approach points the job at the right warehouse in every target without hard-coding IDs?",
+      "options": [
+        {
+          "text": "A custom variable that uses `lookup` with `warehouse: 'reporting-wh'`",
+          "correct": true,
+          "why": "A lookup resolves the named object's ID during deployment in the target workspace, so the same definition picks up the correct warehouse ID in test and in prod."
+        },
+        {
+          "text": "A custom variable whose `default` is the prod ID, overridden with `--var` in test",
+          "average": true,
+          "why": "This works, but the IDs are still hard-coded and every test deploy must remember the right --var. A lookup derives the ID from the name in each workspace instead."
+        },
+        {
+          "text": "A substitution such as `${resources.sql_warehouses.reporting_wh.id}`",
+          "why": "Resource substitutions point at resources defined in the bundle itself. This warehouse already exists outside the bundle, so there is nothing to substitute."
+        },
+        {
+          "text": "A complex variable that maps each target name to its warehouse ID",
+          "why": "A complex variable can hold a map, but nothing selects the current target's entry automatically, and the IDs remain hard-coded."
+        }
+      ],
+      "in_practice": "A lookup also fails the deploy loudly if the name is missing or duplicated, which is far cheaper than a prod job quietly running on the wrong warehouse for a week.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/variables",
+      "evidence": "If a lookup is defined for a variable, the ID of the object with the specified name is used as the value of the variable. This ensures the correct resolved ID of the object is always used for the variable."
+    },
+    {
+      "family": "bundle-config-variable-precedence",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A release engineer's `databricks.yml` declares variable `catalog` with default `dev_sales`, and the `prod` target sets `catalog: prod_sales`. On the CI runner, `BUNDLE_VAR_catalog=stage_sales` is still exported from an earlier step, and the deploy step runs `databricks bundle deploy -t prod --var=\"catalog=hotfix_sales\"`. Which value does the deployment use?",
+      "options": [
+        {
+          "text": "`hotfix_sales`, because `--var` options are checked first",
+          "correct": true,
+          "why": "The CLI checks --var options first, then BUNDLE_VAR_ environment variables, then variable-overrides.json, then target variables, then the default, and it stops at the first value it finds."
+        },
+        {
+          "text": "`prod_sales`, because the target's value is the most specific setting",
+          "average": true,
+          "why": "Target variable values sit near the bottom of the lookup order. Both a --var option and a BUNDLE_VAR_ environment variable win over them."
+        },
+        {
+          "text": "`stage_sales`, because environment variables override command options",
+          "why": "BUNDLE_VAR_ environment variables are checked second, after --var options, so the explicit option on the command wins."
+        },
+        {
+          "text": "`dev_sales`, because the default applies before any target value",
+          "why": "The default is the last fallback, used only when no other source supplies a value."
+        }
+      ],
+      "in_practice": "The order explains surprise deploys: without the --var, a stale BUNDLE_VAR_ export on a shared runner would silently beat the prod target's value, so scope such exports to a single step.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/variables",
+      "evidence": "The Databricks CLI looks for values for variables in the following order, stopping when it finds a value: --var options; environment variables that begin with BUNDLE_VAR_; the variable-overrides.json file; variables mappings within targets; the default value."
+    },
+    {
+      "family": "bundle-config-target-cluster-override",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's top-level `resources` mapping defines a job cluster with `job_cluster_key: etl_cluster`, `spark_version: 15.4.x-scala2.12`, `node_type_id: i3.xlarge` and `num_workers: 2`. The `prod` target's `resources` mapping repeats the same job and `job_cluster_key` and sets only `num_workers: 8`. What cluster does a prod deployment define?",
+      "options": [
+        {
+          "text": "Runtime 15.4.x-scala2.12 on i3.xlarge nodes with 8 workers",
+          "correct": true,
+          "why": "Target settings join the top-level settings that share the same job_cluster_key. Where both define a setting, the target wins, and everything else carries over."
+        },
+        {
+          "text": "A cluster with only `num_workers: 8`, because the target replaces it",
+          "average": true,
+          "why": "Target overrides join rather than replace. Settings the target doesn't repeat, such as spark_version and node_type_id, carry over from the top-level mapping."
+        },
+        {
+          "text": "Runtime 15.4.x-scala2.12 on i3.xlarge nodes with 2 workers",
+          "why": "Precedence runs the other way: when the same setting appears in both places for one job_cluster_key, the targets mapping wins."
+        },
+        {
+          "text": "No cluster, because validation rejects a repeated `job_cluster_key`",
+          "why": "Repeating the job and job_cluster_key under a target is the documented override pattern; the matching key is how the CLI knows which settings to join."
+        }
+      ],
+      "in_practice": "Overriding only what differs, such as 2 workers in dev and 8 in prod, keeps one reviewed cluster spec, so a runtime upgrade reaches every environment through a single change.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/overrides",
+      "evidence": "If any cluster setting is defined both in the top-level resources mapping and the targets mapping for the same job_cluster_key, then the setting in the targets mapping takes precedence over the setting in the top-level resources mapping."
+    },
+    {
+      "family": "bundle-config-variables-resolve-at-deploy",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer deploys a bundle job to the `test` target with variable `run_date` at its default. To backfill one day, the engineer runs `databricks bundle run -t test daily_job --var=\"run_date=2026-10-01\"` without redeploying, but the run still processes the default date. What explains this, and what should the engineer do?",
+      "options": [
+        {
+          "text": "Variables resolve at deploy time; pass the date as a job parameter, such as with `--params`",
+          "correct": true,
+          "why": "Bundle variables are interpreted when the bundle is deployed, so a run uses the values from the last deployment. Values that change per run belong in job parameters."
+        },
+        {
+          "text": "`bundle run` ignores `--var`; export `BUNDLE_VAR_run_date` before the run instead",
+          "average": true,
+          "why": "An environment variable changes how the value is supplied, not when it takes effect. Any variable value still applies only at the next deploy."
+        },
+        {
+          "text": "The variable needs a `lookup` so that it resolves when the run starts",
+          "why": "A lookup resolves a named object's ID, such as a warehouse or cluster, during deployment. It doesn't turn a variable into a per-run value."
+        },
+        {
+          "text": "The `test` target needs `mode: development` for variables to apply at run time",
+          "why": "Development mode changes naming, schedules and concurrency for deployed resources. It doesn't make deployment-time variables take effect at run time."
+        }
+      ],
+      "in_practice": "Keeping deploy-time settings such as catalogs and warehouses apart from run-time inputs such as dates lets one deployed job serve dozens of backfill runs without a redeploy between them.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/variables",
+      "evidence": "Bundle variables are deployment-time variables. They are interpreted when you deploy the bundle. ... passing different values for variables for the run of the job will not apply. Instead, pass values to a job run using job parameters."
+    },
+    {
+      "family": "bundles-deploy-code-and-config",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer moves a project made of notebooks, a Lakeflow Job and a Lakeflow Spark Declarative Pipeline into a Declarative Automation Bundle. What does deploying the bundle to a target workspace deliver as a single unit?",
+      "options": [
+        {
+          "text": "The source files together with the job and pipeline definitions and settings",
+          "correct": true,
+          "why": "A bundle's source files and metadata deploy together: the notebooks and other files with the business logic, plus definitions and settings for resources such as jobs and pipelines."
+        },
+        {
+          "text": "Only the notebooks, while the job and pipeline are configured in the UI",
+          "average": true,
+          "why": "Deploying only code is what a production Git folder does. Bundles also describe jobs and pipelines as source files, so their configuration is versioned and deployed too."
+        },
+        {
+          "text": "Only the job and pipeline definitions, while notebooks sync through Git folders",
+          "why": "A bundle uploads the source files its resources run as part of the same deployment, so code and configuration don't drift apart."
+        },
+        {
+          "text": "A snapshot image of the dev workspace that is restored in each target",
+          "why": "Bundles are configuration files plus source files that the CLI deploys to each target, not an image or snapshot of a workspace."
+        }
+      ],
+      "in_practice": "Shipping code and job settings together means a bad release is undone with one revert and redeploy, instead of matching a notebook version to a hand-edited job schedule.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/",
+      "evidence": "Your bundle project's collection of source files and metadata is deployed as a single bundle to your target environment. A bundle includes ... Source files, such as notebooks and Python files ... Definitions and settings for Databricks resources, such as Lakeflow Jobs, Lakeflow pipelines ..."
+    },
+    {
+      "family": "bundles-include-resource-files",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineering team wants each job and pipeline definition in its own YAML file under a `resources` folder instead of one long `databricks.yml`. How do those files become part of the bundle configuration?",
+      "options": [
+        {
+          "text": "`databricks.yml` lists them in its `include` mapping, such as `resources/*.yml`",
+          "correct": true,
+          "why": "databricks.yml is the bundle's main configuration file, and every other configuration file must be listed through path globs in its include mapping."
+        },
+        {
+          "text": "The CLI reads every `.yml` file in the project folder automatically",
+          "average": true,
+          "why": "Aside from databricks.yml, configuration files join the bundle only when the include mapping names them; a YAML file isn't merged just because it sits in the project."
+        },
+        {
+          "text": "A `sync` mapping uploads the files so their resources are deployed",
+          "why": "sync controls which files are uploaded to the workspace with the bundle. Uploading a YAML file doesn't merge it into the bundle configuration."
+        },
+        {
+          "text": "Each file is saved as another `databricks.yml` inside the `resources` folder",
+          "why": "A bundle has one and only one databricks.yml at its root. Other configuration files are pulled in through include."
+        }
+      ],
+      "in_practice": "One file per resource keeps pull requests small, so a change to the ingestion job doesn't collide with a teammate's edit to the reporting pipeline.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/reference",
+      "evidence": "include: Specifies a list of path globs that contain configuration files to include within the bundle. ... Aside from databricks.yml, you must use the include array to specify all configuration files."
+    },
+    {
+      "family": "bundles-job-references-bundle-pipeline",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's bundle defines a pipeline under `resources.pipelines.orders_pipeline` and a Lakeflow Job whose pipeline task refreshes it. Each target (dev, test and prod) gets its own copy of the pipeline with a different ID. How should the job's pipeline task reference the pipeline?",
+      "options": [
+        {
+          "text": "Set `pipeline_id` to `${resources.pipelines.orders_pipeline.id}`",
+          "correct": true,
+          "why": "A resource substitution resolves to the ID of the pipeline the bundle deployed in the current target, so one job definition works in every environment."
+        },
+        {
+          "text": "Set `pipeline_id` per target to the ID copied from each workspace",
+          "average": true,
+          "why": "Per-target IDs can only be copied after each pipeline exists, and they go stale when a pipeline is recreated. The substitution tracks the deployed ID automatically."
+        },
+        {
+          "text": "Set `pipeline_id` to the pipeline's name, `orders_pipeline`",
+          "why": "pipeline_id expects the pipeline's ID, not its name. The bundle supplies the ID through the resource substitution."
+        },
+        {
+          "text": "Define a variable with `lookup` set to `pipeline: 'orders_pipeline'`",
+          "why": "A lookup resolves an object that already exists by name, so on a first deployment it fails before the bundle has created the pipeline."
+        }
+      ],
+      "in_practice": "Wiring tasks to resources by substitution lets a brand-new test workspace come up with a single deploy, with no manual step to copy IDs between the pipeline and the job.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/ci-cd/github",
+      "evidence": "The example bundle defines sample_pipeline under resources.pipelines, and the job's refresh_pipeline task uses pipeline_task with pipeline_id: ${resources.pipelines.sample_pipeline.id} to run it."
+    },
+    {
+      "family": "bundles-removed-resource-deleted",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team retires a nightly cleanup job by deleting its definition from the bundle configuration. After the pull request merges, CI runs `databricks bundle deploy -t prod`. The job was previously deployed to prod by this bundle. What happens to the job in the prod workspace?",
+      "options": [
+        {
+          "text": "The deployment deletes it from the prod workspace",
+          "correct": true,
+          "why": "A deployment tracks the resources it created by ID in its state, and a resource removed from the configuration is removed from the target workspace if it was previously deployed."
+        },
+        {
+          "text": "It stays in prod, unmanaged, until someone deletes it by hand",
+          "average": true,
+          "why": "Leaving orphans behind is how create-and-update scripts behave. Bundles keep deployment state, so a resource that disappears from the configuration is removed on the next deploy."
+        },
+        {
+          "text": "It is paused and kept until `databricks bundle destroy` runs",
+          "why": "Deploy doesn't pause removed resources; it removes them. destroy is for tearing down everything the bundle deployed."
+        },
+        {
+          "text": "The deploy fails until the job is deleted with the jobs CLI",
+          "why": "No manual cleanup is required, because the bundle's stored state lets the deployment remove the job itself."
+        }
+      ],
+      "in_practice": "Because removals go through the same reviewed pull request as additions, prod doesn't collect forgotten jobs that keep running, and keep costing compute, after a project is retired.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "a bundle deployment tracks the resources it creates in the target workspace by their IDs as a state that is stored in the workspace file system ... If a resource is removed from the bundle configuration, it is removed from the target workspace if it was previously deployed."
+    },
+    {
+      "family": "bundles-production-mode-git-branch",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A team's `databricks.yml` sets the `prod` target to `mode: production` with `git: branch: main`. CI deploys to prod from `main` without issues. During an incident, an engineer checks out branch `hotfix-112` locally and runs `databricks bundle deploy -t prod` with the same service principal profile CI uses, and the deployment fails validation. What is the cause, and what is the safer fix?",
+      "options": [
+        {
+          "text": "The branch doesn't match the target's `git.branch`; merge the hotfix to `main` and deploy",
+          "correct": true,
+          "why": "Production mode validates that the current Git branch equals the branch set for the target. --force can override the check, but merging keeps prod matching the reviewed main branch."
+        },
+        {
+          "text": "A stale deployment lock blocks the deploy; rerun it with `--force-lock`",
+          "average": true,
+          "why": "--force-lock only takes over a lock left by a crashed or interrupted deploy. The failure comes from the Git branch check, which --force, not --force-lock, overrides."
+        },
+        {
+          "text": "Production mode accepts deploys only from CI runners; trigger the CI workflow",
+          "why": "Production mode doesn't check where the CLI runs. It compares the current Git branch with the target's git.branch, and hotfix-112 doesn't match."
+        },
+        {
+          "text": "Production mode blocks cluster changes; revert the hotfix's cluster settings",
+          "why": "Production mode blocks overriding cluster definitions with options such as a cluster ID flag, which the engineer didn't pass. The branch check is what failed."
+        }
+      ],
+      "in_practice": "Pinning prod to main makes what runs in prod equal what was reviewed, the first question in any incident review; --force exists for emergencies but leaves prod running unreviewed code.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/deployment-modes",
+      "evidence": "Validates that the current Git branch is equal to the Git branch that is specified in the target. Specifying a Git branch in the target is optional ... This validation can be overridden by specifying --force while deploying."
+    },
+    {
+      "family": "cli-destroy-auto-approve",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A CI pipeline deploys a bundle to a short-lived `test` target for each pull request and must tear the deployment down afterward with no one at the keyboard. Which command removes the deployed resources without stalling on a prompt?",
+      "options": [
+        {
+          "text": "`databricks bundle destroy -t test --auto-approve`",
+          "correct": true,
+          "why": "bundle destroy permanently deletes the jobs, pipelines and artifacts the bundle deployed, and --auto-approve skips the confirmation prompts that would otherwise block an unattended run."
+        },
+        {
+          "text": "`databricks bundle destroy -t test`",
+          "average": true,
+          "why": "Without --auto-approve, destroy asks for confirmation before permanently deleting resources, which stalls a non-interactive CI job."
+        },
+        {
+          "text": "`databricks bundle deploy -t test --force`",
+          "why": "deploy creates or updates resources, and --force overrides validations such as the Git branch check. Neither tears a deployment down."
+        },
+        {
+          "text": "`databricks bundle deployment unbind test_job`",
+          "why": "unbind removes the link between one bundle resource and its workspace counterpart and leaves the resource itself in the workspace."
+        }
+      ],
+      "in_practice": "Tearing down per-PR deployments keeps a shared test workspace from piling up hundreds of stale jobs and their costs; anything that must survive can be protected with the lifecycle prevent_destroy setting.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "By default, you are prompted to confirm permanent deletion of the previously-deployed jobs, pipelines, and artifacts. To skip these prompts and perform automatic permanent deletion, add the --auto-approve option to the bundle destroy command."
+    },
+    {
+      "family": "cli-repos-update-git-folder",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A team keeps a production Git folder at `/Workspace/Production/etl` that only automation may change. After each pull request merges into `main`, a GitHub Actions workflow must bring the folder to the latest commit on `main`. Which Databricks CLI command should the workflow run?",
+      "options": [
+        {
+          "text": "`databricks repos update /Workspace/Production/etl --branch main`",
+          "correct": true,
+          "why": "The repos command group manages Git folders, and repos update moves the folder to the latest commit of the named branch, as in the documented GitHub Actions workflow."
+        },
+        {
+          "text": "`databricks bundle deploy -t prod` run from the repository root",
+          "average": true,
+          "why": "bundle deploy uploads a bundle's files and resource definitions to the bundle's own deployment path. It doesn't update a Git folder, which tracks a branch of the remote repository."
+        },
+        {
+          "text": "`databricks git-credentials update` with the service principal's token",
+          "why": "git-credentials manages the Git provider tokens Databricks uses. It doesn't change which commit a Git folder has checked out."
+        },
+        {
+          "text": "`databricks bundle sync --full` from a checkout of `main`",
+          "why": "bundle sync is a one-way upload of local files to the bundle's own workspace directory. It doesn't move a Git folder to a branch's latest commit."
+        }
+      ],
+      "in_practice": "Letting only the workflow update the production folder means prod code always equals merged main, and run-only access for users prevents hand edits that the next merge would overwrite.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/ci-cd/github",
+      "evidence": "The following example GitHub Actions YAML file updates a workspace Git folder when a remote branch updates. ... run: databricks repos update /Workspace/<git-folder-path> --branch git-folder-cicd-example"
+    },
+    {
+      "family": "cli-bundle-plan-preview",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team wants each pull request to show reviewers which jobs and pipelines a merge would create, update or delete in the `prod` target, without changing anything in the workspace. Which Databricks CLI command should the pull request check run?",
+      "options": [
+        {
+          "text": "`databricks bundle plan -t prod`",
+          "correct": true,
+          "why": "bundle plan builds the bundle and lists the actions a deployment would perform on each resource, without making any changes, so reviewers can preview the deploy."
+        },
+        {
+          "text": "`databricks bundle validate -t prod`",
+          "average": true,
+          "why": "validate checks that the configuration is correct and prints the bundle's identity, but it doesn't list the create, update or delete actions a deploy would take."
+        },
+        {
+          "text": "`databricks bundle summary -t prod`",
+          "why": "summary reports the bundle's identity and deployed resources with links. It describes what is deployed now, not what the next deploy would change."
+        },
+        {
+          "text": "`databricks bundle deploy -t prod --auto-approve`",
+          "why": "deploy applies the changes, and --auto-approve only skips confirmation prompts, which is the opposite of a read-only preview."
+        }
+      ],
+      "in_practice": "A plan in the pull request turns an accidental 'delete pipelines.orders' into something a reviewer sees before merge, instead of a production pipeline disappearing after it.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "This command builds the bundle and displays the actions which will be performed on resources that would be deployed, without making any changes. This allows you to preview changes before running bundle deploy."
+    },
+    {
+      "family": "cli-ci-auth-workload-identity",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team runs `databricks bundle deploy` from GitHub Actions. The security team rejects storing any long-lived Databricks token or OAuth secret in GitHub secrets. How should the workflow authenticate the Databricks CLI?",
+      "options": [
+        {
+          "text": "Workload identity federation for a service principal with a GitHub Actions federation policy",
+          "correct": true,
+          "why": "Workload identity federation lets the CLI authenticate as the service principal using the workflow's GitHub-issued identity, so no Databricks secret has to be stored."
+        },
+        {
+          "text": "A service principal access token stored as an encrypted GitHub secret",
+          "average": true,
+          "why": "A service principal is the right identity, but a stored token is still a long-lived secret to rotate and protect, which the security team ruled out."
+        },
+        {
+          "text": "A senior engineer's personal access token stored as a GitHub secret",
+          "why": "A personal token ties production deploys to one person and is still a stored secret. CI should run as a service principal."
+        },
+        {
+          "text": "`databricks auth login` in the workflow to start OAuth user-to-machine sign-in",
+          "why": "User-to-machine login needs a person to finish a browser sign-in, so it suits interactive use. Fully automated workflows use machine-to-machine authentication."
+        }
+      ],
+      "in_practice": "Federation leaves no token to rotate or leak, and the policy's subject, such as repo:my-org/my-repo:environment:Prod, must match exactly, so workflows outside that environment can't authenticate.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/ci-cd/",
+      "evidence": "Authenticate access to Databricks using OAuth token federation: Use workload identity federation for CI/CD authentication, which eliminates the need for Databricks secrets, making it the most secure way to authenticate to Databricks."
+    },
+    {
+      "family": "cli-generate-then-bind",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer adopts bundles for an existing production job with notebook tasks that was built in the Jobs UI. The engineer runs `databricks bundle generate job --existing-job-id 4417`, commits the YAML and deploys to prod. The workspace now has two copies of the job, both scheduled. What should the engineer have done?",
+      "options": [
+        {
+          "text": "Bound the generated resource to the existing job with `--bind` or `bundle deployment bind`",
+          "correct": true,
+          "why": "generate only writes configuration, and deploying it creates a new job unless the resource is bound to the existing one. Once bound, deploys update that job."
+        },
+        {
+          "text": "Given the generated YAML the same job name as the existing job",
+          "average": true,
+          "why": "Bundles correlate resources with the IDs in their deployment state, not by name, so a matching name still produces a second job."
+        },
+        {
+          "text": "Deployed with `--force` so the existing job is overwritten",
+          "why": "--force overrides validations such as the Git branch check. It doesn't link the configuration to a job created outside the bundle."
+        },
+        {
+          "text": "Run `databricks bundle destroy` first to clear the UI-created job",
+          "why": "destroy deletes only resources the bundle previously deployed. It wouldn't touch the UI-created job, and it wouldn't link it to the bundle."
+        }
+      ],
+      "in_practice": "Binding keeps the job's ID, run history and anything that points at it, while a duplicate job can double-process data until someone notices two schedules firing.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "if your bundle includes resource configuration and you deploy it, Databricks creates a new resource rather than updating the existing one. To update an existing resource instead, you must either use the --bind flag with bundle generate or run bundle deployment bind before deploying."
+    }
+  ]
+}

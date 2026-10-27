@@ -1,1 +1,345 @@
-{"items": []}
+{
+  "items": [
+    {
+      "family": "patterns-available-now-incremental-batch",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer turns an always-on Structured Streaming ingestion into a nightly Lakeflow Jobs run. Each run should process every record that has arrived since the previous run and then stop. Which trigger setting does Databricks recommend for this incremental batch pattern?",
+      "options": [
+        { "text": ".trigger(availableNow=True)", "correct": true, "why": "Trigger.AvailableNow consumes all records that are available when the run starts as an incremental batch and then stops, and it can split the work into several micro-batches with sizing options such as maxBytesPerTrigger." },
+        { "text": ".trigger(once=True)", "average": true, "why": "Trigger.Once is the setting many engineers remember, but it is deprecated in Databricks Runtime 11.3 LTS and above, and Databricks says to use AvailableNow for all incremental batch workloads." },
+        { "text": ".trigger(processingTime='24 hours')", "why": "A 24-hour processing-time interval keeps the query running between checks, so the job never finishes and its compute sits idle for most of the day." },
+        { "text": ".trigger(continuous='1 second')", "why": "The continuous trigger is an experimental Spark OSS feature that Databricks doesn't support, and it targets low latency rather than a nightly batch." }
+      ],
+      "in_practice": "Running the stream as a nightly AvailableNow job keeps the checkpoint's exactly-once tracking while paying only for the minutes the job runs, instead of a cluster that idles 23 hours a day.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/triggers",
+      "evidence": "In Databricks Runtime 11.3 LTS and above, Trigger.Once is deprecated. Use Trigger.AvailableNow for all incremental batch processing workloads. The AvailableNow trigger option consumes all available records as an incremental batch with the ability to configure batch size with options such as maxBytesPerTrigger."
+    },
+    {
+      "family": "patterns-standard-vs-managed-file-connectors",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer uses Auto Loader to ingest files that partners drop into an Amazon S3 bucket. In Lakeflow Connect's catalog of file connectors, which connector category does this approach belong to?",
+      "options": [
+        { "text": "A standard connector that uses Spark and SQL APIs", "correct": true, "why": "Lakeflow Connect lists cloud object storage ingestion with Auto Loader or COPY INTO under standard file connectors, which use Spark and SQL APIs and give you more control over how files are read and processed." },
+        { "text": "A managed connector that handles authentication and retries", "average": true, "why": "Managed file connectors cover services such as Google Drive, OneDrive and SharePoint, where Databricks handles authentication, incremental reads and retries; S3 with Auto Loader is not one of them." },
+        { "text": "A query-based connector that tracks a cursor column", "why": "Query-based connectors query a source database directly and use a cursor column to find new rows; they don't read files from object storage." },
+        { "text": "A database connector that runs an ingestion gateway", "why": "Ingestion gateways and staging storage belong to CDC database connectors for sources such as SQL Server, not to file ingestion from S3." }
+      ],
+      "in_practice": "Knowing the category sets expectations: with a standard connector the team owns choices such as schema handling and triggers, while a managed connector trades that control for less code to maintain.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/file-connectors-overview",
+      "evidence": "Standard file connectors use Spark and SQL APIs, giving you more control over how files are read and processed: Cloud object storage - Ingest files from S3, ADLS, or GCS using Auto Loader or COPY INTO."
+    },
+    {
+      "family": "patterns-local-file-upload-table",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data analyst has three small CSV files on a laptop and needs them in a Unity Catalog managed table this afternoon, without writing any code. Which approach meets this need?",
+      "options": [
+        { "text": "Upload them through Add or upload data > Create or modify a table", "correct": true, "why": "The Create or modify a table using file upload page imports small CSV, TSV, JSON, Avro, Parquet or text files from a local machine and creates or overwrites a managed Delta table in the schema you choose." },
+        { "text": "Run COPY INTO with the laptop's local folder as the source path", "average": true, "why": "COPY INTO is a common reflex for loading files, but it reads from a cloud storage URI or a volume path, so it can't reach a laptop's disk, and running it means writing SQL." },
+        { "text": "Point an Auto Loader stream at the laptop's Downloads folder", "why": "Auto Loader discovers files in cloud object storage and Unity Catalog volumes, such as s3:// or /Volumes/ paths, not on a local machine, and it requires streaming code." },
+        { "text": "Upload them to a volume and query them with read_files each time", "why": "A volume is a good landing place for files, but querying them with read_files on every use means writing SQL and never produces the managed table the analyst needs." }
+      ],
+      "in_practice": "The upload page suits one-off reference data such as targets or mappings; it takes up to 10 files under 2 GB in total, so recurring feeds belong in a volume loaded by Auto Loader or COPY INTO.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/create-or-modify-table",
+      "evidence": "The Create or modify a table using file upload page allows you to upload CSV, TSV, or JSON, Avro, Parquet, or text files to create or overwrite a managed Delta Lake table. ... You can use the UI to create a Delta table by importing small CSV, TSV, JSON, Avro, Parquet, or text files from your local machine."
+    },
+    {
+      "family": "patterns-triggered-pipeline-nightly-feed",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team uses Lakeflow Spark Declarative Pipelines to ingest a partner's order files, which land in a Unity Catalog volume once each night. Analysts need the data by 7 a.m., and the team wants to avoid paying for compute between loads. Which pipeline configuration should the team use?",
+      "options": [
+        { "text": "Triggered mode, scheduled to run after the nightly drop", "correct": true, "why": "Triggered mode processes new data on a schedule or when started manually and then stops, which is the batch ingestion pattern for a feed that arrives once a day." },
+        { "text": "Continuous mode, so each file is processed as it lands", "average": true, "why": "Continuous mode processes data as it arrives in the source, which is the streaming pattern; for one nightly drop it keeps compute running all day to wait for files that come once." },
+        { "text": "Triggered mode with a full refresh on every scheduled run", "why": "A full refresh reprocesses all source data instead of only the new files, which wastes compute and gives up the benefit of incremental ingestion." },
+        { "text": "Real-time mode for sub-second end-to-end latency", "why": "Real-time mode targets sub-second operational workloads such as fraud detection; a nightly feed with a morning deadline doesn't need it." }
+      ],
+      "in_practice": "A triggered pipeline on a nightly schedule might run for 10 minutes a day, while the same pipeline in continuous mode keeps compute up around the clock for data that changes once.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/",
+      "evidence": "Batch ingestion - Triggered: Processes new data on a schedule or when manually triggered. Streaming ingestion - Continuous: Processes new data as it arrives in the source."
+    },
+    {
+      "family": "patterns-managed-connector-incremental-runs",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer sets up a Lakeflow Connect managed connector that ingests Salesforce objects into Unity Catalog on an hourly schedule. The sales operations lead worries that every hourly run will re-read millions of unchanged records. How does the connector behave on runs after the first one?",
+      "options": [
+        { "text": "It ingests only the records that changed since the prior run", "correct": true, "why": "Lakeflow Connect ingests all selected data on the first run while tracking changes, then uses that tracking on later runs to ingest only what changed; the Salesforce connector tracks changes with a cursor column." },
+        { "text": "It re-reads every selected object and merges it into the tables", "average": true, "why": "A full re-read on each run is what many hand-built export jobs do, but managed connectors track changes after the initial load and pull only changed data when the source supports it." },
+        { "text": "It streams changes continuously through an ingestion gateway", "why": "Ingestion gateways run continuously for database connectors; SaaS connectors such as Salesforce use a connection and a scheduled ingestion pipeline without a gateway." },
+        { "text": "It waits for a watermark query that the engineer writes", "why": "Managed connectors handle change tracking themselves; the Salesforce connector selects a cursor column from a set list of options instead of relying on a hand-written query." }
+      ],
+      "in_practice": "Incremental runs keep hourly syncs cheap: after a one-time initial load, each run might move a few thousand changed rows instead of millions, which keeps pipeline minutes and source load low.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/",
+      "evidence": "On the first run of your pipeline, it ingests all of the selected data from the source. In parallel, it tracks changes to the source data. On each subsequent run of the pipeline, it uses that change tracking to ingest only the data that's changed from the prior run, when possible."
+    },
+    {
+      "family": "patterns-serverless-continuous-ingestion",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A platform team requires all new ingestion workloads to run on serverless compute. A data engineer's notebook reads events with Structured Streaming using `.trigger(processingTime='1 minute')`, and the business needs fresh data within about a minute, around the clock. Which approach meets both requirements?",
+      "options": [
+        { "text": "Run the ingestion as a serverless pipeline in continuous mode", "correct": true, "why": "The trigger limits for serverless notebooks and jobs don't apply to Lakeflow Spark Declarative Pipelines, and Databricks recommends a serverless pipeline in continuous mode for continuous streaming." },
+        { "text": "Keep the processingTime trigger and run the notebook as a serverless job", "average": true, "why": "Serverless notebooks and jobs support only the AvailableNow and Once triggers, so a processingTime trigger can't run there even though the same code works on classic compute." },
+        { "text": "Switch to .trigger(continuous='1 minute') on serverless job compute", "why": "The continuous trigger is an experimental Spark OSS mode that Databricks doesn't support, and serverless jobs accept only AvailableNow and Once in any case." },
+        { "text": "Keep the trigger and move the notebook to a classic all-purpose cluster", "why": "Classic compute would run the processingTime trigger, but it breaks the platform team's serverless requirement and bills an always-on interactive cluster." }
+      ],
+      "in_practice": "Moving streaming code to serverless starts with a trigger review: AvailableNow jobs suit hourly or daily freshness, while minute-level freshness around the clock points to a continuous serverless pipeline.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/triggers",
+      "evidence": "In serverless notebooks and jobs, only Trigger.AvailableNow() and Trigger.Once() are supported. Databricks recommends Trigger.AvailableNow(). These trigger restrictions do not apply to Lakeflow pipelines processing modes. For continuous streaming, use a serverless pipeline in continuous mode."
+    },
+    {
+      "family": "patterns-default-trigger-storage-costs",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer runs a Structured Streaming query on a classic cluster that reads a bronze Delta table stored in S3 and writes to a silver table. No trigger is set. New data arrives about once an hour, and the business accepts 15 minutes of latency. The cloud bill shows a very high volume of S3 API requests from this stream. Which change addresses the cause?",
+      "options": [
+        { "text": "Set a processing-time trigger, such as processingTime='10 minutes'", "correct": true, "why": "Without a trigger, Structured Streaming uses processingTime with a 0 ms interval and checks for new data every few milliseconds; a 10-minute interval still meets the 15-minute target with far fewer storage calls." },
+        { "text": "Add a maxFilesPerTrigger limit so each micro-batch reads fewer files", "average": true, "why": "maxFilesPerTrigger caps how much each micro-batch reads, but it doesn't change how often the query checks for new data, so the request volume stays high." },
+        { "text": "Add workers so each micro-batch finishes in less time", "why": "Faster micro-batches don't reduce polling; with the default interval of 0 the query starts checking again as soon as a batch ends." },
+        { "text": "Restart the query with a new checkpoint location", "why": "A new checkpoint makes the query begin fresh and reprocess the source, while the trigger, and so the polling rate, stays the same." }
+      ],
+      "in_practice": "Matching the trigger interval to the real latency need is a cheap fix: checking every 10 minutes instead of every few milliseconds cuts polling by orders of magnitude while the 15-minute target is still met.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/triggers",
+      "evidence": "By default, if you don't set a trigger mode, Structured Streaming sets the trigger mode to processingTime and the interval to 0, which checks for new data every few milliseconds. This can generate a high volume of cloud storage API calls per day and result in unexpected charges from your cloud provider."
+    },
+    {
+      "family": "copy-into-pattern-glob-filter",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer uses COPY INTO to load CSV files from `s3://sales-landing/` into a Unity Catalog table. Only files named like `orders_2026*.csv` inside each `region=*` subfolder should be loaded. Which clause selects these files?",
+      "options": [
+        { "text": "PATTERN = 'region=*/orders_2026*.csv'", "correct": true, "why": "PATTERN takes a glob pattern that identifies which files in the source directory to load, so wildcards such as * can match names across subfolders." },
+        { "text": "FILES = ('region=*/orders_2026*.csv')", "average": true, "why": "FILES looks similar, but it takes an explicit list of file names, up to 1,000 of them, rather than a glob, and it can't be combined with PATTERN." },
+        { "text": "COPY_OPTIONS ('pattern' = 'region=*/orders_2026*.csv')", "why": "COPY_OPTIONS controls the operation itself, with options such as force and mergeSchema; choosing which files to load is not one of them." },
+        { "text": "FORMAT_OPTIONS ('fileFilter' = 'region=*/orders_2026*.csv')", "why": "FORMAT_OPTIONS passes reader options for parsing the file format, such as header or delimiter; it is not where COPY INTO selects files." }
+      ],
+      "in_practice": "A glob keeps one scheduled command stable as new region folders appear, while an explicit FILES list has to be regenerated for every run and tops out at 1,000 names.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
+      "evidence": "FILES: A list of file names to load, with a limit of 1000 files. Cannot be specified with PATTERN. PATTERN: A glob pattern that identifies the files to load from the source directory. Cannot be specified with FILES."
+    },
+    {
+      "family": "copy-into-by-position-headerless-csv",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer receives headerless CSV files whose fields appear in exactly the same order as the columns of an existing Unity Catalog table. Which COPY INTO statement maps the source fields to the table columns by their order?",
+      "options": [
+        { "text": "COPY INTO sales.raw.orders BY POSITION FROM '/Volumes/sales/raw/landing' FILEFORMAT = CSV", "correct": true, "why": "BY POSITION matches source columns to target columns by ordinal position instead of by name and casts types automatically; it is supported only for headerless CSV files." },
+        { "text": "COPY INTO sales.raw.orders FROM '/Volumes/sales/raw/landing' FILEFORMAT = CSV FORMAT_OPTIONS ('header' = 'true')", "average": true, "why": "Setting header to true tells the reader that the first line holds column names, so the first data row of each headerless file would be treated as a header instead of loaded." },
+        { "text": "COPY INTO sales.raw.orders FROM '/Volumes/sales/raw/landing' FILEFORMAT = TEXT", "why": "The TEXT format loads each line as a single string value, so the comma-separated fields would not be split into the table's columns." },
+        { "text": "COPY INTO sales.raw.orders FROM '/Volumes/sales/raw/landing' FILEFORMAT = CSV COPY_OPTIONS ('mergeSchema' = 'true')", "why": "mergeSchema only lets the target schema evolve; it doesn't change how columns are matched, so headerless fields named _c0, _c1 and so on still don't line up with the table's column names." }
+      ],
+      "in_practice": "Positional mapping avoids writing a SELECT that casts and renames _c0, _c1 and so on for every field, which matters when a legacy export has dozens of unnamed columns.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
+      "evidence": "BY POSITION | ( col_name [ , <col_name> ... ] ): Matches source columns to target table columns by ordinal position. Type casting of the matched columns is done automatically. This parameter is only supported for headerless CSV file format. ... The default name matching is not used for matching."
+    },
+    {
+      "family": "copy-into-ignore-corrupt-files",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly COPY INTO loads vendor Parquet files from a Unity Catalog volume into a bronze table. Last night, two truncated files made the whole command fail. The team wants future runs to load the readable files, report how many were skipped, and pick up the two files automatically once the vendor replaces them. Which change meets these requirements?",
+      "options": [
+        { "text": "Add FORMAT_OPTIONS ('ignoreCorruptFiles' = 'true')", "correct": true, "why": "With ignoreCorruptFiles, COPY INTO skips files it can't read and returns the count in num_skipped_corrupt_files; corrupt files aren't tracked as loaded, so fixed versions load on a later run." },
+        { "text": "Add COPY_OPTIONS ('force' = 'true')", "average": true, "why": "force disables the skip for files that were already loaded, so every run would reload the whole folder and duplicate rows, and it does nothing about unreadable files." },
+        { "text": "Add VALIDATE ALL to the scheduled statement", "why": "VALIDATE checks whether the data can be parsed and loaded but writes nothing to the table, so the nightly job would stop loading data at all." },
+        { "text": "Add COPY_OPTIONS ('mergeSchema' = 'true')", "why": "mergeSchema lets the target schema evolve when new columns appear; it doesn't help when a file is truncated and can't be read." }
+      ],
+      "in_practice": "Skipping a couple of bad files keeps the other few hundred flowing into bronze on time, and the skip count in the command result or in DESCRIBE HISTORY gives the team a number to alert on.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/examples",
+      "evidence": "Files that can't be read due to corruption can be skipped by setting ignoreCorruptFiles to true in the FORMAT_OPTIONS. The result of the COPY INTO command returns how many files were skipped due to corruption in the num_skipped_corrupt_files column. Corrupt files aren't tracked by COPY INTO, so they can be reloaded in a subsequent run if the corruption is fixed."
+    },
+    {
+      "family": "copy-into-uc-source-read-privileges",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 2,
+      "type": "multiple",
+      "stem": "A data engineer runs COPY INTO on a SQL warehouse to load files from Amazon S3 into a Unity Catalog table, with no inline credentials in the statement. An admin must give the engineer read access to the source files through Unity Catalog. Which two grants can provide this access? (Choose two.)",
+      "options": [
+        { "text": "READ VOLUME on a volume that covers the source files", "correct": true, "why": "Databricks recommends a Unity Catalog volume for ingestion source data, and READ VOLUME on that volume lets COPY INTO read the files through the volume path." },
+        { "text": "READ FILES on the external location that covers the S3 path", "correct": true, "why": "When the S3 path sits inside a Unity Catalog external location, READ FILES on that location lets COPY INTO read the source files without inline credentials." },
+        { "text": "MODIFY on the target table in the destination schema", "average": true, "why": "MODIFY governs changing data in the target table, which is where many people look first, but it says nothing about reading files in cloud storage, so the source would still be unreadable." },
+        { "text": "WRITE FILES on the external location that covers the S3 path", "why": "WRITE FILES allows writing files directly to the external location; reading source files for a load is governed by READ FILES instead." },
+        { "text": "CREATE EXTERNAL TABLE on the external location", "why": "CREATE EXTERNAL TABLE lets a user register tables whose data lives in the external location; it doesn't grant reading arbitrary files for a load." }
+      ],
+      "in_practice": "Granting READ VOLUME or READ FILES keeps cloud keys out of SQL text and job code, and access can be revoked centrally in Unity Catalog instead of rotating shared credentials.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/configure-data-access",
+      "evidence": "To access data using a Unity Catalog volume (recommended), the READ VOLUME privilege on the volume. ... To access data using a Unity Catalog external location, the READ FILES privilege on the external location."
+    },
+    {
+      "family": "copy-into-single-command-over-concurrent",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer must load a backlog of about 5,000 JSON files from one S3 prefix into a Unity Catalog table before a morning deadline. A teammate proposes starting one COPY INTO command per file in parallel to finish sooner. Which approach does Databricks recommend?",
+      "options": [
+        { "text": "Run one COPY INTO command that loads all of the files in the prefix", "correct": true, "why": "A single COPY INTO with multiple files typically performs better than concurrent commands that each load one file; concurrency is meant for producers that can't coordinate or for loading a huge directory folder by folder." },
+        { "text": "Run one COPY INTO per file in parallel, since concurrency is supported", "average": true, "why": "Concurrent COPY INTO commands on distinct files are supported and eventually succeed, but Databricks says not to run them concurrently to improve performance, because many single-file commands are typically slower." },
+        { "text": "Run parallel COPY INTO commands over overlapping sets of files", "why": "Concurrent commands that don't work on distinct sets of input files run into transaction conflicts, so overlapping file sets cause failures rather than speed." },
+        { "text": "Run one COPY INTO per file with COPY_OPTIONS ('force' = 'true')", "why": "force turns off idempotency so files load even if they were loaded before; it adds duplicate risk and does nothing for throughput." }
+      ],
+      "in_practice": "One command over the prefix is also simpler to rerun after a failure, since already loaded files are skipped; if the backlog grows toward millions of files, Databricks points to Auto Loader instead.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
+      "evidence": "COPY INTO should not be invoked concurrently to improve performance; a single COPY INTO command with multiple files typically performs better than running concurrent COPY INTO commands with a single file each."
+    },
+    {
+      "family": "copy-into-modified-file-still-skipped",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's nightly COPY INTO job ingests CSV files from an S3 prefix into a Unity Catalog table. After yesterday's load included `orders_0412.csv`, the vendor found errors and overwrote that object with a corrected version under an identical name. Tonight's job runs without any changes. How does COPY INTO treat the corrected file?",
+      "options": [
+        { "text": "It skips the file, because already loaded files are skipped even if modified", "correct": true, "why": "COPY INTO is idempotent: files in the source that it has already loaded are skipped, and the reference states that this holds even if the files have been modified since they were loaded." },
+        { "text": "It loads the file again, because its modification time is newer", "average": true, "why": "Timestamp-based change detection is a common assumption, but COPY INTO doesn't reload a file it already loaded, even after the file is overwritten." },
+        { "text": "It replaces the rows that the original file loaded yesterday", "why": "COPY INTO loads files into the table without matching rows to earlier loads; replacing yesterday's rows takes a deliberate delete or MERGE step." },
+        { "text": "It fails the run because the file contents no longer match", "why": "COPY INTO doesn't raise an error for a previously loaded file; it keeps track of loaded files and simply skips them on later runs." }
+      ],
+      "in_practice": "Corrections need a deliberate step, such as deleting the bad rows and reloading that one file with FILES and force set to true; otherwise a silent skip can leave known-bad rows in the table for weeks.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
+      "evidence": "Loads data from a file location into a Delta table. This is a retryable and idempotent operation. Files in the source location that have already been loaded are skipped. This is true even if the files have been modified since they were loaded."
+    },
+    {
+      "family": "auto-loader-default-directory-listing",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer starts a new Auto Loader stream on an S3 path and sets no file detection options. How does Auto Loader discover new files in this configuration?",
+      "options": [
+        { "text": "It lists the input directory to find files it hasn't processed", "correct": true, "why": "Directory listing is Auto Loader's default mode: it identifies new files by listing the input directory and needs no permissions beyond access to the data." },
+        { "text": "It subscribes to file events for the input directory through a queue", "average": true, "why": "File notification mode, preferably with file events, is what Databricks recommends for most workloads, but it has to be set up; it is not the mode Auto Loader uses by default." },
+        { "text": "It reads the bucket's object version history to find changed files", "why": "Auto Loader doesn't read object version history; it discovers files either by listing directories or by consuming file notifications." },
+        { "text": "It waits for a file arrival trigger to pass it the new file paths", "why": "A file arrival trigger can start a Lakeflow Jobs run when files land, but the stream still discovers files itself through its detection mode." }
+      ],
+      "in_practice": "The default is quick to start because it needs only read access, but listing cost grows with the directory; teams with millions of files usually switch to file events once the external location supports them.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/file-detection-modes",
+      "evidence": "Auto Loader uses directory listing mode by default. In directory listing mode, Auto Loader identifies new files by listing the input directory. Directory listing mode allows you to quickly start Auto Loader streams without any permission configurations other than access to your data on cloud storage."
+    },
+    {
+      "family": "auto-loader-json-inferred-as-strings",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer starts an Auto Loader stream on JSON files with `cloudFiles.schemaLocation` set and no schema, schema hints, or type inference options. Which data types does Auto Loader assign to the inferred columns?",
+      "options": [
+        { "text": "STRING for every column, nested JSON fields included", "correct": true, "why": "For formats that don't encode types, such as JSON, CSV and XML, Auto Loader infers every column as a string by default, nested JSON fields included, to avoid type-mismatch problems as the schema evolves." },
+        { "text": "Types sampled from the data, as spark.read.json would pick", "average": true, "why": "Choosing types from sample data is the Spark DataFrameReader's behavior; Auto Loader does this only when cloudFiles.inferColumnTypes is set to true." },
+        { "text": "A single VARIANT column that holds each whole record", "why": "Loading each record into one VARIANT column is a separate ingestion pattern you opt into; it is not what default schema inference produces." },
+        { "text": "The column types of the target Unity Catalog table", "why": "Auto Loader infers the schema from the source files and stores it at the schema location; it doesn't take types from the destination table." }
+      ],
+      "in_practice": "String-typed bronze tables rarely break when a vendor changes a type; teams cast in silver, or set cloudFiles.inferColumnTypes or schema hints when they want typed columns on landing.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/schema",
+      "evidence": "By default, Auto Loader schema inference seeks to avoid schema evolution issues due to type mismatches. For formats that don't encode data types (JSON, CSV, and XML), Auto Loader infers all columns as strings (including nested fields in JSON files)."
+    },
+    {
+      "family": "auto-loader-pipeline-managed-locations",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "In Lakeflow Spark Declarative Pipelines, a data engineer defines `CREATE OR REFRESH STREAMING TABLE bronze_orders AS SELECT * FROM STREAM read_files(...)` to land files in Unity Catalog. Which checkpoint and schema location settings must the engineer provide?",
+      "options": [
+        { "text": "None, because the pipeline manages both locations automatically", "correct": true, "why": "When read_files is used in a CREATE STREAMING TABLE statement inside Lakeflow Spark Declarative Pipelines, the checkpoint and schema locations are managed automatically." },
+        { "text": "A volume path for cloudFiles.schemaLocation and checkpointLocation", "average": true, "why": "Both paths are required when Auto Loader runs in plain Structured Streaming, but a pipeline manages them for you, and Databricks recommends keeping the managed directories." },
+        { "text": "A folder inside the target table's own storage directory", "why": "Unity Catalog doesn't allow checkpoint or schema evolution files to be nested under a table directory, and a pipeline doesn't need either path set anyway." },
+        { "text": "A table property that points to a checkpoint folder", "why": "Streaming tables in a pipeline don't take their checkpoint from a table property; the pipeline creates and manages the checkpoint and schema directories itself." }
+      ],
+      "in_practice": "Letting the pipeline own these directories avoids classic bugs such as two streams sharing a checkpoint; manually configured paths are also left untouched by a full refresh, which can surprise a team.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/unity-catalog",
+      "evidence": "When you use read_files in a CREATE STREAMING TABLE statement inside Lakeflow pipelines, checkpoint and schema locations are managed automatically."
+    },
+    {
+      "family": "auto-loader-fail-on-new-columns",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer at a bank lands transaction files into a Unity Catalog table with Auto Loader and a provided schema. Compliance requires that the stream stop whenever an unexpected column appears and stay stopped until someone reviews and updates the schema. Which `cloudFiles.schemaEvolutionMode` setting meets this requirement?",
+      "options": [
+        { "text": "failOnNewColumns", "correct": true, "why": "failOnNewColumns fails the stream when a new column appears and doesn't update the schema; it won't restart until someone updates the provided schema or removes the offending file." },
+        { "text": "addNewColumns", "average": true, "why": "addNewColumns also stops the stream, but it first merges the new column into the stored schema so a plain restart carries on without review; it is also not allowed when a schema is provided." },
+        { "text": "rescue", "why": "rescue never evolves the schema and never fails the stream; it moves the new column into the rescued data column, so nobody is forced to review it." },
+        { "text": "none", "why": "none ignores new columns and keeps running, so an unexpected field would be dropped without anyone noticing unless a rescued data column is configured." }
+      ],
+      "in_practice": "A hard stop costs some freshness, perhaps an hour until someone approves the change, but it guarantees no unreviewed column reaches a regulated table; the failed run's alert starts the review.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/schema",
+      "evidence": "failOnNewColumns: Stream fails and does not restart unless you update the provided schema or remove the offending data file. The schema is not updated automatically."
+    },
+    {
+      "family": "auto-loader-migrate-to-file-events",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team has run an Auto Loader stream in directory listing mode for a year, and the source folder now holds millions of files, so each listing is slow and costly. An admin has enabled file events on the Unity Catalog external location for that folder. How should the team move the stream to file events?",
+      "options": [
+        { "text": "Set cloudFiles.useManagedFileEvents to true and restart on the existing checkpoint", "correct": true, "why": "Auto Loader can switch between directory listing and file notifications at any time while keeping exactly-once guarantees, so enabling useManagedFileEvents on the same stream and checkpoint is enough." },
+        { "text": "Set cloudFiles.useManagedFileEvents to true and start from a new checkpoint", "average": true, "why": "A new checkpoint discards the record of files already ingested, so the stream would begin fresh and reload the backlog; switching detection modes doesn't require it." },
+        { "text": "Set cloudFiles.useIncrementalListing to true and keep directory listing", "why": "Incremental listing is deprecated and doesn't use the file events the admin enabled; Databricks recommends file events instead." },
+        { "text": "Set cloudFiles.backfillInterval to one day so files are found sooner", "why": "backfillInterval schedules periodic full listings to catch missed files; it is unsupported with file events and would add listing cost rather than remove it." }
+      ],
+      "in_practice": "Keeping the checkpoint avoids re-ingesting a year of files and the duplicates that would follow, and file events then discover new files incrementally instead of listing millions of objects each run.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/file-notification-mode",
+      "evidence": "You can switch between file notifications and directory listing at any time and still maintain exactly-once data processing guarantees. ... Start by enabling file events for your external location, then set cloudFiles.useManagedFileEvents in your Auto Loader stream configuration."
+    },
+    {
+      "family": "auto-loader-provided-schema-drops-new-columns",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer configures Auto Loader with `.schema(expected_schema)` and `cloudFiles.format` set to `json`, and sets no schema evolution mode or rescued data column. Weeks later, analysts report that two fields a vendor added never appear in the Unity Catalog table, yet the stream never failed. Which explanation fits this behavior?",
+      "options": [
+        { "text": "With a provided schema the default mode is none, so new columns are ignored and not rescued", "correct": true, "why": "addNewColumns is the default only when no schema is provided; with a provided schema the default is none, which doesn't evolve the schema, ignores new columns and doesn't rescue them unless rescuedDataColumn is set." },
+        { "text": "The default addNewColumns mode added the fields, but the stream was never restarted", "average": true, "why": "addNewColumns is the default only without a provided schema, and it would have failed the stream visibly; with a provided schema it isn't allowed at all." },
+        { "text": "Schema inference sampled only the first 1,000 files, so later fields were never seen", "why": "Sampling limits apply when Auto Loader infers a schema, and this stream infers none; the provided schema is what decides which fields are kept." },
+        { "text": "Rescue mode moved the new fields into the _rescued_data column", "why": "rescue is not the default, and when a schema is provided there is no rescued data column unless the rescuedDataColumn option is set." }
+      ],
+      "in_practice": "Silent drops are expensive to discover weeks later; setting schemaEvolutionMode to rescue, or passing the expected schema as schema hints so addNewColumns can run, keeps unexpected fields visible from day one.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/schema",
+      "evidence": "addNewColumns mode is the default when a schema is not provided, but none is the default when you provide a schema. ... none: Does not evolve the schema, new columns are ignored, and data is not rescued unless the rescuedDataColumn option is set. Stream does not fail due to schema changes."
+    },
+    {
+      "family": "auto-loader-file-events-cache-expiry",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer lands partner exports into a Unity Catalog table with an Auto Loader job that uses file events and `Trigger.AvailableNow`. The job runs once a month. Only a few hundred new files arrive each month among millions of older ones, yet every run spends far longer discovering files than processing them. What is the most likely cause?",
+      "options": [
+        { "text": "The file events cache expires between monthly runs, so discovery falls back to directory listing", "correct": true, "why": "The file events service caches recently created files; if Auto Loader runs less often than about once every seven days, the cache expires and Auto Loader falls back to directory listing to find files and rebuild it." },
+        { "text": "File events always list the full source directory at the start of an AvailableNow run", "average": true, "why": "With file events, discovery is incremental when streams run regularly; a full listing happens because the cache of recent files has expired, not on every run." },
+        { "text": "The default limit of 1,000 files per micro-batch slows down file discovery", "why": "The 1,000-file default caps how many files each micro-batch processes; it doesn't control how Auto Loader finds files, and under AvailableNow discovery runs asynchronously." },
+        { "text": "The checkpoint holds too much file state and should be reset each month", "why": "The checkpoint's file state is what prevents duplicates; resetting it would make the stream begin fresh and re-ingest millions of older files." }
+      ],
+      "in_practice": "Scheduling the job at least weekly, even when little data arrives, keeps discovery incremental; a short weekly run is usually cheaper than a monthly run that lists millions of objects.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/file-notification-mode",
+      "evidence": "The file events service optimizes file discovery by caching the most recently created files. If Auto Loader runs infrequently, this cache can expire, and Auto Loader falls back to directory listing to discover files and update the cache. To avoid this scenario, invoke Auto Loader at least once every seven days."
+    }
+  ]
+}
