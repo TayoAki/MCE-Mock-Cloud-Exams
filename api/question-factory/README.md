@@ -16,10 +16,11 @@ exam guide ──► blueprint ──► sources ──► scrape ──► draf
 
 - Every guide objective, by number ("2.3"), with its official text.
 - The app objective (`ingestion.auto-loader`) each guide objective is taught under, its domain, and the bank file it lives in.
-- How many new items each objective needs, sized so each domain matches its exam weight.
+- How many factory items each objective should have (`target`, counting every batch), sized so each domain matches its exam weight.
+- The bank files that hold each objective's items (`files`), one per batch. New items go in the last file, so a batch never rewrites the previous one.
 - The difficulty mix (40% recall, 35% apply, 25% judge) and the cap on "Choose two" items (10%).
 
-When the guide changes, update this file first; everything downstream follows from it.
+When the guide changes, update this file first; everything downstream follows from it. To grow the bank, raise the targets and add a new file per objective group; the validator's coverage report then shows what each objective still needs.
 
 ## 2. Sources: where the facts come from
 
@@ -101,4 +102,11 @@ Existing questions are never changed by the seed; revise them in the backoffice.
 
 ## Status of the bank
 
-The 222 factory items, written in October 2026 from documentation scraped that month, are drafts. Like the rest of the pilot bank they still need independent subject-matter review before CertPath presents them as reviewed content.
+The factory holds 422 items in two batches, both written in October 2026 from documentation read that month:
+
+| Batch | Files | Items | Bank after |
+|---|---|---|---|
+| 1 | `platform`, `ingestion-1`, `ingestion-2`, `transformation-1`, `transformation-2`, `jobs-1`, `jobs-2`, `cicd`, `troubleshooting`, `governance-1`, `governance-2` | 222 | 300 |
+| 2 | `platform-2`, `ingestion-3`, `ingestion-4`, `transformation-3`, `transformation-4`, `jobs-3`, `jobs-4`, `cicd-2`, `troubleshooting-2`, `governance-3`, `governance-4` | 200 | 500 |
+
+Batch 2 was written against batch 1, testing facts the earlier questions don't. All of them are drafts. Like the rest of the pilot bank they still need independent subject-matter review before CertPath presents them as reviewed content.

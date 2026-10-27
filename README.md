@@ -92,7 +92,7 @@ The backoffice covers the plan's content workflow: draft → human review → pu
 
 - **MongoDB instead of PostgreSQL.** You specified MongoDB, so the plan's 38-table reference schema became 35 collections. Join tables are embedded and the plan's uniqueness and idempotency constraints are unique indexes; the mapping is in [`api/README.md`](api/README.md). Grading and completion use multi-document transactions, so MongoDB must run as a replica set.
 - **"Customer and rider app" is the learner app.** CertPath has no riders, so `mobile/` serves learners and `admin/` serves staff.
-- **Content.** The plan shipped five sample questions. The seed now holds 300 original draft questions across all seven domains. 78 were written by hand (including the newer formats and stories). The other 222 come from the [question factory](api/question-factory/README.md), which:
+- **Content.** The plan shipped five sample questions. The seed now holds 500 original draft questions across all seven domains, each domain sized to its exam weight. 78 were written by hand (including the newer formats and stories). The other 422 come from the [question factory](api/question-factory/README.md) in two batches, which:
   - maps the August 2026 exam guide's 33 objectives to the app;
   - scrapes the cited documentation (with Firecrawl when `FIRECRAWL_API_KEY` is set);
   - writes every item to one authoring spec;
