@@ -1,1 +1,209 @@
-{"items": []}
+{
+  "items": [
+    {
+      "family": "lakehouse-default-delta-format",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer creates a table in Unity Catalog with `CREATE TABLE main.sales.orders (order_id BIGINT, amount DECIMAL(10,2))` and gives no USING clause. Which table format does Databricks use for the new table?",
+      "options": [
+        { "text": "Delta Lake", "correct": true, "why": "Delta Lake is the default format for all operations on Databricks, so a table created without a USING clause is a Delta table: Parquet data files plus a transaction log that provides ACID commits and history." },
+        { "text": "Parquet", "average": true, "why": "Parquet is the tempting pick because Delta stores its data in Parquet files, but the table is a Delta table: its transaction log adds ACID transactions, table history and time travel that a plain Parquet table lacks." },
+        { "text": "Apache Iceberg", "why": "Databricks can work with Iceberg tables, but only when you choose that format; Delta Lake remains the default for a table created without a USING clause." },
+        { "text": "Hive SerDe text format", "why": "Hive SerDe text tables are a legacy Hive format that Databricks does not pick by default; serverless compute does not support Hive SerDe tables at all." }
+      ],
+      "in_practice": "Because Delta is the default, every table a team creates gets ACID writes, schema enforcement and history with no extra setup, so a nightly load that fails halfway never leaves dashboards reading half-written data.",
+      "source": "https://docs.databricks.com/aws/en/delta/",
+      "evidence": "Delta Lake is the default format for all operations on Databricks. Unless otherwise specified, all tables on Databricks are Delta Lake tables."
+    },
+    {
+      "family": "lakehouse-unity-catalog-governance-layer",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform team is onboarding new engineers to the Databricks lakehouse. Which component is the governance layer that enforces access control when a table is queried, captures lineage automatically, and logs activity for auditing?",
+      "options": [
+        { "text": "Unity Catalog", "correct": true, "why": "Unity Catalog is the unified governance layer for data and AI on Databricks: it enforces privileges at query time, tracks lineage as assets are used, and logs activity for auditing." },
+        { "text": "The Delta Lake transaction log", "average": true, "why": "The Delta Lake transaction log records each write to one table, which makes it look like an audit trail, but it is a storage-layer feature: it does not decide who may query the table or track lineage across assets." },
+        { "text": "The legacy Hive metastore", "why": "The legacy Hive metastore holds table metadata for a single workspace; it does not capture lineage or govern access across workspaces the way Unity Catalog does." },
+        { "text": "Lakeflow Jobs", "why": "Lakeflow Jobs orchestrates notebooks, queries and pipelines; it runs workloads but does not decide who may read the tables those workloads touch." }
+      ],
+      "in_practice": "With one governance layer, a team grants access once in SQL and the same rules apply in notebooks, SQL warehouses and dashboards across attached workspaces, instead of maintaining separate cloud IAM policies for each tool.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/",
+      "evidence": "Unity Catalog is the unified governance layer for data and AI built into Databricks. ... Unity Catalog operates beneath every data and AI interaction ... enforcing access control when you query a table or call a model, tracking lineage as data and AI assets are used, logging activity for auditing, and more."
+    },
+    {
+      "family": "lakehouse-lineage-impact-analysis",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer plans to drop the `discount_pct` column from the Unity Catalog table `main.sales.orders` next week. Before the change, the engineer must find every downstream table, job, and dashboard that depends on the column so their owners can be warned. Which approach meets this requirement?",
+      "options": [
+        { "text": "Review the table's column-level lineage in Catalog Explorer to list downstream assets", "correct": true, "why": "Unity Catalog captures lineage automatically down to the column level and aggregates it across workspaces on the metastore, so the Lineage tab shows the downstream tables, jobs and dashboards that depend on the column." },
+        { "text": "Run DESCRIBE HISTORY on the table to see which jobs used the column", "average": true, "why": "DESCRIBE HISTORY lists the operations that wrote to this table, with user and timestamp; it does not record which downstream queries, jobs or dashboards read the column." },
+        { "text": "Search the workspace notebooks for the column name and list the matches", "why": "A text search of notebooks misses SQL queries, dashboards, jobs in other workspaces and code that selects all columns, so it cannot produce a complete impact list." },
+        { "text": "Run DESCRIBE DETAIL on the table to list the tables that reference it", "why": "DESCRIBE DETAIL returns metadata about the current table, such as its location, size and properties; it does not list the assets that consume it." }
+      ],
+      "in_practice": "An impact check before a schema change turns a surprise dashboard outage into a planned migration: the owners of each affected job and report get notice and a date instead of a broken Monday-morning refresh.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage",
+      "evidence": "Unity Catalog captures lineage automatically for queries run on Databricks, down to the column level ... Perform impact analysis: Before changing or deleting a table or column, identify the downstream tables, jobs, and dashboards that depend on it."
+    },
+    {
+      "family": "lakehouse-lineage-path-reference",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer builds the Unity Catalog table `main.silver.customers` with a query that reads its source by path as delta.`s3://raw-bucket/customers`. In Catalog Explorer, the lineage graph shows the S3 path upstream, but clicking a column shows no column-level links. Which change makes column lineage appear in Catalog Explorer?",
+      "options": [
+        { "text": "Register the source as a Unity Catalog table and read it by its table name", "correct": true, "why": "Catalog Explorer and the lineage API show column lineage only when both the source and the target are referenced by table name, so a source read by path does not get column links there." },
+        { "text": "Turn on column lineage for the table, because it is not captured by default", "average": true, "why": "Column lineage is not an opt-in setting: Unity Catalog captures lineage automatically for queries run on Databricks, down to the column level, when tables are referenced by name." },
+        { "text": "Grant the engineer the BROWSE privilege on the parent catalog", "why": "BROWSE on the parent catalog is needed to view lineage at all, but the engineer already sees the graph; the missing column links come from the path reference, not from permissions." },
+        { "text": "Rerun the query on Databricks Runtime 11.3 LTS or above", "why": "Databricks Runtime 11.3 LTS is the requirement for lineage of streaming between Delta tables; a newer runtime does not add column lineage for a source referenced by path." }
+      ],
+      "in_practice": "Reading data by table name instead of storage path keeps lineage, access control and auditing tied to one governed object, so a compliance review can trace a PII column end to end without a hand-maintained mapping sheet.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage",
+      "evidence": "If the source or the target is referenced as a path (Example: select * from delta.\"s3://<bucket>/<path>\"), Catalog Explorer and the lineage API don't show column lineage. They show column lineage only when both the source and target are referenced by table name."
+    },
+    {
+      "family": "lakehouse-time-travel-retention-window",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A finance data team must be able to re-create a report from the Unity Catalog managed table `main.finance.ledger` exactly as the data looked at any point in the last 60 days. The table uses default retention settings, and the team wants to add only as much storage cost as the requirement needs. Which configuration meets this requirement?",
+      "options": [
+        { "text": "Set both delta.logRetentionDuration and delta.deletedFileRetentionDuration to 60 days", "correct": true, "why": "Time travel needs both the log entries and the data files for a version, so both properties must cover the 60-day window; this is the smallest change that keeps every version readable, at the cost of keeping more data files." },
+        { "text": "Set delta.logRetentionDuration to 60 days and keep the other defaults", "average": true, "why": "Raising log retention keeps 60 days of history visible, but deleted-file retention stays at 7 days, so VACUUM can remove older data files and time travel to versions older than 7 days is blocked." },
+        { "text": "Set delta.deletedFileRetentionDuration to 60 days and keep the other defaults", "why": "Keeping data files longer is not enough while log retention stays at 30 days; log retention must also be at least the deleted-file retention, so this combination is not allowed on a managed table." },
+        { "text": "Keep the default settings and stop running VACUUM on the table", "why": "Skipping VACUUM does not help: log entries older than 30 days are still cleaned up, and time travel to versions older than the 7-day deleted-file threshold is blocked on Unity Catalog managed tables anyway." }
+      ],
+      "in_practice": "Retention is a cost lever: keeping 60 days of replaced files on a heavily updated table can multiply its storage footprint, so teams extend the window only on tables with an audit need and leave the 7-day default elsewhere.",
+      "source": "https://docs.databricks.com/aws/en/tables/history",
+      "evidence": "To query a previous table version, you must retain both the log and the data files for that version ... For example, to access 30 days of historical data, set delta.deletedFileRetentionDuration = \"interval 30 days\", which matches the default setting for delta.logRetentionDuration."
+    },
+    {
+      "family": "lakehouse-restore-duplicates-downstream-stream",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer finds that last night's load corrupted the bronze Delta table `main.retail.events` and plans to run `RESTORE TABLE main.retail.events TO VERSION AS OF 118`. Since version 118 the table has also been compacted with OPTIMIZE. A Structured Streaming job reads the bronze table incrementally and appends to a silver table. What should the engineer plan for before running the restore?",
+      "options": [
+        { "text": "The stream may treat the restored files as new data and append duplicate rows to silver", "correct": true, "why": "RESTORE is a data-changing operation: its commit re-adds earlier data files with dataChange set to true, so a stream reading the table can process them again as new data and write duplicates downstream." },
+        { "text": "Nothing downstream, because RESTORE only moves the table's current version pointer", "average": true, "why": "Treating RESTORE as a metadata-only pointer move is the common assumption, but it writes a new commit that removes and re-adds data files marked as data changes, which streaming readers see." },
+        { "text": "The silver table is rolled back to the matching version by the stream automatically", "why": "A stream never rolls its target back; RESTORE changes only the table it runs on, so silver keeps every row already written and may receive the restored files again." },
+        { "text": "The restore is blocked until the stream stops, because the stream locks the table", "why": "A running stream does not lock the Delta table against RESTORE; the documented requirement for restoring is MODIFY permission on the table." }
+      ],
+      "in_practice": "Teams that restore a bronze table usually pause the downstream stream and plan a dedup or targeted rebuild of silver; skipping that step can double-count a day of revenue in gold reports.",
+      "source": "https://docs.databricks.com/aws/en/tables/history",
+      "evidence": "Restore is a data-changing operation and might result in duplicate data for downstream workloads. ... the data change log entries added by the restore operation are considered new data updates, and processing them may result in duplicate data."
+    },
+    {
+      "family": "compute-serverless-streaming-trigger",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer moves a PySpark Structured Streaming notebook from classic compute to serverless compute for jobs. The job is scheduled to run every hour. Which trigger should the `writeStream` call use?",
+      "options": [
+        { "text": "`.trigger(availableNow=True)`", "correct": true, "why": "Serverless compute for notebooks and jobs supports Trigger.AvailableNow, which processes all available data and then stops, and Databricks recommends it for streaming on serverless." },
+        { "text": "`.trigger(processingTime=\"1 minute\")`", "average": true, "why": "A processing-time trigger is the usual micro-batch choice on classic compute, but serverless notebooks and jobs do not support it and raise INFINITE_STREAMING_TRIGGER_NOT_SUPPORTED." },
+        { "text": "`.trigger(continuous=\"1 second\")`", "why": "Continuous triggers are not supported in serverless notebooks or jobs either; always-on, low-latency streaming belongs in a serverless pipeline in continuous mode." },
+        { "text": "No trigger, so Spark uses its default", "why": "Leaving the trigger unset gives Spark's default of ProcessingTime(\"0 seconds\"), which serverless rejects, so a supported trigger must be set explicitly." }
+      ],
+      "in_practice": "AvailableNow suits scheduled incremental jobs: compute runs only while there is data to process, so an hourly job that finishes in 4 minutes is billed for those minutes, not for an always-on stream.",
+      "source": "https://docs.databricks.com/aws/en/compute/serverless/limitations",
+      "evidence": "Serverless compute for notebooks and jobs supports the following Structured Streaming triggers: Trigger.AvailableNow(). Databricks recommends this trigger mode for serverless compute. ... The following triggers are not supported ...: Trigger.Continuous(interval). Trigger.ProcessingTime(interval)."
+    },
+    {
+      "family": "compute-warehouse-iwm-serverless-only",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is comparing serverless and pro SQL warehouses for a reporting workload. Which capability does a serverless SQL warehouse offer that a pro SQL warehouse does not?",
+      "options": [
+        { "text": "Intelligent Workload Management", "correct": true, "why": "Intelligent Workload Management, which uses AI-powered prediction to give workloads the right resources quickly, is available only on serverless SQL warehouses; pro supports Photon and Predictive IO but not IWM." },
+        { "text": "The Photon engine", "average": true, "why": "Photon is often associated with serverless, but every SQL warehouse type, including pro and classic, runs on the Photon engine." },
+        { "text": "Predictive IO", "why": "Predictive IO speeds up selective scans on both serverless and pro SQL warehouses; only the classic type lacks it." },
+        { "text": "Compute that runs in your own AWS account", "why": "That describes pro and classic warehouses, whose compute layer lives in your AWS account; a serverless warehouse's compute runs in your Databricks account instead." }
+      ],
+      "in_practice": "For BI traffic that idles overnight and spikes at 9 a.m., rapid scaling and a 2–6 second startup let a serverless warehouse stop when idle without making the first users wait, instead of keeping a pro warehouse warm.",
+      "source": "https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types",
+      "evidence": "A pro SQL warehouse supports Photon and Predictive IO, but does not support Intelligent Workload Management. With a pro SQL warehouse (unlike a serverless SQL warehouse), the compute layer exists in your AWS account."
+    },
+    {
+      "family": "compute-pool-min-idle-instances",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform team creates an instance pool so that its classic job clusters start faster. What does the pool's Minimum Idle Instances setting control?",
+      "options": [
+        { "text": "How many instances stay ready and unterminated, refilled as clusters take them", "correct": true, "why": "Minimum Idle Instances is the number of instances the pool always keeps idle; they are never terminated by auto termination, and when a cluster takes some, Databricks provisions more to restore the minimum." },
+        { "text": "The cap on idle plus in-use instances the pool can provision", "average": true, "why": "That is Maximum Capacity, which limits all instances and fails autoscaling requests with INSTANCE_POOL_MAX_CAPACITY_FAILURE; the minimum sets the warm buffer, not the ceiling." },
+        { "text": "How many minutes an extra instance can stay idle before it terminates", "why": "That is idle instance auto termination, which applies only to instances above the minimum; the minimum idle instances are never terminated by it." },
+        { "text": "How many idle instances get the preloaded Databricks Runtime version", "why": "The preloaded Databricks Runtime is a separate pool setting that applies to the pool's idle instances in general; it is not a count of instances." }
+      ],
+      "in_practice": "Idle instances trade money for speed: they are running VMs your cloud provider bills while they wait. Size the minimum to the clusters that must start quickly at peak, and prefer serverless when the workload supports it.",
+      "source": "https://docs.databricks.com/aws/en/compute/pools",
+      "evidence": "The minimum number of instances the pool keeps idle. These instances do not terminate, regardless of the auto termination settings. If a cluster consumes idle instances from the pool, Databricks provisions additional instances to maintain the minimum."
+    },
+    {
+      "family": "compute-dedicated-access-mode-r-rdd",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data scientist runs an R notebook that also calls legacy Spark RDD code a few times a week. The workspace uses Unity Catalog, and the platform team's default for new classic compute is standard access mode. Which compute should the data scientist use for this notebook?",
+      "options": [
+        { "text": "Classic compute in dedicated access mode, assigned to the data scientist", "correct": true, "why": "Dedicated access mode is meant for workloads that need RDD APIs, R, GPUs or privileged machine access, and the compute is assigned to a single user or group." },
+        { "text": "Classic compute in standard access mode, shared with the team", "average": true, "why": "Standard access mode is recommended for most workloads, but R is not supported on standard compute and RDD APIs are one of its documented limitations, so this notebook needs dedicated compute." },
+        { "text": "Serverless compute for notebooks", "why": "Serverless compute supports neither R nor Spark RDD APIs, so it cannot run this notebook even though it is the general recommendation for notebooks." },
+        { "text": "A serverless SQL warehouse attached to the notebook", "why": "A SQL warehouse runs SQL only; it cannot execute R code or Spark RDD operations." }
+      ],
+      "in_practice": "Reserving dedicated compute for the few notebooks that truly need R or RDDs lets everyone else share standard compute, which for a team of 20 can mean a couple of shared clusters instead of 20 personal ones.",
+      "source": "https://docs.databricks.com/aws/en/compute/dedicated-overview",
+      "evidence": "Choose dedicated compute for workloads that require: RDD APIs: Workloads that need direct access to Spark's RDD (Resilient Distributed Dataset) APIs ... R language support: Data science workloads that require R programming capabilities."
+    },
+    {
+      "family": "compute-serverless-migration-blockers",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 2,
+      "type": "multiple",
+      "stem": "A platform team is reviewing five classic Lakeflow Jobs tasks before moving them to serverless compute for jobs. Which two tasks must be redesigned before they can run on serverless compute? (Choose two.)",
+      "options": [
+        { "text": "A task whose cluster runs a compute-scoped init script to install Python packages", "correct": true, "why": "Compute-scoped init scripts are not supported on serverless compute, so the package setup must move into a base environment or notebook dependencies." },
+        { "text": "A task that runs on a custom Docker image from Databricks Container Services", "correct": true, "why": "Databricks Container Services is not supported on serverless compute, so a task that depends on a custom container image must drop that dependency or stay on classic jobs compute." },
+        { "text": "A notebook task that installs its libraries with %pip at the top of the notebook", "average": true, "why": "Notebook-scoped %pip installs are what serverless recommends in place of compute-scoped libraries, so this task can move as it is." },
+        { "text": "A JAR task that runs a compiled application", "why": "JAR tasks in jobs are supported on serverless compute; the JAR library limitation applies to notebooks, not to JAR job tasks." },
+        { "text": "A Python task that writes output files to a Unity Catalog volume", "why": "Unity Catalog volumes are the storage that serverless recommends in place of DBFS, so writing to a volume needs no change." }
+      ],
+      "in_practice": "Auditing tasks for unsupported features before a serverless migration avoids failed first runs; the tasks that pass can switch right away and stop paying for cluster startup and idle time.",
+      "source": "https://docs.databricks.com/aws/en/compute/serverless/limitations",
+      "evidence": "Databricks Container Services is not supported. ... The following compute-specific features are not supported: ... Compute-scoped init scripts. To install packages or configure the Python environment, use a base environment or notebook dependencies instead."
+    },
+    {
+      "family": "compute-serverless-billing-background-features",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A FinOps analyst queries `system.billing.usage` for a workspace where every notebook and job still runs on classic compute, and finds a steady stream of records under the serverless jobs SKU. No one on the team has run serverless notebooks or jobs. Which explanation is most likely?",
+      "options": [
+        { "text": "Predictive optimization or data quality monitoring ran on serverless infrastructure", "correct": true, "why": "Data quality monitoring and predictive optimization run on serverless infrastructure and are billed under the serverless jobs SKU, even though they are managed separately from serverless notebooks and jobs." },
+        { "text": "Serverless SQL warehouse queries are billed under the serverless jobs SKU", "average": true, "why": "Serverless SQL warehouses are a separate serverless product with their own configuration, and their usage is attributed to Databricks SQL; the documented cause of unexpected serverless jobs records is background features such as predictive optimization." },
+        { "text": "Classic job clusters are billed as serverless when they use instance pools", "why": "Pool-backed classic clusters still run in your own cloud account as classic compute; serverless compute does not even support instance pools." },
+        { "text": "The records are delayed charges from serverless runs months ago", "why": "Usage can take up to 24 hours to appear in the billable usage table, but that delay cannot explain a steady stream of records when no serverless workloads have run." }
+      ],
+      "in_practice": "Getting this attribution right matters for chargeback: table maintenance cost belongs to the tables it optimizes, so FinOps teams break serverless jobs usage down by the product that generated it before billing any team.",
+      "source": "https://docs.databricks.com/aws/en/compute/serverless/",
+      "evidence": "Data quality monitoring and predictive optimization run on serverless infrastructure and are billed under the serverless jobs SKU. These features are managed separately from serverless compute for notebooks, workflows, and Lakeflow pipelines."
+    }
+  ]
+}
