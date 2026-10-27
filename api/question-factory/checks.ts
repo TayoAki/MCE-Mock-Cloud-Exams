@@ -6,6 +6,7 @@ import blueprintJson from '../src/seed/questions/blueprint.json' with { type: 'j
 import { ItemSchema, type Item } from '../src/seed/questions/schema.js';
 import { DOMAINS, UNITS } from '../src/seed/bank.js';
 import { HANDS_ON_UNIT, STORIES } from '../src/seed/formats.js';
+import { WITHDRAWN_FAMILIES } from '../src/seed/questions/withdrawn.js';
 
 export interface BlueprintObjective {
   code: string;
@@ -154,6 +155,7 @@ export function checkBank(files: Record<string, unknown[]>): BankReport {
       if (expected && !expected.includes(file)) findings.push({ family: item.family, level: 'error', message: `objective ${item.objective} belongs in ${expected.map((f) => `${f}.json`).join(' or ')}, not ${file}.json` });
       if (fileOf.has(item.family)) findings.push({ family: item.family, level: 'error', message: `family is duplicated (also in ${fileOf.get(item.family)}.json)` });
       if (seed.families.has(item.family)) findings.push({ family: item.family, level: 'error', message: 'family collides with an existing seed question' });
+      if (WITHDRAWN_FAMILIES[item.family]) findings.push({ family: item.family, level: 'error', message: 'family key was withdrawn after publishing; use a new key' });
       fileOf.set(item.family, file);
       items.push(item);
     }

@@ -98,7 +98,12 @@ This appends the error-free items to the objective's bank file. Family keys are 
 - It composes the explanation as three paragraphs: the key's why; the tempting answer's why and the other options' whys; then "In practice".
 - It stores the evidence in the question's reviewer notes.
 
-Existing questions are never changed by the seed; revise them in the backoffice.
+The bank files stay the source of truth after publishing:
+- **Fixing a published question:** edit its item. On the next start the importer publishes the new content as a new revision and retires the old one for new sessions, so learner history stays on the revision it was answered on.
+- **Withdrawing a question:** remove the item and add its family key, with the reason, to `src/seed/questions/withdrawn.ts`. The importer retires it, and the validator stops the key from being reused.
+- **Staff edits win:** once staff revise a question in the backoffice, the importer leaves that family alone.
+
+The API logs what each start changed, for example `Question bank: 24 added, 3 revised, 1 withdrawn`.
 
 ## Status of the bank
 

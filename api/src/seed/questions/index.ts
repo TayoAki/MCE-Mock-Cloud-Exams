@@ -24,6 +24,7 @@ import transformation4 from './transformation-4.json' with { type: 'json' };
 import troubleshooting from './troubleshooting.json' with { type: 'json' };
 import troubleshooting2 from './troubleshooting-2.json' with { type: 'json' };
 import { arrangeItem, composeRationale, type Item, type ItemFile } from './schema.js';
+import { WITHDRAWN_FAMILIES } from './withdrawn.js';
 
 /**
  * The question bank built by the question factory (api/question-factory):
@@ -110,20 +111,89 @@ async function refreshLayout(familyId: string, rationale: string) {
 }
 
 /**
- * Adds the factory's questions. Additive and idempotent by family key, so an
- * existing database picks up new items on the next start without changing
- * anything already there (published questions are revised through the backoffice).
+ * The published revision of a factory family that the importer may still change:
+ * every revision came from the factory (none from the backoffice) and the latest is published.
  */
-export async function addQuestionBank(examVersionId: string, opts: { publish: boolean; reviewerId: string; now?: Date }) {
+async function factoryOwned(familyId: string, reviewerId: string) {
+  const versions = await QuestionVersion.find({ familyId }).sort({ revision: -1 });
+  if (!versions.length || versions.some((v) => v.createdBy !== reviewerId)) return null;
+  return versions[0]!.status === 'published' ? versions[0]! : null;
+}
+
+/** Retires the published revision for new sessions, as the backoffice does. */
+async function retireVersion(version: InstanceType<typeof QuestionVersion>, actorId: string, note: string) {
+  version.status = 'retired';
+  version.retiredAt = new Date();
+  await version.save();
+  await ContentAudit.create({ actorId, entityType: 'question_version', entityId: version._id, action: 'retired', note });
+}
+
+/**
+ * Keeps an untouched factory question in step with its bank file. A changed item
+ * is published as a new revision and the old one retired for new sessions, so
+ * learner history stays on the revision it was answered on. Once staff revise
+ * the family in the backoffice, the importer leaves it alone.
+ */
+async function syncItem(familyId: string, item: Item, opts: { reviewerId: string; now: Date }) {
+  await refreshLayout(familyId, composeRationale(item));
+  const current = await factoryOwned(familyId, opts.reviewerId);
+  if (!current) return false;
+  await QuestionFamily.updateOne({ _id: familyId, difficulty: { $ne: item.difficulty } }, { $set: { difficulty: item.difficulty } });
+  const key = await QuestionKey.findById(current._id).lean();
+  const { options, correct } = arrangeItem(item);
+  const rationale = composeRationale(item);
+  const same =
+    current.prompt === item.stem &&
+    current.answerType === item.type &&
+    current.sourceUrl === item.source &&
+    JSON.stringify(current.options.map((o) => [o.key, o.text])) === JSON.stringify(options.map((o) => [o.key, o.text])) &&
+    JSON.stringify(key?.correctOptions ?? []) === JSON.stringify(correct) &&
+    words(key?.rationale ?? '') === words(rationale);
+  if (same) return false;
+  const revision = await QuestionVersion.create({
+    familyId,
+    examVersionId: current.examVersionId,
+    objectiveId: current.objectiveId,
+    domainId: current.domainId,
+    revision: current.revision + 1,
+    prompt: item.stem,
+    answerType: item.type,
+    options,
+    sourceUrl: item.source,
+    createdBy: opts.reviewerId,
+    status: 'published',
+    reviewedBy: opts.reviewerId,
+    reviewedAt: opts.now,
+    publishedAt: opts.now,
+  });
+  await QuestionKey.create({ _id: revision._id, correctOptions: correct, rationale, reviewedNotes: `${REVIEW_NOTE} Guide ${item.guide}. Evidence: ${item.evidence}` });
+  await ContentAudit.create({ actorId: opts.reviewerId, entityType: 'question_version', entityId: revision._id, action: 'published', note: 'Question factory item updated from its bank file.' });
+  await retireVersion(current, opts.reviewerId, `Superseded by revision ${revision.revision}`);
+  return true;
+}
+
+/**
+ * Imports the factory's questions, idempotently by family key: new items are
+ * added, changed ones get a new revision (see syncItem) and withdrawn ones are
+ * retired. Questions staff have revised in the backoffice are never changed.
+ */
+export async function addQuestionBank(examVersionId: string, opts: { publish: boolean; reviewerId: string; now?: Date; items?: Item[] }) {
   const now = opts.now ?? new Date();
   await ensureObjectives(examVersionId);
   const objectives = new Map((await Objective.find({ examVersionId }).lean()).map((o) => [o.code, o]));
   const existing = new Map((await QuestionFamily.find({ examVersionId }).select({ familyKey: 1, createdBy: 1 }).lean()).map((f) => [f.familyKey, f]));
   let added = 0;
-  for (const item of bankItems()) {
+  let revised = 0;
+  let withdrawn = 0;
+  for (const [familyKey, reason] of Object.entries(WITHDRAWN_FAMILIES)) {
+    const family = existing.get(familyKey);
+    const current = family?.createdBy === opts.reviewerId ? await factoryOwned(family._id, opts.reviewerId) : null;
+    if (current) (await retireVersion(current, opts.reviewerId, `Withdrawn from the question factory: ${reason}`), withdrawn++);
+  }
+  for (const item of opts.items ?? bankItems()) {
     const family = existing.get(item.family);
     if (family) {
-      if (family.createdBy === opts.reviewerId) await refreshLayout(family._id, composeRationale(item));
+      if (family.createdBy === opts.reviewerId && opts.publish && (await syncItem(family._id, item, { reviewerId: opts.reviewerId, now }))) revised++;
       continue;
     }
     const objective = objectives.get(item.objective);
@@ -164,5 +234,5 @@ export async function addQuestionBank(examVersionId: string, opts: { publish: bo
     });
     added++;
   }
-  return { added };
+  return { added, revised, withdrawn };
 }

@@ -99,7 +99,7 @@
       "guide": "2.4",
       "difficulty": 2,
       "type": "single",
-      "stem": "An admin has created a Unity Catalog connection to Salesforce in Catalog Explorer. A non-admin data engineer must now create an ingestion pipeline from that connection with Declarative Automation Bundles, writing into the existing schema sales.crm_raw, where the engineer already has USE CATALOG, USE SCHEMA and CREATE TABLE. Which additional privilege does the engineer need?",
+      "stem": "An admin created a Unity Catalog connection to Salesforce in Catalog Explorer. A data engineer without admin rights must build a Lakeflow Connect ingestion pipeline on that connection with Declarative Automation Bundles, landing data in sales.crm_raw, where the engineer already holds the catalog and schema privileges needed to create tables there. What else must the engineer be granted?",
       "options": [
         {
           "text": "USE CONNECTION on the Salesforce connection",

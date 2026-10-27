@@ -4,7 +4,8 @@ import { loadBankFiles } from '../question-factory/validate.js';
 import { Objective, QuestionFamily, QuestionKey, QuestionVersion } from '../src/models/index.js';
 import { FIXTURE_REVIEWER_ID } from '../src/seed/seed.js';
 import { addQuestionBank, bankItems } from '../src/seed/questions/index.js';
-import { arrangeItem, composeRationale } from '../src/seed/questions/schema.js';
+import { arrangeItem, composeRationale, type Item } from '../src/seed/questions/schema.js';
+import { WITHDRAWN_FAMILIES } from '../src/seed/questions/withdrawn.js';
 import { mockInventory } from '../src/services/selection.js';
 import { pilotVersionId } from './helpers.js';
 
@@ -44,16 +45,50 @@ describe('question factory bank', () => {
     expect(key.rationale.startsWith(item.options.find((o) => o.correct)!.why)).toBe(true);
     expect(key.reviewedNotes).toContain(item.evidence);
 
-    // An explanation stored in an older layout (same words) is brought up to date; an edited one is left alone.
+    // An explanation stored in an older layout (same words) is brought up to date in place.
     await QuestionKey.updateOne({ _id: qv._id }, { $set: { rationale: key.rationale.replace(/\n\n/g, ' ') } });
-    const second = bankItems()[1]!;
-    const secondQv = (await QuestionVersion.findOne({ familyId: (await QuestionFamily.findOne({ examVersionId, familyKey: second.family }).lean())!._id }).lean())!;
-    await QuestionKey.updateOne({ _id: secondQv._id }, { $set: { rationale: 'Edited by a reviewer.' } });
     const before = await QuestionFamily.countDocuments({ examVersionId });
-    expect((await addQuestionBank(examVersionId, { publish: true, reviewerId: FIXTURE_REVIEWER_ID })).added).toBe(0);
+    expect(await addQuestionBank(examVersionId, { publish: true, reviewerId: FIXTURE_REVIEWER_ID })).toEqual({ added: 0, revised: 0, withdrawn: 0 });
     expect(await QuestionFamily.countDocuments({ examVersionId })).toBe(before);
     expect((await QuestionKey.findById(qv._id).lean())!.rationale).toBe(composeRationale(item));
-    expect((await QuestionKey.findById(secondQv._id).lean())!.rationale).toBe('Edited by a reviewer.');
+  });
+
+  it('publishes a changed item as a new revision, unless staff have revised it', async () => {
+    const examVersionId = await pilotVersionId();
+    const opts = { publish: true, reviewerId: FIXTURE_REVIEWER_ID };
+    const [item, staffItem] = [bankItems()[2]!, bankItems()[3]!];
+    const familyOf = async (key: string) => (await QuestionFamily.findOne({ examVersionId, familyKey: key }).lean())!._id;
+
+    const changed = { ...item, stem: `Updated: ${item.stem}`, difficulty: item.difficulty === 3 ? 1 : 3 } as Item;
+    expect(await addQuestionBank(examVersionId, { ...opts, items: [changed] })).toMatchObject({ added: 0, revised: 1 });
+    const versions = await QuestionVersion.find({ familyId: await familyOf(item.family) }).sort({ revision: 1 }).lean();
+    expect(versions.map((v) => [v.revision, v.status])).toEqual([[1, 'retired'], [2, 'published']]);
+    expect(versions[1]).toMatchObject({ prompt: changed.stem, createdBy: FIXTURE_REVIEWER_ID });
+    expect((await QuestionKey.findById(versions[1]!._id).lean())!.rationale).toBe(composeRationale(changed));
+    expect((await QuestionFamily.findById(await familyOf(item.family)).lean())!.difficulty).toBe(changed.difficulty);
+    // Importing the same content again changes nothing.
+    expect(await addQuestionBank(examVersionId, { ...opts, items: [changed] })).toMatchObject({ revised: 0 });
+
+    // A revision made in the backoffice hands the family to staff.
+    const staffFamily = await familyOf(staffItem.family);
+    const published = (await QuestionVersion.findOne({ familyId: staffFamily, status: 'published' }).lean())!;
+    const { _id, status, publishedAt, reviewedBy, reviewedAt, ...copy } = published;
+    await QuestionVersion.create({ ...copy, revision: published.revision + 1, createdBy: 'staff-editor' });
+    expect(await addQuestionBank(examVersionId, { ...opts, items: [{ ...staffItem, stem: `Updated: ${staffItem.stem}` }] })).toMatchObject({ revised: 0 });
+    expect(await QuestionVersion.countDocuments({ familyId: staffFamily })).toBe(published.revision + 1);
+  });
+
+  it('retires withdrawn items and keeps their family keys out of the bank', async () => {
+    const examVersionId = await pilotVersionId();
+    const opts = { publish: true, reviewerId: FIXTURE_REVIEWER_ID };
+    const [familyKey] = Object.keys(WITHDRAWN_FAMILIES);
+    const item = { ...bankItems()[4]!, family: familyKey! };
+    expect(await addQuestionBank(examVersionId, { ...opts, items: [item] })).toMatchObject({ added: 1 });
+    expect(await addQuestionBank(examVersionId, { ...opts, items: [] })).toMatchObject({ withdrawn: 1 });
+    const family = (await QuestionFamily.findOne({ examVersionId, familyKey }).lean())!;
+    expect((await QuestionVersion.find({ familyId: family._id }).lean()).map((v) => v.status)).toEqual(['retired']);
+    expect(await addQuestionBank(examVersionId, { ...opts, items: [] })).toMatchObject({ withdrawn: 0 });
+    expect(checkBank({ test: [item] }).findings).toContainEqual(expect.objectContaining({ family: familyKey, level: 'error', message: expect.stringContaining('withdrawn') }));
   });
 
   it('fills a full 45-question mock exam across every domain', async () => {

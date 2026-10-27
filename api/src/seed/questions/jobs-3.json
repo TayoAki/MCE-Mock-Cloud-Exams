@@ -533,7 +533,7 @@
       "guide": "4.2",
       "difficulty": 1,
       "type": "single",
-      "stem": "A data engineer wants every task in a multi-task job to write the same identifier of the current job run into an audit column, so that rows written by different tasks in one run can be grouped later. Which dynamic value reference should each task's parameter use?",
+      "stem": "Several tasks in one Lakeflow Jobs run append rows to shared Delta tables, and auditors later group those rows by the run that produced them. Each task passes an audit-column value through a parameter. Which reference gives all tasks in a run the same identifier?",
       "options": [
         {
           "text": "{{job.run_id}}",

@@ -194,7 +194,8 @@ export async function seedDatabase(options: SeedOptions = {}) {
   await addFormatContent(examVersionId, { publish, reviewerId: FIXTURE_REVIEWER_ID, now });
   await applySeedDifficulty(examVersionId, FIXTURE_REVIEWER_ID);
   // The question factory's bank, mapped to the current exam guide's objectives.
-  await addQuestionBank(examVersionId, { publish, reviewerId: FIXTURE_REVIEWER_ID, now });
+  const bank = await addQuestionBank(examVersionId, { publish, reviewerId: FIXTURE_REVIEWER_ID, now });
+  if (bank.added || bank.revised || bank.withdrawn) console.log(`Question bank: ${bank.added} added, ${bank.revised} revised, ${bank.withdrawn} withdrawn`);
 
   const result: { examVersionId: string; adminId?: string; demoUserId?: string } = { examVersionId };
   if (options.accounts) {

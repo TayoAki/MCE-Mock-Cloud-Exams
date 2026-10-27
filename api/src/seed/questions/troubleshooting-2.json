@@ -8,10 +8,24 @@
       "type": "single",
       "stem": "A data engineer runs a serverless job in Lakeflow Jobs that must finish within 10 minutes of each hourly trigger to feed an operations dashboard. Recent runs take about 10 minutes, and hovering over each run's Duration shows about 5 minutes in Waiting for resources, under a minute in Queued and about 4 minutes in Running. Performance optimized is disabled for the job. Which change shortens the runs most directly?",
       "options": [
-        { "text": "Enable Performance optimized so the serverless tasks start faster", "correct": true, "why": "The run breakdown puts most of the time in Waiting for resources. With Performance optimized disabled, the job uses standard performance mode, which has a startup latency of 4 to 6 minutes; performance-optimized mode is built to start and run faster." },
-        { "text": "Back the job's compute with an instance pool that keeps idle instances", "average": true, "why": "Instance pools with idle instances are the fix for slow VM launches on classic compute. This job runs on serverless compute, where the startup wait is set by the performance mode, not by pools." },
-        { "text": "Raise the job's maximum concurrent runs from 1 to 2", "why": "Maximum concurrent runs addresses time spent in the Queued phase, which is under a minute here. Allowing overlapping runs doesn't shorten the 5 minutes spent waiting for resources." },
-        { "text": "Trim the job's environment down to fewer Python packages", "why": "Fewer packages, or a workspace base environment, shortens the Library installation phase. The breakdown shows the time going to Waiting for resources instead." }
+        {
+          "text": "Enable Performance optimized so the serverless tasks start faster",
+          "correct": true,
+          "why": "The run breakdown puts most of the time in Waiting for resources. With Performance optimized disabled, the job uses standard performance mode, which has a startup latency of 4 to 6 minutes; performance-optimized mode is built to start and run faster."
+        },
+        {
+          "text": "Back the job's compute with an instance pool that keeps idle instances",
+          "average": true,
+          "why": "Instance pools with idle instances are the fix for slow VM launches on classic compute. This job runs on serverless compute, where the startup wait is set by the performance mode, not by pools."
+        },
+        {
+          "text": "Raise the job's maximum concurrent runs from 1 to 2",
+          "why": "Maximum concurrent runs addresses time spent in the Queued phase, which is under a minute here. Allowing overlapping runs doesn't shorten the 5 minutes spent waiting for resources."
+        },
+        {
+          "text": "Trim the job's environment down to fewer Python packages",
+          "why": "Fewer packages, or a workspace base environment, shortens the Library installation phase. The breakdown shows the time going to Waiting for resources instead."
+        }
       ],
       "in_practice": "Standard mode consumes fewer DBUs on the same SKU, so it suits overnight batch work; moving a latency-sensitive hourly job to performance-optimized mode trades some extra cost for several fewer minutes of startup on every run.",
       "source": "https://docs.databricks.com/aws/en/jobs/diagnose-job-performance",
@@ -25,10 +39,24 @@
       "type": "single",
       "stem": "A serverless job in Lakeflow Jobs usually finishes its nightly load in about 20 minutes, but last night's run took 55 minutes. Before anyone tunes queries, the data engineering lead wants to know whether the run simply processed far more data than usual. What is the quickest way for the engineer on call to check?",
       "options": [
-        { "text": "Compare rows read and rows written for last night's run and a recent normal run", "correct": true, "why": "For serverless jobs, the job run and task run sidebars show rows read and written and the total query count. Opening a slow run next to an earlier fast run shows whether data volume changed or the workload itself got slower." },
-        { "text": "Hover over last night's Duration to see its breakdown by phase", "average": true, "why": "The phase breakdown shows whether time went to queueing, waiting for resources, library installation or running. It would show that Running grew, but not whether more input data caused it." },
-        { "text": "Compare the bar heights of the two runs in the matrix view", "why": "Bar height in the matrix view reflects run duration, which only confirms the slowdown. It says nothing about how many rows each run read or wrote." },
-        { "text": "Query execution_duration_seconds in system.lakeflow.job_run_timeline", "why": "That column records time spent, not rows processed, so it can't show whether data volume changed. It also logs 0 for multi-task and non-legacy job runs." }
+        {
+          "text": "Compare rows read and rows written for last night's run and a recent normal run",
+          "correct": true,
+          "why": "For serverless jobs, the job run and task run sidebars show rows read and written and the total query count. Opening a slow run next to an earlier fast run shows whether data volume changed or the workload itself got slower."
+        },
+        {
+          "text": "Hover over last night's Duration to see its breakdown by phase",
+          "average": true,
+          "why": "The phase breakdown shows whether time went to queueing, waiting for resources, library installation or running. It would show that Running grew, but not whether more input data caused it."
+        },
+        {
+          "text": "Compare the bar heights of the two runs in the matrix view",
+          "why": "Bar height in the matrix view reflects run duration, which only confirms the slowdown. It says nothing about how many rows each run read or wrote."
+        },
+        {
+          "text": "Query execution_duration_seconds in system.lakeflow.job_run_timeline",
+          "why": "That column records time spent, not rows processed, so it can't show whether data volume changed. It also logs 0 for multi-task and non-legacy job runs."
+        }
       ],
       "in_practice": "Separating a volume spike from a regression decides who acts: a 3x jump in rows read after month-end close is expected, while flat input with more queries or new performance insights points to a code change worth rolling back.",
       "source": "https://docs.databricks.com/aws/en/jobs/diagnose-job-performance",
@@ -42,31 +70,59 @@
       "type": "single",
       "stem": "A data engineer builds a 90-day duration baseline for jobs in Lakeflow Jobs by computing period_end_time - period_start_time for each row of system.lakeflow.job_run_timeline. A multi-task nightly job that usually runs for about three hours never shows a value above one hour, and it has several rows for every run_id. Which change gives each run's real duration?",
       "options": [
-        { "text": "Group the rows by run_id and sum period_end_time - period_start_time", "correct": true, "why": "The timeline tables slice any run longer than an hour into several rows with the same run_id, each covering up to an hour. Summing the slices per run, as Databricks' example duration query does, restores the full run time." },
-        { "text": "Keep only the rows where result_state IS NOT NULL", "average": true, "why": "This leaves one row per run, but only the final slice carries the result state. That row covers the last hour or less, so the baseline would still understate a three-hour run." },
-        { "text": "Average run_duration_seconds instead of the period columns", "why": "The duration columns in job_run_timeline are populated only for single-task jobs created with the legacy Jobs APIs. For this multi-task job they log 0." },
-        { "text": "Read the run durations from system.lakeflow.jobs", "why": "system.lakeflow.jobs is a slowly changing dimension table of job definitions, such as names, triggers and settings. It holds no run history or durations." }
+        {
+          "text": "Group the rows by run_id and sum period_end_time - period_start_time",
+          "correct": true,
+          "why": "The timeline tables slice any run longer than an hour into several rows with the same run_id, each covering up to an hour. Summing the slices per run, as Databricks' example duration query does, restores the full run time."
+        },
+        {
+          "text": "Keep only the rows where result_state IS NOT NULL",
+          "average": true,
+          "why": "This leaves one row per run, but only the final slice carries the result state. That row covers the last hour or less, so the baseline would still understate a three-hour run."
+        },
+        {
+          "text": "Average run_duration_seconds instead of the period columns",
+          "why": "The duration columns in job_run_timeline are populated only for single-task jobs created with the legacy Jobs APIs. For this multi-task job they log 0."
+        },
+        {
+          "text": "Read the run durations from system.lakeflow.jobs",
+          "why": "system.lakeflow.jobs is a slowly changing dimension table of job definitions, such as names, triggers and settings. It holds no run history or durations."
+        }
       ],
       "in_practice": "A baseline that caps long runs at an hour hides exactly the regressions that matter; summing slices lets a team alert when a three-hour job drifts past its 95th percentile instead of finding out from a missed SLA.",
       "source": "https://docs.databricks.com/aws/en/admin/system-tables/jobs",
       "evidence": "For runs that last longer than 1 hour, multiple rows are emitted with the same run_id, each representing up to one hour of the run's duration. Example: CAST(SUM(period_end_time - period_start_time) AS LONG) as duration ... GROUP BY ALL"
     },
     {
-      "family": "monitoring-skipped-runs-enable-queueing",
+      "family": "monitoring-failure-rate-final-rows",
       "objective": "troubleshooting.monitoring",
       "guide": "6.2",
-      "difficulty": 3,
+      "difficulty": 2,
       "type": "single",
-      "stem": "A data engineer's job in Lakeflow Jobs runs every 30 minutes and MERGEs new orders into the same Delta table. Maximum concurrent runs is 1 and queueing is turned off. Since order volume grew, runs take about 40 minutes, and the matrix view now shows every other run as Skipped. Every scheduled run must eventually execute, and two runs must never write at the same time. What should the engineer change?",
+      "stem": "A platform lead builds a 30-day failure rate for every job in Lakeflow Jobs from system.lakeflow.job_run_timeline: per job_id, the count of rows with result_state = 'FAILED' divided by count(*). Jobs whose runs last several hours show failure rates far below what their Runs tabs suggest. Which change fixes the rate?",
       "options": [
-        { "text": "Turn on queueing for the job", "correct": true, "why": "With queueing on, a run that would exceed the job's maximum concurrent runs waits in the queue, for up to 48 hours, instead of being skipped. Runs still execute one at a time, so the MERGEs never overlap." },
-        { "text": "Raise maximum concurrent runs to 2", "average": true, "why": "A higher limit stops the skips, but each new run would start while the previous one is still merging, which breaks the rule that two runs never write at the same time." },
-        { "text": "Add retries to the job's task", "why": "Retries rerun a task run that failed. A skipped run never started, so retry settings don't bring it back." },
-        { "text": "Set a 30-minute timeout on the job", "why": "A timeout stops runs that exceed it, leaving MERGEs unfinished and producing Timed Out runs. It doesn't make the skipped runs execute." }
+        {
+          "text": "Count only rows where result_state IS NOT NULL in the denominator",
+          "correct": true,
+          "why": "Runs longer than an hour are split across several rows, and result_state is set only on the row that ends the run. Counting rows with a result_state counts each finished run once, so long runs stop inflating the denominator."
+        },
+        {
+          "text": "Count the FAILED runs in system.lakeflow.jobs instead",
+          "average": true,
+          "why": "The jobs table is a slowly changing dimension of job definitions, such as names, triggers and owners. It holds no run outcomes, so the failure rate has to come from the timeline table."
+        },
+        {
+          "text": "Query system.lakeflow.job_task_run_timeline instead",
+          "why": "Task runs longer than an hour are sliced the same way, so the denominator would still count slices, and it would count task runs rather than job runs."
+        },
+        {
+          "text": "Also count TIMED_OUT and ERROR rows as failures",
+          "why": "Which outcomes count as failures is a question about the numerator. The low rates for long jobs come from the denominator counting every hourly slice."
+        }
       ],
-      "in_practice": "Queueing keeps a fixed cadence honest during growth spurts: late runs show up as a visible backlog instead of silently missing loads. The lasting fix is still to bring run time back under the 30-minute interval.",
-      "source": "https://docs.databricks.com/aws/en/jobs/configure-job",
-      "evidence": "To prevent runs of a job from being skipped because of concurrency limits, you can enable queueing for the job. When queueing is enabled, the run is queued for up to 48 hours if resources are unavailable for a job run."
+      "in_practice": "A failure-rate dashboard built on slice counts under-reports exactly the long, expensive jobs. Counting finished runs once, as the documented outcome query does with result_state IS NOT NULL, makes per-job alert thresholds trustworthy.",
+      "source": "https://docs.databricks.com/aws/en/admin/system-tables/jobs",
+      "evidence": "result_state: The outcome of the job run. For runs longer than one hour that are split across multiple rows, this column is populated only in the row that represents the end of the run."
     },
     {
       "family": "monitoring-pipeline-event-log-expectations",
@@ -76,10 +132,24 @@
       "type": "single",
       "stem": "A data engineer wants to chart, for every update of a Lakeflow Spark Declarative Pipelines pipeline, how many records passed and failed each expectation. Where are these per-expectation counts recorded?",
       "options": [
-        { "text": "In flow_progress events in the pipeline's event log", "correct": true, "why": "The pipeline event log stores data quality metrics in the details:flow_progress.data_quality.expectations object of flow_progress events, with passed_records and failed_records for each expectation. Query it with event_log() or a published event log table." },
-        { "text": "In the system.lakeflow.pipeline_update_timeline table", "average": true, "why": "This system table tracks each pipeline update, with its trigger, result state and timing. It doesn't break results down by expectation." },
-        { "text": "In the operation metrics from DESCRIBE HISTORY on each target table", "why": "Table history records each commit's operation and write metrics. Expectation pass and fail counts are kept in the pipeline event log, not in the table history." },
-        { "text": "In the Top 5 error types table on the Runs tab", "why": "That table ranks the most frequent error types across job and pipeline runs. It doesn't report record counts for expectations." }
+        {
+          "text": "In flow_progress events in the pipeline's event log",
+          "correct": true,
+          "why": "The pipeline event log stores data quality metrics in the details:flow_progress.data_quality.expectations object of flow_progress events, with passed_records and failed_records for each expectation. Query it with event_log() or a published event log table."
+        },
+        {
+          "text": "In the system.lakeflow.pipeline_update_timeline table",
+          "average": true,
+          "why": "This system table tracks each pipeline update, with its trigger, result state and timing. It doesn't break results down by expectation."
+        },
+        {
+          "text": "In the operation metrics from DESCRIBE HISTORY on each target table",
+          "why": "Table history records each commit's operation and write metrics. Expectation pass and fail counts are kept in the pipeline event log, not in the table history."
+        },
+        {
+          "text": "In the Top 5 error types table on the Runs tab",
+          "why": "That table ranks the most frequent error types across job and pipeline runs. It doesn't report record counts for expectations."
+        }
       ],
       "in_practice": "Charting failed_records per expectation over weeks turns data quality into a trend: a rule drifting from 0.1% to 5% failures flags an upstream change before the dropped rows show up as a gap in a finance report.",
       "source": "https://docs.databricks.com/aws/en/ldp/monitor-event-logs",
@@ -93,10 +163,24 @@
       "type": "single",
       "stem": "While a nightly job in Lakeflow Jobs is still running, a data engineer opens its Runs tab and sees that the ingest_orders cell for tonight's run in the matrix view is yellow. What does the yellow cell indicate?",
       "options": [
-        { "text": "The task is waiting for a retry", "correct": true, "why": "The matrix view color-codes run and task bars by status: green for successful, red for unsuccessful, pink for skipped, yellow for waiting for retry, and grey for pending, canceled or timed out." },
-        { "text": "The task has run past its expected duration", "average": true, "why": "When a run exceeds a configured expected completion time, the matrix view shows a separate duration warning. Yellow itself means the task is waiting to be retried." },
-        { "text": "The task was skipped in this run", "why": "Skipped runs are shown in pink in the matrix view, not yellow." },
-        { "text": "The task timed out and was stopped", "why": "Timed-out runs are shown in grey in the matrix view, along with pending and canceled runs." }
+        {
+          "text": "The task is waiting for a retry",
+          "correct": true,
+          "why": "The matrix view color-codes run and task bars by status: green for successful, red for unsuccessful, pink for skipped, yellow for waiting for retry, and grey for pending, canceled or timed out."
+        },
+        {
+          "text": "The task has run past its expected duration",
+          "average": true,
+          "why": "When a run exceeds a configured expected completion time, the matrix view shows a separate duration warning. Yellow itself means the task is waiting to be retried."
+        },
+        {
+          "text": "The task was skipped in this run",
+          "why": "Skipped runs are shown in pink in the matrix view, not yellow."
+        },
+        {
+          "text": "The task timed out and was stopped",
+          "why": "Timed-out runs are shown in grey in the matrix view, along with pending and canceled runs."
+        }
       ],
       "in_practice": "Yellow cells that show up night after night mark a flapping task: it still succeeds, but each retry adds minutes to the run and often points to a flaky source connection worth fixing.",
       "source": "https://docs.databricks.com/aws/en/jobs/monitor",
@@ -110,10 +194,24 @@
       "type": "single",
       "stem": "A data engineer opens the Spark UI page of a slow aggregation step and sees Spill (Memory) at 96 GB next to Spill (Disk) at 14 GB. How should the engineer read these two numbers?",
       "options": [
-        { "text": "The spilled data's size deserialized in memory and serialized on disk", "correct": true, "why": "In the Spark UI, shuffle spill (memory) is the size of the deserialized form of the data in memory, and shuffle spill (disk) is the size of its serialized form on disk. They measure the same spill, which is why the disk figure is smaller." },
-        { "text": "Two separate spills that together wrote 110 GB to local disk", "average": true, "why": "Adding the values double counts the spill. Both metrics describe the same data, once as it sat in memory and once as it was written to disk." },
-        { "text": "Data cached in memory, and the part that overflowed to disk", "why": "Spill isn't caching. Both values describe data that Spark had to move out of execution memory because it didn't fit." },
-        { "text": "Memory used by the driver, and disk used by the executors", "why": "Both values are task metrics from the executors that ran the stage. Neither one measures the driver." }
+        {
+          "text": "The spilled data's size deserialized in memory and serialized on disk",
+          "correct": true,
+          "why": "In the Spark UI, shuffle spill (memory) is the size of the deserialized form of the data in memory, and shuffle spill (disk) is the size of its serialized form on disk. They measure the same spill, which is why the disk figure is smaller."
+        },
+        {
+          "text": "Two separate spills that together wrote 110 GB to local disk",
+          "average": true,
+          "why": "Adding the values double counts the spill. Both metrics describe the same data, once as it sat in memory and once as it was written to disk."
+        },
+        {
+          "text": "Data cached in memory, and the part that overflowed to disk",
+          "why": "Spill isn't caching. Both values describe data that Spark had to move out of execution memory because it didn't fit."
+        },
+        {
+          "text": "Memory used by the driver, and disk used by the executors",
+          "why": "Both values are task metrics from the executors that ran the stage. Neither one measures the driver."
+        }
       ],
       "in_practice": "Reading spill correctly changes the sizing math: about 14 GB actually reached local disk, so more memory per core or auto-optimized shuffle partitions usually fixes it, with no 110 GB of disk I/O to plan for.",
       "source": "https://spark.apache.org/docs/latest/web-ui.html",
@@ -127,10 +225,24 @@
       "type": "single",
       "stem": "A data engineer opens the SQL DAG for a query whose stages finished in about 6 minutes of wall-clock time and sees that a scan node reports a duration of 3.2 hours. What does the node's duration measure?",
       "options": [
-        { "text": "Executor time summed across all of the node's tasks", "correct": true, "why": "Durations in the SQL DAG are cumulative: they add up executor time across all tasks rather than measuring elapsed time. A scan running on many cores in parallel can log hours of work within minutes of wall-clock time." },
-        { "text": "Elapsed time from the node's first task starting to its last task ending", "average": true, "why": "That is the natural reading, but SQL DAG durations aren't wall-clock time. They sum the time every task spent, so they correlate with elapsed time and cost without equaling either." },
-        { "text": "Time the driver spent planning and optimizing the operator", "why": "Query planning happens on the driver before tasks run. The node's duration reflects executor work during execution." },
-        { "text": "The node's time totaled over every run of the query on the cluster", "why": "Each SQL DAG belongs to a single query execution, so its metrics cover that execution only, not earlier runs of the same query." }
+        {
+          "text": "Executor time summed across all of the node's tasks",
+          "correct": true,
+          "why": "Durations in the SQL DAG are cumulative: they add up executor time across all tasks rather than measuring elapsed time. A scan running on many cores in parallel can log hours of work within minutes of wall-clock time."
+        },
+        {
+          "text": "Elapsed time from the node's first task starting to its last task ending",
+          "average": true,
+          "why": "That is the natural reading, but SQL DAG durations aren't wall-clock time. They sum the time every task spent, so they correlate with elapsed time and cost without equaling either."
+        },
+        {
+          "text": "Time the driver spent planning and optimizing the operator",
+          "why": "Query planning happens on the driver before tasks run. The node's duration reflects executor work during execution."
+        },
+        {
+          "text": "The node's time totaled over every run of the query on the cluster",
+          "why": "Each SQL DAG belongs to a single query execution, so its metrics cover that execution only, not earlier runs of the same query."
+        }
       ],
       "in_practice": "Because node times are summed executor time, they rank operators by cost: a scan holding most of a query's node-hours is where file compaction or clustering will save the most DBUs, even though it lasted only minutes.",
       "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/slow-spark-stage-low-io",
@@ -144,10 +256,24 @@
       "type": "single",
       "stem": "A data engineer investigates a nightly job whose longest stage runs for 40 minutes but reads, writes and shuffles little data. Summary Metrics show no skew, and the stage has no spill. In the SQL DAG, a SortMergeJoin node shows about 2 million input rows on each side and 1.8 billion output rows. What is the most likely cause, and what should the engineer do?",
       "options": [
-        { "text": "An exploding join; tighten the join condition or reduce input rows on both sides", "correct": true, "why": "A node with few input rows and far more output rows points to an exploding join, often a condition that matches many rows per key. Databricks recommends deciding which subset of the result is needed, then updating the join condition or reducing the input rows." },
-        { "text": "Skewed join keys; lower the AQE skew partition thresholds", "average": true, "why": "Skew shows up as a Max task duration far above the 75th percentile, which this stage doesn't have. The problem is how many rows the join produces, not how they're spread across tasks." },
-        { "text": "Too little memory; move to workers with more memory per core", "why": "Memory pressure appears as spill or lost executors. This stage has no spill, and more memory wouldn't reduce the 1.8 billion rows the join emits." },
-        { "text": "Too many small files; run OPTIMIZE on both source tables", "why": "Small files show up as a scan node reading tens of thousands of files. Here the scans are cheap, and the time goes into the join's output." }
+        {
+          "text": "An exploding join; tighten the join condition or reduce input rows on both sides",
+          "correct": true,
+          "why": "A node with few input rows and far more output rows points to an exploding join, often a condition that matches many rows per key. Databricks recommends deciding which subset of the result is needed, then updating the join condition or reducing the input rows."
+        },
+        {
+          "text": "Skewed join keys; lower the AQE skew partition thresholds",
+          "average": true,
+          "why": "Skew shows up as a Max task duration far above the 75th percentile, which this stage doesn't have. The problem is how many rows the join produces, not how they're spread across tasks."
+        },
+        {
+          "text": "Too little memory; move to workers with more memory per core",
+          "why": "Memory pressure appears as spill or lost executors. This stage has no spill, and more memory wouldn't reduce the 1.8 billion rows the join emits."
+        },
+        {
+          "text": "Too many small files; run OPTIMIZE on both source tables",
+          "why": "Small files show up as a scan node reading tens of thousands of files. Here the scans are cheap, and the time goes into the join's output."
+        }
       ],
       "in_practice": "An exploding join turns a 2-million-row input into a billion-row intermediate result that costs DBUs at every later step; adding the missing join key often cuts a 40-minute stage to seconds.",
       "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/slow-spark-stage-low-io",
@@ -161,10 +287,24 @@
       "type": "single",
       "stem": "A data engineer's daily report reads the Delta table web.clicks, which is partitioned by event_date and user_id. The longest stage has no skew, no spill and modest input, yet the SQL DAG shows its scan node taking most of the time and reading about 400,000 files that total 30 GB. What most likely caused this pattern?",
       "options": [
-        { "text": "Partitioning on a high-cardinality column created many small files", "correct": true, "why": "Reading tens of thousands of files or more points to a small file problem; files should be at least 8 MB, and these average under 0.1 MB. Partitioning on too many columns or on a high-cardinality column such as user_id most often causes it." },
-        { "text": "Too few shuffle partitions for the size of the scan", "average": true, "why": "spark.sql.shuffle.partitions sets the partition count after a shuffle for joins and aggregations. A scan reads files before any shuffle, so it doesn't explain a scan dominated by file count." },
-        { "text": "Data skew across the event_date values", "why": "Skew would show as a Max task duration well above the 75th percentile in Summary Metrics, which this stage doesn't have." },
-        { "text": "Executors spilling the scanned rows to local disk", "why": "The stage shows no spill, and spill comes from shuffles, joins, sorts and aggregations running short of execution memory, not from reading many files." }
+        {
+          "text": "Partitioning on a high-cardinality column created many small files",
+          "correct": true,
+          "why": "Reading tens of thousands of files or more points to a small file problem; files should be at least 8 MB, and these average under 0.1 MB. Partitioning on too many columns or on a high-cardinality column such as user_id most often causes it."
+        },
+        {
+          "text": "Too few shuffle partitions for the size of the scan",
+          "average": true,
+          "why": "spark.sql.shuffle.partitions sets the partition count after a shuffle for joins and aggregations. A scan reads files before any shuffle, so it doesn't explain a scan dominated by file count."
+        },
+        {
+          "text": "Data skew across the event_date values",
+          "why": "Skew would show as a Max task duration well above the 75th percentile in Summary Metrics, which this stage doesn't have."
+        },
+        {
+          "text": "Executors spilling the scanned rows to local disk",
+          "why": "The stage shows no spill, and spill comes from shuffles, joins, sorts and aggregations running short of execution memory, not from reading many files."
+        }
       ],
       "in_practice": "Replacing user_id partitions with liquid clustering on user_id and compacting the table can turn 400,000 tiny files into a few thousand right-sized ones, cutting scan time and per-file overhead for every query on the table.",
       "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/slow-spark-stage-low-io",
@@ -178,10 +318,24 @@
       "type": "single",
       "stem": "A reconciliation job joins orders to payments with a FULL OUTER JOIN so that unmatched rows from both sides are kept. A data engineer sees one task in the join's stage run for 12 minutes while the rest finish in under a minute, and one shuffle partition holds 3 GB against a 30 MB median. Adaptive query execution is on with its default settings, but the final plan shows no skew handling. What explains this?",
       "options": [
-        { "text": "AQE can't optimize skew on either side of a FULL OUTER join", "correct": true, "why": "AQE handles skew only in shuffle-based joins, and the join type decides which side it can split. For FULL OUTER joins neither side is skew-optimized, so the 3 GB partition runs as a single task." },
-        { "text": "The partition is under the default skewed partition threshold", "average": true, "why": "The defaults treat a partition as skewed when it exceeds 256MB and 5 times the median. A 3 GB partition against a 30 MB median clears both, so the thresholds aren't what blocked it." },
-        { "text": "AQE needs a SKEW hint on the join before it handles skew", "why": "AQE skew join handling is automatic, and Databricks recommends it over the skew join hint. Supported joins need no hint." },
-        { "text": "AQE handles skew only in broadcast hash joins", "why": "It's the reverse: AQE never optimizes skew in broadcast joins and handles it only in sort merge and shuffle hash joins." }
+        {
+          "text": "AQE can't optimize skew on either side of a FULL OUTER join",
+          "correct": true,
+          "why": "AQE handles skew only in shuffle-based joins, and the join type decides which side it can split. For FULL OUTER joins neither side is skew-optimized, so the 3 GB partition runs as a single task."
+        },
+        {
+          "text": "The partition is under the default skewed partition threshold",
+          "average": true,
+          "why": "The defaults treat a partition as skewed when it exceeds 256MB and 5 times the median. A 3 GB partition against a 30 MB median clears both, so the thresholds aren't what blocked it."
+        },
+        {
+          "text": "AQE needs a SKEW hint on the join before it handles skew",
+          "why": "AQE skew join handling is automatic, and Databricks recommends it over the skew join hint. Supported joins need no hint."
+        },
+        {
+          "text": "AQE handles skew only in broadcast hash joins",
+          "why": "It's the reverse: AQE never optimizes skew in broadcast joins and handles it only in sort merge and shuffle hash joins."
+        }
       ],
       "in_practice": "Knowing the join-type rule saves hours of threshold tuning; where the logic allows, restructuring the FULL OUTER join into join types AQE can optimize, such as an INNER join, lets it split a 12-minute straggler.",
       "source": "https://docs.databricks.com/aws/en/optimizations/aqe",
@@ -195,10 +349,24 @@
       "type": "single",
       "stem": "A FinOps analyst wants a list of the maintenance operations that predictive optimization ran on Unity Catalog managed tables over the last 30 days, with the estimated DBUs each one used. Which source provides this?",
       "options": [
-        { "text": "The system.storage.predictive_optimization_operations_history table", "correct": true, "why": "This system table records each operation predictive optimization ran, with its table, operation type, status, metrics and usage in estimated DBUs, so the analyst can rank tables and operations by cost." },
-        { "text": "DESCRIBE HISTORY run against each managed table", "average": true, "why": "Table history shows the commits each OPTIMIZE or VACUUM made, but one table at a time and without any DBU usage, so it can't answer the cost question." },
-        { "text": "DESCRIBE TABLE EXTENDED ... AS JSON on each table", "why": "Its predictive_optimization_evaluations field shows only the latest evaluation result for each operation type, with no history and no usage figures." },
-        { "text": "SHOW TBLPROPERTIES on each table", "why": "Table properties show settings such as retention durations. They don't record which maintenance operations ran or what they cost." }
+        {
+          "text": "The system.storage.predictive_optimization_operations_history table",
+          "correct": true,
+          "why": "This system table records each operation predictive optimization ran, with its table, operation type, status, metrics and usage in estimated DBUs, so the analyst can rank tables and operations by cost."
+        },
+        {
+          "text": "DESCRIBE HISTORY run against each managed table",
+          "average": true,
+          "why": "Table history shows the commits each OPTIMIZE or VACUUM made, but one table at a time and without any DBU usage, so it can't answer the cost question."
+        },
+        {
+          "text": "DESCRIBE TABLE EXTENDED ... AS JSON on each table",
+          "why": "Its predictive_optimization_evaluations field shows only the latest evaluation result for each operation type, with no history and no usage figures."
+        },
+        {
+          "text": "SHOW TBLPROPERTIES on each table",
+          "why": "Table properties show settings such as retention durations. They don't record which maintenance operations ran or what they cost."
+        }
       ],
       "in_practice": "Ranking tables by estimated DBUs often shows a few hot tables, such as a streaming target compacted many times a day, driving most of the maintenance spend and worth a layout review.",
       "source": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization",
@@ -212,10 +380,24 @@
       "type": "single",
       "stem": "A data engineer on Databricks Runtime 18.1 wants to move the Delta table sales.events, which is partitioned by event_date, to liquid clustering on event_date and customer_id while jobs keep reading and writing it. Which statement does Databricks recommend?",
       "options": [
-        { "text": "ALTER TABLE sales.events REPLACE PARTITIONED BY WITH CLUSTER BY (event_date, customer_id)", "correct": true, "why": "In Databricks Runtime 18.1 and above, REPLACE PARTITIONED BY WITH CLUSTER BY converts a partitioned Delta table to liquid clustering in place. It minimizes reader and writer downtime and works for managed and external tables." },
-        { "text": "ALTER TABLE sales.events CLUSTER BY (event_date, customer_id)", "average": true, "why": "ALTER TABLE ... CLUSTER BY enables liquid clustering on an existing unpartitioned table. Clustering isn't compatible with partitioning, so a partitioned table needs the REPLACE PARTITIONED BY conversion." },
-        { "text": "CREATE OR REPLACE TABLE sales.events CLUSTER BY (event_date, customer_id) AS SELECT * FROM sales.events", "why": "Recreating the table with CTAS rewrites all of the data and doesn't preserve all table metadata, while the conversion command keeps downtime for readers and writers to a minimum." },
-        { "text": "OPTIMIZE sales.events ZORDER BY (customer_id)", "why": "Z-ordering keeps the partitioned layout and only colocates data within partitions. It doesn't enable liquid clustering, which replaces both partitioning and ZORDER." }
+        {
+          "text": "ALTER TABLE sales.events REPLACE PARTITIONED BY WITH CLUSTER BY (event_date, customer_id)",
+          "correct": true,
+          "why": "In Databricks Runtime 18.1 and above, REPLACE PARTITIONED BY WITH CLUSTER BY converts a partitioned Delta table to liquid clustering in place. It minimizes reader and writer downtime and works for managed and external tables."
+        },
+        {
+          "text": "ALTER TABLE sales.events CLUSTER BY (event_date, customer_id)",
+          "average": true,
+          "why": "ALTER TABLE ... CLUSTER BY enables liquid clustering on an existing unpartitioned table. Clustering isn't compatible with partitioning, so a partitioned table needs the REPLACE PARTITIONED BY conversion."
+        },
+        {
+          "text": "CREATE OR REPLACE TABLE sales.events CLUSTER BY (event_date, customer_id) AS SELECT * FROM sales.events",
+          "why": "Recreating the table with CTAS rewrites all of the data and doesn't preserve all table metadata, while the conversion command keeps downtime for readers and writers to a minimum."
+        },
+        {
+          "text": "OPTIMIZE sales.events ZORDER BY (customer_id)",
+          "why": "Z-ordering keeps the partitioned layout and only colocates data within partitions. It doesn't enable liquid clustering, which replaces both partitioning and ZORDER."
+        }
       ],
       "in_practice": "In-place conversion avoids a full CTAS rewrite of a multi-terabyte table and the cutover window that comes with it; teams then run OPTIMIZE so a new key such as customer_id starts paying off in data skipping.",
       "source": "https://docs.databricks.com/aws/en/delta/clustering",
@@ -229,10 +411,24 @@
       "type": "single",
       "stem": "A platform team ran ALTER CATALOG analytics ENABLE PREDICTIVE OPTIMIZATION. A week later, the managed tables in analytics show automatic OPTIMIZE and VACUUM operations in their history, but analytics.raw.clickstream, an external table whose files sit in an S3 external location, shows none and keeps accumulating small files. What explains this?",
       "options": [
-        { "text": "Predictive optimization runs only on Unity Catalog managed tables", "correct": true, "why": "Predictive optimization supports only Unity Catalog managed tables and doesn't run on external tables. The external table needs its own scheduled OPTIMIZE and VACUUM, or conversion to a managed table." },
-        { "text": "The table needs its own ALTER TABLE ... ENABLE PREDICTIVE OPTIMIZATION", "average": true, "why": "Tables inherit the setting from their schema and catalog, so a table-level enable isn't needed. External tables are excluded wherever the setting is enabled." },
-        { "text": "Predictive optimization maintains only tables that use liquid clustering", "why": "Predictive optimization also compacts files, runs VACUUM and collects statistics on managed tables without clustering keys. Clustering isn't a requirement." },
-        { "text": "The catalog setting applies only to tables created after it was enabled", "why": "Settings are inherited by the schemas and tables in the catalog, existing ones included, which is why the existing managed tables are already being maintained." }
+        {
+          "text": "Predictive optimization runs only on Unity Catalog managed tables",
+          "correct": true,
+          "why": "Predictive optimization supports only Unity Catalog managed tables and doesn't run on external tables. The external table needs its own scheduled OPTIMIZE and VACUUM, or conversion to a managed table."
+        },
+        {
+          "text": "The table needs its own ALTER TABLE ... ENABLE PREDICTIVE OPTIMIZATION",
+          "average": true,
+          "why": "Tables inherit the setting from their schema and catalog, so a table-level enable isn't needed. External tables are excluded wherever the setting is enabled."
+        },
+        {
+          "text": "Predictive optimization maintains only tables that use liquid clustering",
+          "why": "Predictive optimization also compacts files, runs VACUUM and collects statistics on managed tables without clustering keys. Clustering isn't a requirement."
+        },
+        {
+          "text": "The catalog setting applies only to tables created after it was enabled",
+          "why": "Settings are inherited by the schemas and tables in the catalog, existing ones included, which is why the existing managed tables are already being maintained."
+        }
       ],
       "in_practice": "Raw landing tables are often external, so they quietly miss automatic maintenance; converting one with SET MANAGED or scheduling its own OPTIMIZE and VACUUM keeps a heavily appended table from slowing every query that reads it.",
       "source": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization",
@@ -246,10 +442,24 @@
       "type": "single",
       "stem": "A data engineer is rebuilding the Delta table iot.readings as a liquid clustered table. The old table was partitioned by reading_date, a generated column computed as CAST(reading_ts AS DATE), and queries filter on reading_ts ranges and on device_id. Which clustering definition follows Databricks' guidance?",
       "options": [
-        { "text": "CLUSTER BY (reading_ts, device_id), with no generated date column", "correct": true, "why": "Databricks' migration guidance says that when a generated column was used to reduce cardinality, such as a date derived from a timestamp, you cluster on the original column and don't create the generated column." },
-        { "text": "CLUSTER BY (reading_date, device_id), keeping the generated column", "average": true, "why": "Carrying the generated date over mirrors the old partitioning, but liquid clustering doesn't need a lower-cardinality stand-in. Clustering on the original timestamp serves the reading_ts range filters directly." },
-        { "text": "CLUSTER BY (reading_date, reading_ts, device_id)", "why": "reading_date and reading_ts are highly correlated, and Databricks advises including only one of two highly correlated columns as a clustering key." },
-        { "text": "CLUSTER BY (device_id), then OPTIMIZE ... ZORDER BY (reading_ts)", "why": "Liquid clustering isn't compatible with ZORDER, so a clustered table can't also be Z-ordered. Both columns belong in the clustering keys." }
+        {
+          "text": "CLUSTER BY (reading_ts, device_id), with no generated date column",
+          "correct": true,
+          "why": "Databricks' migration guidance says that when a generated column was used to reduce cardinality, such as a date derived from a timestamp, you cluster on the original column and don't create the generated column."
+        },
+        {
+          "text": "CLUSTER BY (reading_date, device_id), keeping the generated column",
+          "average": true,
+          "why": "Carrying the generated date over mirrors the old partitioning, but liquid clustering doesn't need a lower-cardinality stand-in. Clustering on the original timestamp serves the reading_ts range filters directly."
+        },
+        {
+          "text": "CLUSTER BY (reading_date, reading_ts, device_id)",
+          "why": "reading_date and reading_ts are highly correlated, and Databricks advises including only one of two highly correlated columns as a clustering key."
+        },
+        {
+          "text": "CLUSTER BY (device_id), then OPTIMIZE ... ZORDER BY (reading_ts)",
+          "why": "Liquid clustering isn't compatible with ZORDER, so a clustered table can't also be Z-ordered. Both columns belong in the clustering keys."
+        }
       ],
       "in_practice": "Dropping the derived date column removes a column to maintain and lets range filters on the raw timestamp skip files directly, so an hour-level query no longer has to read a whole day of data.",
       "source": "https://docs.databricks.com/aws/en/delta/clustering",
@@ -263,10 +473,24 @@
       "type": "single",
       "stem": "A platform team enabled predictive optimization for its catalog of Unity Catalog managed tables and, as Databricks recommends, turned off its scheduled OPTIMIZE jobs. One unpartitioned table, web.sessions, had relied on a nightly OPTIMIZE web.sessions ZORDER BY (user_id). Since then, queries that filter on user_id read more files every week. The team wants the layout maintained automatically. What should it do?",
       "options": [
-        { "text": "Run ALTER TABLE web.sessions CLUSTER BY (user_id), then OPTIMIZE web.sessions FULL once", "correct": true, "why": "Predictive optimization's OPTIMIZE never runs ZORDER and ignores Z-ordered files, so the user_id layout decays. Making user_id a liquid clustering key lets predictive optimization cluster new data incrementally, and OPTIMIZE FULL reclusters the existing files once." },
-        { "text": "Turn the nightly OPTIMIZE ... ZORDER BY (user_id) job back on", "average": true, "why": "This restores data skipping, but it brings back the manual job the team wanted to retire, and Databricks recommends disabling scheduled OPTIMIZE jobs when predictive optimization is on. Liquid clustering lets the platform keep the layout." },
-        { "text": "Set a table property that makes predictive optimization Z-order on user_id", "why": "Predictive optimization doesn't run ZORDER when it runs OPTIMIZE, and it ignores Z-ordered files, so no table property changes that." },
-        { "text": "Run ANALYZE TABLE web.sessions COMPUTE STATISTICS FOR COLUMNS user_id", "why": "Statistics help the optimizer, but they don't reorganize rows. Without colocating user_id values, each file still spans most of the key range." }
+        {
+          "text": "Run ALTER TABLE web.sessions CLUSTER BY (user_id), then OPTIMIZE web.sessions FULL once",
+          "correct": true,
+          "why": "Predictive optimization's OPTIMIZE never runs ZORDER and ignores Z-ordered files, so the user_id layout decays. Making user_id a liquid clustering key lets predictive optimization cluster new data incrementally, and OPTIMIZE FULL reclusters the existing files once."
+        },
+        {
+          "text": "Turn the nightly OPTIMIZE ... ZORDER BY (user_id) job back on",
+          "average": true,
+          "why": "This restores data skipping, but it brings back the manual job the team wanted to retire, and Databricks recommends disabling scheduled OPTIMIZE jobs when predictive optimization is on. Liquid clustering lets the platform keep the layout."
+        },
+        {
+          "text": "Set a table property that makes predictive optimization Z-order on user_id",
+          "why": "Predictive optimization doesn't run ZORDER when it runs OPTIMIZE, and it ignores Z-ordered files, so no table property changes that."
+        },
+        {
+          "text": "Run ANALYZE TABLE web.sessions COMPUTE STATISTICS FOR COLUMNS user_id",
+          "why": "Statistics help the optimizer, but they don't reorganize rows. Without colocating user_id values, each file still spans most of the key range."
+        }
       ],
       "in_practice": "Moving Z-ordered tables to liquid clustering is a common first step when adopting predictive optimization; otherwise data skipping on a busy table degrades week by week once the manual OPTIMIZE jobs are retired.",
       "source": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization",
@@ -280,10 +504,24 @@
       "type": "single",
       "stem": "A job cluster that has run unchanged since 2022 fails to start with the termination code EOS_SPARK_IMAGE, and the error says the Spark image for release 11.0.x does not exist. What should the data engineer do?",
       "options": [
-        { "text": "Move the cluster to a supported Databricks Runtime version, after checking compatibility", "correct": true, "why": "EOS_SPARK_IMAGE means the Databricks Runtime version configured for the cluster has reached end of support. The fix is to configure a supported runtime, after reviewing library and code compatibility." },
-        { "text": "Retry the run, since the image download hit a temporary network error", "average": true, "why": "A download problem surfaces as SPARK_IMAGE_DOWNLOAD_FAILURE. EOS_SPARK_IMAGE fails on every retry because the runtime version itself is no longer supported." },
-        { "text": "Switch to a different instance type in another availability zone", "why": "Changing instance type or zone addresses cloud capacity errors such as AWS_INSUFFICIENT_INSTANCE_CAPACITY_FAILURE. It doesn't bring back an end-of-support runtime." },
-        { "text": "Add an init script that downloads the missing Spark image", "why": "Init scripts customize nodes during startup; they can't restore a Databricks Runtime that has reached end of support. The cluster configuration must name a supported version." }
+        {
+          "text": "Move the cluster to a supported Databricks Runtime version, after checking compatibility",
+          "correct": true,
+          "why": "EOS_SPARK_IMAGE means the Databricks Runtime version configured for the cluster has reached end of support. The fix is to configure a supported runtime, after reviewing library and code compatibility."
+        },
+        {
+          "text": "Retry the run, since the image download hit a temporary network error",
+          "average": true,
+          "why": "A download problem surfaces as SPARK_IMAGE_DOWNLOAD_FAILURE. EOS_SPARK_IMAGE fails on every retry because the runtime version itself is no longer supported."
+        },
+        {
+          "text": "Switch to a different instance type in another availability zone",
+          "why": "Changing instance type or zone addresses cloud capacity errors such as AWS_INSUFFICIENT_INSTANCE_CAPACITY_FAILURE. It doesn't bring back an end-of-support runtime."
+        },
+        {
+          "text": "Add an init script that downloads the missing Spark image",
+          "why": "Init scripts customize nodes during startup; they can't restore a Databricks Runtime that has reached end of support. The cluster configuration must name a supported version."
+        }
       ],
       "in_practice": "Runtimes pinned in long-lived job definitions are a common cause of sudden failures; reviewing end-of-support dates each quarter turns a 2 a.m. outage into a planned, tested upgrade.",
       "source": "https://docs.databricks.com/aws/en/compute/troubleshooting/cluster-error-codes",
@@ -297,10 +535,24 @@
       "type": "single",
       "stem": "Early in a notebook, a data engineer runs import pandas. Later in the same notebook, the engineer runs %pip install pandas==2.2.3 to upgrade, but pandas.__version__ still reports the old version. What should the engineer run next?",
       "options": [
-        { "text": "dbutils.library.restartPython(), then import pandas again", "correct": true, "why": "%pip commands don't restart the Python process automatically. After installing or upgrading a package that's already loaded, restarting Python with dbutils.library.restartPython() makes the new version importable." },
-        { "text": "A restart of the cluster from the compute page", "average": true, "why": "A cluster restart ends the notebook session, and notebook-scoped libraries don't persist across sessions, so the upgrade would be lost. It also interrupts everyone else on the cluster." },
-        { "text": "An install of pandas 2.2.3 from the cluster's Libraries tab", "why": "A compute-scoped install changes the library for every notebook on the cluster and needs a new session, while the notebook-scoped 2.2.3 is already installed and only needs a Python restart." },
-        { "text": "%pip install pandas==2.2.3 again with --force-reinstall", "why": "Reinstalling rewrites the files on disk, but the running Python process keeps the module it already imported until Python restarts." }
+        {
+          "text": "dbutils.library.restartPython(), then import pandas again",
+          "correct": true,
+          "why": "%pip commands don't restart the Python process automatically. After installing or upgrading a package that's already loaded, restarting Python with dbutils.library.restartPython() makes the new version importable."
+        },
+        {
+          "text": "A restart of the cluster from the compute page",
+          "average": true,
+          "why": "A cluster restart ends the notebook session, and notebook-scoped libraries don't persist across sessions, so the upgrade would be lost. It also interrupts everyone else on the cluster."
+        },
+        {
+          "text": "An install of pandas 2.2.3 from the cluster's Libraries tab",
+          "why": "A compute-scoped install changes the library for every notebook on the cluster and needs a new session, while the notebook-scoped 2.2.3 is already installed and only needs a Python restart."
+        },
+        {
+          "text": "%pip install pandas==2.2.3 again with --force-reinstall",
+          "why": "Reinstalling rewrites the files on disk, but the running Python process keeps the module it already imported until Python restarts."
+        }
       ],
       "in_practice": "Putting every %pip install in the first cell, followed by a Python restart, keeps scheduled notebooks reproducible and avoids bugs where half the code runs against an older library version.",
       "source": "https://docs.databricks.com/aws/en/libraries/notebooks-python-libraries",
@@ -314,10 +566,24 @@
       "type": "single",
       "stem": "A shared all-purpose cluster has the compute-scoped library geo-utils 1.2, which conflicts with a dependency of a new pipeline. A data engineer uninstalls 1.2 and installs 1.4 from the cluster's Libraries tab. Version 1.2 now shows the status Uninstall pending restart, and notebooks still import 1.2. What must happen for the notebooks to get 1.4?",
       "options": [
-        { "text": "Restart the cluster so the uninstall takes effect", "correct": true, "why": "An uninstalled compute-scoped library is removed only when the cluster restarts; until then its status is Uninstall pending restart. Updating a cluster library means uninstalling the old version, installing the new one and restarting." },
-        { "text": "Detach and reattach the notebooks to start new sessions", "average": true, "why": "A new session lets notebooks see a newly installed library, but the uninstalled 1.2 stays on the cluster until the cluster restarts." },
-        { "text": "Run %pip uninstall -y geo-utils in each notebook", "why": "%pip can't uninstall a library that was installed on the cluster; it can only revert a notebook-scoped version back to the cluster's version." },
-        { "text": "Call dbutils.library.restartPython() in each notebook", "why": "Restarting Python reloads the notebook's environment, but the cluster still has 1.2 installed until the cluster itself restarts." }
+        {
+          "text": "Restart the cluster so the uninstall takes effect",
+          "correct": true,
+          "why": "An uninstalled compute-scoped library is removed only when the cluster restarts; until then its status is Uninstall pending restart. Updating a cluster library means uninstalling the old version, installing the new one and restarting."
+        },
+        {
+          "text": "Detach and reattach the notebooks to start new sessions",
+          "average": true,
+          "why": "A new session lets notebooks see a newly installed library, but the uninstalled 1.2 stays on the cluster until the cluster restarts."
+        },
+        {
+          "text": "Run %pip uninstall -y geo-utils in each notebook",
+          "why": "%pip can't uninstall a library that was installed on the cluster; it can only revert a notebook-scoped version back to the cluster's version."
+        },
+        {
+          "text": "Call dbutils.library.restartPython() in each notebook",
+          "why": "Restarting Python reloads the notebook's environment, but the cluster still has 1.2 installed until the cluster itself restarts."
+        }
       ],
       "in_practice": "Library swaps on shared clusters need a short, announced maintenance window; one planned restart avoids a day of mixed-version failures across every team's notebooks.",
       "source": "https://docs.databricks.com/aws/en/libraries/cluster-libraries",
@@ -331,10 +597,24 @@
       "type": "single",
       "stem": "A data engineer adds the Maven library com.acme:geo-utils:3.1.0 to a Unity Catalog cluster in standard access mode on Databricks Runtime 15.4 LTS, and the installation fails. The same coordinate installs on a dedicated cluster. The cluster must stay in standard access mode because several analysts share it. What resolves the failure?",
       "options": [
-        { "text": "A user with MANAGE ALLOWLIST adds the Maven coordinate to the allowlist", "correct": true, "why": "On standard access mode compute, the Unity Catalog allowlist controls which libraries and init scripts can run, and it's empty by default. Someone with the MANAGE ALLOWLIST privilege must add the coordinate before it installs." },
-        { "text": "Switch the cluster to dedicated access mode", "average": true, "why": "The library would install, but this abandons the standard access mode the team must keep for the shared cluster. Databricks recommends standard access mode and allowlisting the library instead." },
-        { "text": "Install the JAR from a cluster-scoped init script instead", "why": "On standard access mode, init scripts are controlled by the same allowlist, and Databricks doesn't recommend installing libraries with init scripts." },
-        { "text": "Install it as a notebook-scoped library in each notebook", "why": "Notebook-scoped libraries are available for Python and R only; JARs can't be installed at the notebook level." }
+        {
+          "text": "A user with MANAGE ALLOWLIST adds the Maven coordinate to the allowlist",
+          "correct": true,
+          "why": "On standard access mode compute, the Unity Catalog allowlist controls which libraries and init scripts can run, and it's empty by default. Someone with the MANAGE ALLOWLIST privilege must add the coordinate before it installs."
+        },
+        {
+          "text": "Switch the cluster to dedicated access mode",
+          "average": true,
+          "why": "The library would install, but this abandons the standard access mode the team must keep for the shared cluster. Databricks recommends standard access mode and allowlisting the library instead."
+        },
+        {
+          "text": "Install the JAR from a cluster-scoped init script instead",
+          "why": "On standard access mode, init scripts are controlled by the same allowlist, and Databricks doesn't recommend installing libraries with init scripts."
+        },
+        {
+          "text": "Install it as a notebook-scoped library in each notebook",
+          "why": "Notebook-scoped libraries are available for Python and R only; JARs can't be installed at the notebook level."
+        }
       ],
       "in_practice": "Routing JARs through the allowlist gives the platform team one reviewed list of code allowed on shared compute, which is what keeps user isolation on standard access mode intact.",
       "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/allowlist",
@@ -348,10 +628,24 @@
       "type": "single",
       "stem": "A data engineer's notebook on a classic cluster with 16 large workers and a small driver runs pdf = spark.table(\"sales.events\").toPandas() on about 40 GB of data to build a weekly summary in pandas. The notebook fails with a message that the Spark driver stopped unexpectedly, while the Spark UI shows healthy executors. A teammate suggests adding workers. What should the engineer do?",
       "options": [
-        { "text": "Aggregate in Spark first and call toPandas() only on the small result", "correct": true, "why": "toPandas() collects every record of the DataFrame to the driver, so 40 GB overwhelms a small driver however many workers there are. Databricks advises converting only a small subset of the data." },
-        { "text": "Add more workers so the conversion spreads across executors", "average": true, "why": "Executors compute the DataFrame, but toPandas() gathers all of its rows into one pandas DataFrame on the driver. More workers add no driver memory." },
-        { "text": "Enable spark.sql.execution.arrow.pyspark.enabled for the conversion", "why": "Arrow makes the transfer to pandas more efficient, but even with Arrow, toPandas() still collects all records to the driver." },
-        { "text": "Set spark.sql.shuffle.partitions to auto before the conversion", "why": "Auto-optimized shuffle sizes partitions for joins and aggregations on the executors. It doesn't change how much data toPandas() brings back to the driver." }
+        {
+          "text": "Aggregate in Spark first and call toPandas() only on the small result",
+          "correct": true,
+          "why": "toPandas() collects every record of the DataFrame to the driver, so 40 GB overwhelms a small driver however many workers there are. Databricks advises converting only a small subset of the data."
+        },
+        {
+          "text": "Add more workers so the conversion spreads across executors",
+          "average": true,
+          "why": "Executors compute the DataFrame, but toPandas() gathers all of its rows into one pandas DataFrame on the driver. More workers add no driver memory."
+        },
+        {
+          "text": "Enable spark.sql.execution.arrow.pyspark.enabled for the conversion",
+          "why": "Arrow makes the transfer to pandas more efficient, but even with Arrow, toPandas() still collects all records to the driver."
+        },
+        {
+          "text": "Set spark.sql.shuffle.partitions to auto before the conversion",
+          "why": "Auto-optimized shuffle sizes partitions for joins and aggregations on the executors. It doesn't change how much data toPandas() brings back to the driver."
+        }
       ],
       "in_practice": "Pushing the weekly summary into a Spark groupBy shrinks 40 GB to a few thousand rows before conversion, so a modest driver copes, instead of paying for a driver large enough to hold the whole table.",
       "source": "https://docs.databricks.com/aws/en/pandas/pyspark-pandas-conversion",

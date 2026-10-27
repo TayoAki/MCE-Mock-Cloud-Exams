@@ -197,7 +197,7 @@
       "guide": "5.2",
       "difficulty": 1,
       "type": "single",
-      "stem": "A data engineer's `databricks.yml` declares the `prod` target first and the `dev` target second, and only `dev` sets `default: true`. The engineer runs `databricks bundle deploy` without `-t`. Which target does the deployment use?",
+      "stem": "Two targets are configured for a project: `prod`, listed first, and `dev`, listed second with `default: true`. A developer types `databricks bundle deploy` and leaves out the target flag. Where is the bundle deployed?",
       "options": [
         {
           "text": "`dev`, because it is marked as the default target",

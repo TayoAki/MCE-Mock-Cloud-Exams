@@ -1,3 +1,376 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "lakehouse-external-location-path-credential",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform admin has registered an IAM role in Unity Catalog as a storage credential for the S3 bucket s3://acme-landing. Data engineers now need governed permission to create external tables and volumes under s3://acme-landing/raw/ only. Which Unity Catalog object should the admin create next?",
+      "options": [
+        {
+          "text": "An external location that pairs the raw/ path with the storage credential",
+          "correct": true,
+          "why": "An external location combines a cloud storage path with the storage credential that authorizes access to it. Granting privileges on that external location controls who can create external tables and volumes under raw/, without handing anyone the IAM role."
+        },
+        {
+          "text": "A second storage credential that is scoped to the raw/ prefix",
+          "average": true,
+          "why": "A storage credential holds the authentication, such as an IAM role, and grants on it control who can define external locations. Path-level access comes from an external location that references the credential, not from another credential."
+        },
+        {
+          "text": "A managed volume in a new schema that points at the raw/ prefix",
+          "why": "A managed volume is created inside Unity Catalog managed storage rather than registered on a path you choose, so it can't scope access to files that already sit under raw/."
+        },
+        {
+          "text": "A connection object that targets the acme-landing bucket",
+          "why": "A connection represents an external database system, such as one used for federation. It doesn't govern paths in cloud object storage."
+        }
+      ],
+      "in_practice": "Separating credentials from locations lets one IAM role back many external locations, so a platform team can let the ingestion group create external tables under raw/ while the rest of a multi-terabyte bucket stays off limits.",
+      "source": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/",
+      "evidence": "Unity Catalog uses a securable object called an external location, which defines a path to a cloud storage location and the credentials required to access that location. Those credentials are, in turn, defined in a Unity Catalog securable object called a storage credential."
+    },
+    {
+      "family": "lakehouse-delta-log-parquet-checkpoints",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A Delta table written by a high-frequency streaming job has accumulated tens of thousands of JSON commit files in its _delta_log directory. How does Delta Lake avoid reading every one of those commits to work out the table's current state?",
+      "options": [
+        {
+          "text": "It aggregates table versions into Parquet checkpoint files that readers start from",
+          "correct": true,
+          "why": "Delta Lake periodically aggregates table versions into Parquet checkpoint files, so a reader loads the latest checkpoint plus only the JSON commits after it. Databricks manages checkpoint frequency, and users don't interact with checkpoints directly."
+        },
+        {
+          "text": "OPTIMIZE merges the JSON commit files into a single log file",
+          "average": true,
+          "why": "OPTIMIZE compacts small data files and is itself recorded as a new commit; it doesn't rewrite the transaction log. Checkpointing is what bounds how much of the log a reader must scan."
+        },
+        {
+          "text": "VACUUM deletes the JSON commit files that are older than seven days",
+          "why": "VACUUM removes data files that the current table version no longer references. Log files are removed separately after checkpointing, based on the log retention setting, which defaults to 30 days."
+        },
+        {
+          "text": "Readers list the data files in storage and skip the log entirely",
+          "why": "Delta readers take the table's file list from the transaction log, not from a storage listing. That is what gives each query a consistent snapshot while writers keep adding files."
+        }
+      ],
+      "in_practice": "Checkpoints keep table reads fast as history grows: a stream committing every minute adds about 1,400 versions a day, yet a query reads one checkpoint plus a handful of recent commits instead of the whole log.",
+      "source": "https://docs.databricks.com/aws/en/tables/history",
+      "evidence": "To optimize checkpoint querying, table versions are aggregated to Parquet checkpoint files, which improves performance by preventing the need to read all JSON versions of table history. Users don't need to interact with checkpoints directly."
+    },
+    {
+      "family": "lakehouse-classic-compute-plane-customer-account",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A bank's security policy requires that the virtual machines processing its data run inside the bank's own AWS account and network, where its security team can inspect them. A data engineering team is choosing compute for new nightly Lakeflow Jobs in a classic workspace. Which compute meets this policy?",
+      "options": [
+        {
+          "text": "Classic jobs compute, which runs in the classic compute plane",
+          "correct": true,
+          "why": "Classic compute resources are created in the workspace's network inside the customer's AWS account, which Databricks calls the classic compute plane. The VMs that process the data stay in the bank's own account, where its team can inspect them."
+        },
+        {
+          "text": "Serverless compute for jobs, which runs in the workspace's region",
+          "average": true,
+          "why": "Serverless compute does run in the workspace's region, but in the serverless compute plane inside the Databricks account rather than the bank's AWS account, so it doesn't satisfy this policy."
+        },
+        {
+          "text": "A serverless SQL warehouse shared by the jobs' SQL tasks",
+          "why": "A serverless SQL warehouse also runs on serverless infrastructure in the Databricks account, so it fails the same in-account requirement."
+        },
+        {
+          "text": "Any compute type, since all processing happens in the control plane",
+          "why": "The control plane holds Databricks' backend services and the web application. Data is processed in the compute plane, which is classic or serverless depending on the compute chosen."
+        }
+      ],
+      "in_practice": "The trade-off is operational: classic compute meets in-account inspection rules, but it hands cluster sizing, VPC capacity and multi-minute startup back to the team, which serverless would otherwise manage.",
+      "source": "https://docs.databricks.com/aws/en/getting-started/overview",
+      "evidence": "For serverless compute, the serverless compute resources run in a serverless compute plane in your Databricks account. For classic Databricks compute, the compute resources are in your AWS account in what is called the classic compute plane."
+    },
+    {
+      "family": "lakehouse-external-volume-shared-files",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A claims vendor's application writes scanned PDF claim forms to s3://acme-claims/scans/ and reads them back from that path for its own audits. A data engineer must give Databricks users governed, path-based access to the same files without copying them or changing the vendor's process. An external location already covers the path. What should the engineer create?",
+      "options": [
+        {
+          "text": "An external volume registered on s3://acme-claims/scans/",
+          "correct": true,
+          "why": "An external volume adds Unity Catalog governance to an existing storage path, and Databricks recommends external volumes for non-tabular files that external systems also read or write. Users reach the files under /Volumes without a copy."
+        },
+        {
+          "text": "A managed volume that a nightly job loads with copies of the PDFs",
+          "average": true,
+          "why": "Managed volumes are the default for Databricks-only files, but they live in Unity Catalog managed storage. Copying the PDFs in duplicates the data, lags the vendor's writes, and breaks the no-copy requirement."
+        },
+        {
+          "text": "An external table defined over the scans/ folder",
+          "why": "Tables govern tabular data. PDFs aren't rows and columns, and Unity Catalog governs non-tabular files with volumes, not tables."
+        },
+        {
+          "text": "A DBFS mount of the bucket for the engineering group",
+          "why": "DBFS mounts are a legacy pattern that lacks Unity Catalog access control lists, so they give no governed, auditable access to the files."
+        }
+      ],
+      "in_practice": "Governing files where they already land avoids a second copy of what can be terabytes of scans, and grants on the volume decide which teams read claim documents. The vendor's direct access still needs matching bucket or IAM controls.",
+      "source": "https://docs.databricks.com/aws/en/volumes/",
+      "evidence": "Databricks recommends using external volumes to store non-tabular data files that are read or written by external systems in addition to Databricks."
+    },
+    {
+      "family": "lakehouse-cross-region-metastore-sharing",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A retailer's Databricks account has one workspace in us-east-1 and another in eu-west-1, each attached to its own Unity Catalog metastore. Merchandisers in the EU workspace need to query the live main.sales.orders table that a data engineering team maintains in the US workspace. The team wants no copy jobs, and access must stay governed and audited in Databricks. Which approach meets these requirements?",
+      "options": [
+        {
+          "text": "Share the table to the EU metastore with Databricks-to-Databricks OpenSharing",
+          "correct": true,
+          "why": "Databricks-to-Databricks sharing works across Unity Catalog metastores, including metastores in the same account. Recipients read the live table without replication, and the platform handles authentication and auditing."
+        },
+        {
+          "text": "Grant SELECT on the table to the EU merchandisers' account group",
+          "average": true,
+          "why": "Grants apply across the workspaces that share one metastore. A metastore serves a single region, so the EU workspace uses a different metastore and can't reach the US catalog through a grant."
+        },
+        {
+          "text": "Attach the EU workspace to the US metastore as a second metastore",
+          "why": "A metastore can be attached only to workspaces in its own region, so an eu-west-1 workspace can't use the us-east-1 metastore."
+        },
+        {
+          "text": "Copy the table into the EU metastore with a nightly job",
+          "why": "A copy job would give the analysts data, but it adds a second copy to maintain and leaves EU data up to a day stale, which the no-copy requirement rules out."
+        }
+      ],
+      "in_practice": "Sharing avoids replicating a large fact table across regions, but the cloud vendor may charge egress for cross-region reads, so heavy EU query volumes are worth measuring before choosing sharing over a regional copy.",
+      "source": "https://docs.databricks.com/aws/en/delta-sharing/",
+      "evidence": "Databricks-to-Databricks sharing lets you share data with users in other Databricks accounts, whether they're on AWS, Azure, or GCP. It's also a great way to securely share data across different Unity Catalog metastores in your own Databricks account."
+    },
+    {
+      "family": "lakehouse-lineage-lost-after-rename",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "Last month a data engineer renamed the Unity Catalog table main.sales.orders_v2 to main.sales.orders. Before dropping a column, the engineer opens the table's Lineage tab in Catalog Explorer with the default time range. A quarterly finance notebook job that reads the table last ran six weeks ago, before the rename, and it isn't listed as a downstream consumer. The engineer has permission to view the job. Which explanation fits?",
+      "options": [
+        {
+          "text": "Lineage isn't kept across renames, so reads under the old name don't show",
+          "correct": true,
+          "why": "Unity Catalog doesn't preserve lineage for renamed catalogs, schemas, tables, views, or columns. Reads captured under main.sales.orders_v2 aren't carried over to main.sales.orders, so the job appears only after it reads the table under the new name."
+        },
+        {
+          "text": "The Lineage tab shows only the last 30 days of activity by default",
+          "average": true,
+          "why": "Catalog Explorer retains lineage indefinitely, and its time range defaults to 1 year, so a six-week-old read would be in range if the table hadn't been renamed."
+        },
+        {
+          "text": "Jobs appear as consumers in lineage only while one of their runs is active",
+          "why": "Lineage records the jobs that read and write a table from the queries they ran; a job doesn't have to be running to appear."
+        },
+        {
+          "text": "Notebook tasks aren't linked in lineage views, unlike spark submit tasks",
+          "why": "It's the reverse: spark submit tasks and runs submit requests are the cases whose job links don't appear in lineage views. Notebook tasks are linked normally."
+        }
+      ],
+      "in_practice": "Renames quietly cut lineage, so impact analysis soon after one can miss consumers that run only monthly or quarterly. Teams that rename tables keep a list of known consumers or wait a full reporting cycle before relying on the graph.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage",
+      "evidence": "Lineage is not preserved for renamed catalogs, schemas, tables, views, or columns."
+    },
+    {
+      "family": "compute-serverless-query-profile-not-spark-ui",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer moves a notebook task from classic jobs compute to serverless compute for jobs. One Spark SQL query in the notebook now runs slowly, and on classic compute the engineer would have opened the Spark UI to investigate. Where should the engineer look for the query's execution details on serverless compute?",
+      "options": [
+        {
+          "text": "The query profile for that query",
+          "correct": true,
+          "why": "Serverless compute doesn't provide the Spark UI. The query profile, reachable from the task run's query statements or query history, shows the plan, execution details and metrics for the query."
+        },
+        {
+          "text": "The Spark UI, opened from the task run's compute",
+          "average": true,
+          "why": "The Spark UI is the habit from classic compute, but it isn't available on serverless compute; Databricks points to the query profile instead."
+        },
+        {
+          "text": "The compute event log for the serverless resource",
+          "why": "Compute event logs aren't supported on serverless compute, and they describe cluster lifecycle events rather than how a query executed."
+        },
+        {
+          "text": "The Spark driver logs from cluster log delivery",
+          "why": "Spark logs aren't available on serverless compute; users get only client-side application logs, which don't show a query's plan or metrics."
+        }
+      ],
+      "in_practice": "The query profile shows where the time goes, such as a scan reading far more files than expected, so the engineer can fix layout or filters without rerunning on a classic cluster just to get a Spark UI.",
+      "source": "https://docs.databricks.com/aws/en/compute/serverless/limitations",
+      "evidence": "The Spark UI is not available. Instead, use the query profile to view information about your Spark queries."
+    },
+    {
+      "family": "compute-photon-large-joins-benefit",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform team is deciding which classic jobs compute workloads should run with Photon, since Photon instance types consume DBUs at a different rate than the same instances without Photon. Which workload is Photon most likely to speed up?",
+      "options": [
+        {
+          "text": "A nightly job that joins and aggregates several multi-terabyte Delta tables",
+          "correct": true,
+          "why": "Photon gives the greatest benefit for longer-running queries over large datasets, where its native vectorized execution speeds up scans, hash joins, aggregations, shuffles and Delta writes."
+        },
+        {
+          "text": "A service that runs thousands of lookups that each finish in about a second",
+          "average": true,
+          "why": "Many fast queries sound like a good fit, but queries that complete in under two seconds see no meaningful gain, because planning and scheduling dominate their time."
+        },
+        {
+          "text": "A job whose main step applies a Python UDF to every row of a table",
+          "why": "Photon doesn't support UDFs, so that step falls back to the standard Spark runtime and gains little from Photon."
+        },
+        {
+          "text": "A streaming job that keeps stateful aggregations across micro-batches",
+          "why": "Photon supports stateless streaming only, so stateful streaming workloads don't run on Photon."
+        }
+      ],
+      "in_practice": "Turning Photon on everywhere can raise the DBU rate for little gain on short or UDF-heavy jobs; reserving it for heavy join-and-aggregate pipelines is where the faster runtime pays back the higher rate.",
+      "source": "https://docs.databricks.com/aws/en/compute/photon",
+      "evidence": "Photon provides the greatest benefit for longer-running queries that process large datasets. Queries that normally complete in under two seconds don't see meaningful improvement because execution time is dominated by planning and scheduling overhead rather than data processing."
+    },
+    {
+      "family": "compute-pool-spot-workers-on-demand-driver",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform team sets up instance pools to cut the cost of nightly classic job clusters. The jobs can tolerate losing a worker to spot reclamation but fail if the driver is lost. How does Databricks recommend using spot instances with pools?",
+      "options": [
+        {
+          "text": "Use a spot pool for workers and an on-demand pool as the driver type",
+          "correct": true,
+          "why": "Databricks recommends against spot instances for the driver. When workers come from a spot pool, choose an on-demand pool for the driver, so a spot reclamation can cost workers but not the whole run."
+        },
+        {
+          "text": "Use one spot pool for both the driver and the worker nodes",
+          "average": true,
+          "why": "A single spot pool is the cheapest setup, but a reclaimed driver takes the whole job run down, which these jobs can't tolerate."
+        },
+        {
+          "text": "Use one pool that mixes spot and on-demand instances",
+          "why": "A pool holds either all spot or all on-demand instances, so separate pools are needed when the driver and workers have different requirements."
+        },
+        {
+          "text": "Use an on-demand pool for workers and a spot pool for the driver",
+          "why": "This reverses the recommendation: it pays on-demand prices for the many workers and puts the single point of failure on spot capacity."
+        }
+      ],
+      "in_practice": "Spot workers can cut the compute bill of long batch jobs sharply, and keeping only the driver on demand protects every run for the price of a single instance.",
+      "source": "https://docs.databricks.com/aws/en/compute/pool-best-practices",
+      "evidence": "Databricks recommends not using spot instances for your driver node. If you use a spot pool for your worker node, select an on-demand pool as your Driver type."
+    },
+    {
+      "family": "compute-shared-job-cluster-idle-cost",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's job runs three tasks in sequence: extract, a 10-minute notebook; publish, a SQL task on a serverless SQL warehouse that runs for about 2 hours; and archive, a 5-minute notebook. The two notebook tasks share one classic job cluster and must stay on classic compute. The FinOps team finds the cluster billed for well over two hours per run. Which change cuts this cost?",
+      "options": [
+        {
+          "text": "Give extract and archive separate job clusters, one per task",
+          "correct": true,
+          "why": "A job cluster shared across tasks starts with the first task that uses it and terminates only after the last one, staying on and idle while other tasks run. A cluster for a single task terminates as soon as that task finishes."
+        },
+        {
+          "text": "Enable autoscaling on the shared job cluster",
+          "average": true,
+          "why": "Autoscaling can drop idle workers, but the shared cluster still stays up, with its driver and minimum workers, until archive finishes, so most of the idle cost remains."
+        },
+        {
+          "text": "Run the publish SQL task on the shared job cluster as well",
+          "why": "SQL tasks run on serverless or pro SQL warehouses, not on classic job clusters, so publish can't move onto the shared cluster."
+        },
+        {
+          "text": "Switch the notebook tasks to a shared all-purpose cluster",
+          "why": "Databricks doesn't recommend all-purpose compute for production jobs, and an always-on all-purpose cluster would add idle time rather than remove it."
+        }
+      ],
+      "in_practice": "Sharing a job cluster saves a startup between back-to-back tasks, but when a long task on other compute sits between them, a second startup of a few minutes is far cheaper than two idle hours on every run.",
+      "source": "https://docs.databricks.com/aws/en/jobs/compute",
+      "evidence": "Shared across tasks ... When the first task run configured to use the compute resource begins. ... After the final task configured to use the compute resource runs. ... Compute remains on and idle while tasks not using the compute resource run."
+    },
+    {
+      "family": "compute-pro-warehouse-private-federation",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "An analytics team needs a SQL warehouse whose queries reach an on-premises PostgreSQL database through Lakehouse Federation. The database is reachable only over the company's private network, which is connected to the customer VPC where the workspace's classic compute runs. The team wants the best query performance possible under this constraint. Which SQL warehouse type should the team use?",
+      "options": [
+        {
+          "text": "A pro SQL warehouse",
+          "correct": true,
+          "why": "A pro SQL warehouse runs its compute in the customer's AWS account, so it can use the custom networking to reach on-premises databases, and it supports Photon and Predictive IO. Databricks recommends pro for federation over custom-defined networks."
+        },
+        {
+          "text": "A serverless SQL warehouse",
+          "average": true,
+          "why": "Serverless is the general recommendation, but its compute runs in the Databricks account rather than the company's network, and Databricks points to pro when custom networking to on-premises databases is needed."
+        },
+        {
+          "text": "A classic SQL warehouse",
+          "why": "A classic warehouse also runs in the customer's account, but it lacks Predictive IO and offers only entry-level performance, so it isn't the best performer under this constraint."
+        },
+        {
+          "text": "A Lakehouse Real-Time SQL warehouse",
+          "why": "Lakehouse Real-Time is a serverless, read-only warehouse type in Beta for sub-second serving queries. It runs on serverless infrastructure and doesn't address the private network requirement."
+        }
+      ],
+      "in_practice": "The trade-off is startup and elasticity: a pro warehouse typically takes about 4 minutes to start and scales less responsively than serverless, so teams often keep it running through business hours for federation-heavy dashboards.",
+      "source": "https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types",
+      "evidence": "Use a pro SQL warehouse when: Serverless SQL warehouses are not available in a region. You have custom-defined networking and want to connect to databases in your network in the cloud or on-premises for federation or a hybrid-type architecture."
+    },
+    {
+      "family": "compute-warehouse-api-default-classic",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A platform team creates SQL warehouses with an infrastructure-as-code script that calls the SQL warehouses API with default parameters, in a workspace created this year in a region that supports serverless SQL warehouses. Analysts report that these warehouses take about 4 minutes to start and scale slowly under bursts of queries, while warehouses an admin created in the UI start in seconds. What explains the difference?",
+      "options": [
+        {
+          "text": "The API creates a classic warehouse by default unless serverless is requested",
+          "correct": true,
+          "why": "With default parameters, the SQL warehouses API creates a classic warehouse, while the UI defaults to serverless where it's available. Setting enable_serverless_compute to true and warehouse_type to pro in the request creates a serverless warehouse."
+        },
+        {
+          "text": "The API creates a pro warehouse by default, as the UI does without serverless",
+          "average": true,
+          "why": "Pro is the UI default only where serverless isn't available. The API's default with default parameters is classic, which also lacks Predictive IO."
+        },
+        {
+          "text": "Serverless warehouses always take minutes on their first start of the day",
+          "why": "Serverless SQL warehouses typically start in 2 to 6 seconds; a start of about 4 minutes is typical of pro and classic warehouses."
+        },
+        {
+          "text": "The script's service principal lacks permission to use Photon",
+          "why": "There is no Photon permission to grant: every SQL warehouse type supports Photon, and permissions don't change how fast a warehouse starts."
+        }
+      ],
+      "in_practice": "Databricks recommends always setting the warehouse type explicitly in automation, especially across many workspaces; one missing flag can leave every BI user on slower, entry-level classic warehouses.",
+      "source": "https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types",
+      "evidence": "Using the SQL warehouses API with default parameters, the default SQL warehouse type is classic. To use serverless, set the `enable_serverless_compute` parameter to `true` and `warehouse_type` to `pro`."
+    }
+  ]
 }
