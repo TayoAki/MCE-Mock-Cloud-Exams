@@ -1,3 +1,748 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "control-flow-for-each-job-parameter-array",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A job has a job parameter named regions whose default value is the JSON array [\"us\", \"eu\", \"apac\"]. A data engineer adds a For each task that must run a notebook once for each region and pass the current region to the notebook as a parameter. How should the For each task and its nested notebook task be configured?",
+      "options": [
+        {
+          "text": "Set Inputs to {{job.parameters.regions}} and pass {{input}} to the notebook",
+          "correct": true,
+          "why": "A For each task can take a job parameter as its Inputs with {{job.parameters.<name>}}, and the nested task reads the current array element with {{input}}, so each iteration receives one region string."
+        },
+        {
+          "text": "Set Inputs to {{job.parameters.regions}} and pass {{job.parameters.regions}} to the notebook",
+          "average": true,
+          "why": "Referencing the job parameter inside the nested task passes the whole array to every iteration, so each notebook run sees all three regions instead of its own; the current element comes from {{input}}."
+        },
+        {
+          "text": "Set Inputs to regions and pass {{input.regions}} to the notebook",
+          "why": "A bare name in Inputs is not a reference to the job parameter, and {{input.<key>}} reads a field of an object element, which plain strings such as \"us\" do not have."
+        },
+        {
+          "text": "Set Inputs to {{tasks.regions.values}} and pass {{input}} to the notebook",
+          "why": "The {{tasks.<task_name>.values.<value_name>}} syntax reads a task value set by an upstream task; regions is a job parameter, so Inputs references it with {{job.parameters.regions}}."
+        }
+      ],
+      "in_practice": "Driving the loop from a job parameter lets an operator rerun one region with Run now with different parameters, for example [\"eu\"], without editing the job, which keeps a single-region backfill to minutes.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/for-each",
+      "evidence": "To reference a job parameter, use the following syntax in the Inputs text box: {{job.parameters.<name>}}. ... Use the {{input}} reference to set the value to the array value of each iteration"
+    },
+    {
+      "family": "control-flow-task-value-to-sql-task",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A Python notebook task named prep computes a cutoff date that a downstream SQL task must use in the WHERE clause of its query. How should the data engineer pass the value from prep to the SQL task?",
+      "options": [
+        {
+          "text": "Set it with dbutils.jobs.taskValues.set and map {{tasks.prep.values.cutoff}} to a SQL task parameter",
+          "correct": true,
+          "why": "Task values are set from Python code, and any task that supports parameters can reference them with a dynamic value reference; the SQL query then reads its parameter with the named marker :cutoff."
+        },
+        {
+          "text": "Set it with dbutils.jobs.taskValues.set and call dbutils.jobs.taskValues.get in the SQL query",
+          "average": true,
+          "why": "dbutils.jobs.taskValues.set and get are Python functions that work only in notebooks with Python selected, so the SQL query can't call them; it receives the value through a task parameter instead."
+        },
+        {
+          "text": "Store it with spark.conf.set in prep and read it in the query as a ${cutoff} variable",
+          "why": "A Spark configuration set in one task stays in that task's session and does not travel to another task in the job; task values are the mechanism for passing run-time results between tasks."
+        },
+        {
+          "text": "Write it into a job parameter named cutoff from prep and read {{job.parameters.cutoff}}",
+          "why": "Job parameters are key-value pairs defined at the job level and set when a run is triggered, not outputs a task writes during the run; values generated during a run are passed as task values."
+        }
+      ],
+      "in_practice": "Passing the cutoff as a task value keeps the SQL task on a SQL warehouse while the Python logic stays in the notebook, and the resolved value appears under Parameters in the run details for audits.",
+      "source": "https://docs.databricks.com/aws/en/jobs/task-values",
+      "evidence": "Because dbutils.jobs.taskValues.set() and dbutils.jobs.taskValues.get() in the dbutils.jobs.taskValues subutility are Python functions, they can be used only in notebooks with Python selected as the language. However, you can reference task values using dynamic value references for all tasks that support parameters."
+    },
+    {
+      "family": "control-flow-disable-task-keep-history",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A leaf task named enrich_geo calls a partner API that will be down for maintenance all week, and no other task depends on it. A data engineer wants the job's scheduled runs to skip enrich_geo until then, while keeping its configuration and run history so it can be switched back on. What should the engineer do?",
+      "options": [
+        {
+          "text": "Disable the task in the job settings",
+          "correct": true,
+          "why": "A disabled task is skipped at run time but stays in the job with its configuration and run history, so re-enabling it next week restores it without rebuilding anything."
+        },
+        {
+          "text": "Deselect it in Run now with different settings",
+          "average": true,
+          "why": "Deselecting a task affects only that one manual run; the scheduled runs would still include enrich_geo and fail against the unavailable API."
+        },
+        {
+          "text": "Delete the task and recreate it next week",
+          "why": "Deleting removes the task's configuration and run history, which the engineer wants to keep; disabling a task exists for exactly this case."
+        },
+        {
+          "text": "Change its Run if condition to All failed",
+          "why": "Run if conditions decide when a task runs based on upstream results; repurposing one to suppress a task makes it run on nights when its dependencies fail and hides the intent."
+        }
+      ],
+      "in_practice": "Disabling instead of deleting avoids a week of failure alerts and keeps the task's history for comparison, and the job definition records disabled: true so the change shows up in code review.",
+      "source": "https://docs.databricks.com/aws/en/jobs/run-now",
+      "evidence": "Deselecting a task only affects this run. To skip a task on every run without deleting it, disable the task in the job settings."
+    },
+    {
+      "family": "control-flow-if-else-list-operand-fails",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's notebook task named scan sets a task value new_files to a Python list of the file paths it found. An If/else condition task evaluates {{tasks.scan.values.new_files}} != [] so that a load branch runs only when files arrived. Every run now fails at the condition task, even on days with new files. What should the engineer change?",
+      "options": [
+        {
+          "text": "Also set a numeric task value file_count in scan and test it with > 0",
+          "correct": true,
+          "why": "If/else operands accept only numeric, string and boolean task values, and any other type makes the condition expression fail. A count compared with > is evaluated numerically and branches correctly."
+        },
+        {
+          "text": "Test the list with == [] instead and attach the load branch to the false outcome",
+          "average": true,
+          "why": "Flipping the operator does not change the operand's type; the list value still makes the condition expression fail, whichever comparison is used."
+        },
+        {
+          "text": "Compare the list numerically with {{tasks.scan.values.new_files}} > 0",
+          "why": "Numeric operators still need a numeric, string or boolean operand, so a list makes this expression fail as well."
+        },
+        {
+          "text": "Set the condition task's Run if to All done so it evaluates after scan",
+          "why": "The condition task already waits for scan; Run if controls whether a task runs based on upstream status and does nothing about an unsupported operand type."
+        }
+      ],
+      "in_practice": "Publishing a small scalar such as a count for branching, and keeping the full list for a For each task, keeps conditions simple and makes the run details show a readable evaluation such as 37 > 0.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/if-else",
+      "evidence": "Only numeric, string, and boolean values are allowed when referencing task values in an operand. Any other types cause the condition expression to fail."
+    },
+    {
+      "family": "control-flow-for-each-input-size-limits",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "Each night, a Python notebook task named list_prefixes finds about 700 S3 prefixes to reprocess, and a data engineer needs a For each task to run a notebook once per prefix. The JSON array of prefixes is about 30,000 characters long. How should the engineer feed the array to the For each task?",
+      "options": [
+        {
+          "text": "Set it as a task value in list_prefixes and reference that task value in Inputs",
+          "correct": true,
+          "why": "A task value reference in Inputs can stand for a value of up to 48 KB, well above 30,000 characters, and it carries the list computed earlier in the same run."
+        },
+        {
+          "text": "Put it in a job parameter and reference {{job.parameters.prefixes}} in Inputs",
+          "average": true,
+          "why": "Job parameter values are limited to 10,000 characters, so a 30,000-character array does not fit, whatever way the nightly list is placed there."
+        },
+        {
+          "text": "Paste the JSON array directly into the Inputs text box each night",
+          "why": "The Inputs text box holds at most 5,000 characters, and pasting a nightly list by hand defeats the point of a scheduled job."
+        },
+        {
+          "text": "Raise the Concurrency setting so that Inputs accepts a longer array",
+          "why": "Concurrency sets how many iterations run at the same time; it has no effect on how large the Inputs value can be."
+        }
+      ],
+      "in_practice": "Sizing to the limits up front avoids a 2 a.m. failure when the list grows; if the array could pass 48 KB, pass a lookup to a larger config file or table and let each iteration read its own slice.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/for-each",
+      "evidence": "Parameters are limited to 5,000 characters in the UI directly, or 48 KB if you use task value references (where the value can be much larger than the size of the string that describes it), or 10,000 characters for the value of job parameters."
+    },
+    {
+      "family": "control-flow-task-value-debug-value",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer is developing a notebook that reads the task value booking_status set by an upstream task named booking_lookup. During interactive testing there is no upstream task, so the read needs a stand-in value. In scheduled job runs, a missing key must still raise an error rather than be hidden. Which call should the notebook use?",
+      "options": [
+        {
+          "text": "dbutils.jobs.taskValues.get(taskKey=\"booking_lookup\", key=\"booking_status\", debugValue=\"confirmed\")",
+          "correct": true,
+          "why": "debugValue is returned only when the notebook runs interactively, so development works without the upstream task, while job runs still read the real value and fail if the key is missing."
+        },
+        {
+          "text": "dbutils.jobs.taskValues.get(taskKey=\"booking_lookup\", key=\"booking_status\", default=\"confirmed\")",
+          "average": true,
+          "why": "A default is used whenever the key can't be found, including in job runs, so it hides a missing key or a renamed task; Databricks advises against defaults for this reason."
+        },
+        {
+          "text": "dbutils.widgets.get(\"booking_status\"), after defining the widget with a default of \"confirmed\"",
+          "why": "A widget default fills in whenever no parameter arrives, including in a misconfigured job run, so it masks the missing value instead of raising an error."
+        },
+        {
+          "text": "dbutils.jobs.taskValues.get(taskKey=\"booking_lookup\", key=\"booking_status\")",
+          "why": "Without a debugValue, the call has no stand-in for interactive runs, which is the gap the engineer needs to fill during development."
+        }
+      ],
+      "in_practice": "Keeping job runs strict means a renamed upstream task fails the run on the first night, instead of silently tagging thousands of bookings as confirmed for weeks.",
+      "source": "https://docs.databricks.com/aws/en/jobs/task-values",
+      "evidence": "The default value is used if the key cannot be found. The debugValue allows you to set a static value to use during manual code development and testing in notebooks before you schedule the notebook as a task."
+    },
+    {
+      "family": "control-flow-upstream-failed-counts-as-failed",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's job chains extract, then transform. A task named page_oncall depends only on transform and uses the Run if condition At least one failed. Last night extract failed, so transform never started and shows Upstream failed. What happened to page_oncall, and why?",
+      "options": [
+        {
+          "text": "It ran, because an upstream task marked Upstream failed counts as failed",
+          "correct": true,
+          "why": "When Run if conditions are evaluated, upstream tasks marked Upstream failed or Upstream canceled are treated as failed, not as skipped, so At least one failed is met and page_oncall runs."
+        },
+        {
+          "text": "It was Excluded, because transform never ran and so counts as skipped",
+          "average": true,
+          "why": "Treating a task that never started as skipped is the common assumption, but Upstream failed is evaluated as a failure, so the failure-handling task still runs."
+        },
+        {
+          "text": "It was marked Upstream failed too, because extract's failure propagates",
+          "why": "Upstream failed marks tasks whose success-based conditions, such as All succeeded, can't be met; At least one failed is met here, so page_oncall runs."
+        },
+        {
+          "text": "It ran, because At least one failed checks every task in the job",
+          "why": "Run if conditions evaluate only a task's own dependencies; page_oncall ran because its one dependency, transform, counts as failed."
+        }
+      ],
+      "in_practice": "Hanging the alert off the last task in a chain covers failures anywhere upstream, so one page_oncall task can watch a ten-step pipeline instead of wiring an alert to every step.",
+      "source": "https://docs.databricks.com/aws/en/jobs/run-if",
+      "evidence": "Upstream tasks with the Excluded result state are treated as successful when evaluating Run if conditions. Upstream tasks marked Upstream failed or Upstream canceled are treated as failed, not as skipped."
+    },
+    {
+      "family": "control-flow-if-else-disabled-value-source",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer disables a task named count_new_rows while rewriting it. That task sets the task value new_rows, and an If/else condition task named has_rows evaluates {{tasks.count_new_rows.values.new_rows}} > 0 to decide whether the load branch runs. Since the change, every run fails at has_rows. What explains the failure?",
+      "options": [
+        {
+          "text": "An If/else task fails when the task that supplies its condition value is disabled",
+          "correct": true,
+          "why": "Disabling a task doesn't remove references to its values: an If/else condition task fails if the upstream task that provides its condition value is disabled, so has_rows fails until that changes."
+        },
+        {
+          "text": "The disabled task's value resolves to an empty string that > can't compare",
+          "average": true,
+          "why": "This sounds like a type problem, but the documented behavior is simpler: the condition task fails outright when the task that supplies its value is disabled."
+        },
+        {
+          "text": "The > operator compares its operands as strings, so the condition errors",
+          "why": "The >, >=, < and <= operators compare numerically; string comparison applies to == and !=, and the same condition worked before the task was disabled."
+        },
+        {
+          "text": "has_rows needs Run if set to All done to evaluate after a disabled parent",
+          "why": "Run if decides whether a task runs based on upstream results; it can't supply the missing value, and the condition task still fails while its value's source is disabled."
+        }
+      ],
+      "in_practice": "Before disabling a task, check the DAG for If/else or For each tasks that read its values; a temporary condition on a job parameter such as {{job.parameters.force_load}} keeps nightly loads running during a rewrite.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/if-else",
+      "evidence": "An If/else condition task fails if the upstream task that provides its condition value is disabled."
+    },
+    {
+      "family": "recovery-single-task-run-now",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A job with a single notebook task failed overnight because a maintenance process had locked a source table. The lock has now cleared. How should the data engineer rerun the failed work?",
+      "options": [
+        {
+          "text": "Trigger the job again with Run now",
+          "correct": true,
+          "why": "Repair is supported only for jobs that orchestrate two or more tasks, so a failed single-task job is rerun by triggering it again with Run now."
+        },
+        {
+          "text": "Open the failed run and click Repair run",
+          "average": true,
+          "why": "Repair reruns the unsuccessful tasks of multi-task jobs; it isn't supported for a job with only one task."
+        },
+        {
+          "text": "Add a retry policy and wait for the next run",
+          "why": "A retry policy only affects future failures, and waiting for the next scheduled run delays the data by a full cycle."
+        },
+        {
+          "text": "Clone the job and run the clone once",
+          "why": "A clone is a separate job with its own ID and run history, which adds clutter without any benefit over running the original job."
+        }
+      ],
+      "in_practice": "For one-task jobs, Run now is the recovery path; once a job grows to several tasks, repair becomes worthwhile because it skips the work that already succeeded.",
+      "source": "https://docs.databricks.com/aws/en/jobs/repair-job-failures",
+      "evidence": "Repair is supported only with jobs that orchestrate two or more tasks. To re-run a failed single-task job, trigger it again with Run now."
+    },
+    {
+      "family": "recovery-continuous-job-backoff",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs an always-on streaming job with a continuous trigger in Lakeflow Jobs. How does Lakeflow Jobs respond when runs of this job keep failing?",
+      "options": [
+        {
+          "text": "It retries the whole job with exponential backoff and no retry limit",
+          "correct": true,
+          "why": "Continuous jobs can't use retry policies; they retry the entire job on failure with exponential backoff, the retry period grows up to a system maximum, and the number of retries is unlimited."
+        },
+        {
+          "text": "It pauses the job after several failures until someone resumes it",
+          "average": true,
+          "why": "Pausing after repeated failures is a common expectation, but a continuous job keeps retrying at the maximum retry period instead of stopping, so it recovers on its own once the cause clears."
+        },
+        {
+          "text": "It applies each task's configured retry policy, then stops the job",
+          "why": "Retry policies can't be used in a continuous job, and the job never stops on its own: once any task retries are used up, the run is canceled and a new run starts under the backoff."
+        },
+        {
+          "text": "It falls back to a cron schedule until one of the runs succeeds",
+          "why": "A continuous job has no fallback schedule; the scheduler keeps restarting it with a growing retry period."
+        }
+      ],
+      "in_practice": "Backoff lets a stream ride out an upstream outage overnight without anyone resuming it by hand, and Restart run resets the retry period as soon as a fix is deployed.",
+      "source": "https://docs.databricks.com/aws/en/jobs/continuous",
+      "evidence": "You cannot use retry policies in a continuous job. Instead, continuous jobs automatically retry the entire job on failure using an exponential backoff algorithm. ... There is no limit on the number of retries for a continuous job."
+    },
+    {
+      "family": "recovery-mute-until-last-retry",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer adds a Failure notification to a task that has 3 retries. The on-call engineer wants an email only when the final attempt fails, not for attempts that a later retry fixes. Which option should the engineer select in the task's notification settings?",
+      "options": [
+        {
+          "text": "Mute notifications until the last retry",
+          "correct": true,
+          "why": "This task-notification option filters out notifications until the final retry, so an email goes out only if the last attempt also fails."
+        },
+        {
+          "text": "Mute notifications for skipped runs",
+          "average": true,
+          "why": "A failed attempt that will be retried isn't a skipped run, so this filter would still send an email for every failed attempt."
+        },
+        {
+          "text": "Mute notifications for canceled runs",
+          "why": "Retried attempts aren't canceled runs; this filter only removes notifications for runs that were canceled."
+        },
+        {
+          "text": "Duration warning in place of Failure",
+          "why": "A Duration warning fires when a run exceeds its expected duration, not when the last attempt fails, so it would miss real failures."
+        }
+      ],
+      "in_practice": "On a flaky API task that fails transiently a few times a week, muting until the last retry cuts pages to the failures that need a human, which keeps on-call from tuning alerts out.",
+      "source": "https://docs.databricks.com/aws/en/jobs/notifications",
+      "evidence": "When configuring task notifications, you can select Mute notifications until the last retry to filter out all notifications until the final retry."
+    },
+    {
+      "family": "recovery-queue-overrunning-runs",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "An hourly job rewrites the same tables on each run. It usually takes 40 minutes, but about once a week a run takes 70 minutes, and the next hourly run then shows Skipped. The data engineering team wants that run to start as soon as the slow run finishes, without two runs ever writing the tables at once. Which change meets these requirements?",
+      "options": [
+        {
+          "text": "Enable queueing on the job and keep maximum concurrent runs at 1",
+          "correct": true,
+          "why": "With queueing on, a run that hits the job's concurrency limit is queued, for up to 48 hours, instead of skipped, and a limit of 1 still keeps runs from overlapping."
+        },
+        {
+          "text": "Raise maximum concurrent runs to 2 so the next run starts on time",
+          "average": true,
+          "why": "This stops the skip but lets two runs rewrite the same tables at the same time, which the team must avoid."
+        },
+        {
+          "text": "Add retries to each task so that a skipped run tries again",
+          "why": "Retries rerun tasks that fail; a skipped run never started its tasks, so retries don't bring it back."
+        },
+        {
+          "text": "Set a 55-minute job timeout so each run ends before the next",
+          "why": "A timeout stops slow runs as Timed Out with the tables only partly rewritten, trading a skipped run for an incomplete one."
+        }
+      ],
+      "in_practice": "Queueing turns the weekly gap into a 10-minute delay that the hourly cadence absorbs on its own, with no overlapping writes to reason about.",
+      "source": "https://docs.databricks.com/aws/en/jobs/configure-job",
+      "evidence": "To prevent runs of a job from being skipped because of concurrency limits, you can enable queueing for the job. When queueing is enabled, the run is queued for up to 48 hours if resources are unavailable for a job run."
+    },
+    {
+      "family": "recovery-repair-parameter-override",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A five-task nightly job has a job parameter max_bad_rows set to 0. Last night its validate task, the third of five, failed because a vendor glitch produced 12 bad rows. The data team agrees to accept up to 50 bad rows for this one run only, without changing the job's settings or rerunning the two tasks that succeeded. What should the data engineer do?",
+      "options": [
+        {
+          "text": "Repair the run, entering max_bad_rows = 50 in the Repair job run dialog",
+          "correct": true,
+          "why": "A repair reruns only the unsuccessful tasks and their dependents, and parameters entered in the Repair job run dialog override the existing values for that repair."
+        },
+        {
+          "text": "Use Run now with different parameters, setting max_bad_rows to 50",
+          "average": true,
+          "why": "This starts a new run of all five tasks, repeating the two that already succeeded and adding their time and cost."
+        },
+        {
+          "text": "Change the job's default to 50, repair the run, then change it back",
+          "why": "Repairs do use the current settings, but editing the default changes the job for any run that starts in between and relies on someone remembering to revert it."
+        },
+        {
+          "text": "Repair the run as is, since repairs keep the original parameter values",
+          "why": "Without an override, the repair reruns validate with max_bad_rows = 0 and fails again; values entered in the Repair job run dialog are what change it."
+        }
+      ],
+      "in_practice": "A one-off override on the repair ties the exception to that run's history, so an auditor can see exactly which night accepted 12 bad rows and why.",
+      "source": "https://docs.databricks.com/aws/en/jobs/repair-job-failures",
+      "evidence": "To add or edit parameters for the tasks to repair, enter the parameters in the Repair job run dialog. Parameters you enter in the Repair job run dialog override existing values."
+    },
+    {
+      "family": "recovery-partial-run-downstream",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A six-task job succeeded last night, but its build_mart task used a wrong join, so build_mart and the two report tasks downstream of it produced bad output. A data engineer has fixed the notebook and wants to rerun build_mart and everything downstream of it now, without rerunning the three ingestion tasks upstream. What should the engineer do?",
+      "options": [
+        {
+          "text": "Use Run now with different settings, selecting build_mart and its downstream tasks",
+          "correct": true,
+          "why": "Run now with different settings can run a subset of tasks and expand the selection to a task's downstream dependents, the same as build_mart+ in the only field of the API."
+        },
+        {
+          "text": "Repair last night's run so build_mart and its dependents run again",
+          "average": true,
+          "why": "Repair reruns unsuccessful tasks and their dependents; every task in last night's run succeeded, so there is nothing for a repair to rerun."
+        },
+        {
+          "text": "Disable the three ingestion tasks and then click Run now",
+          "why": "Disabling changes the job settings for every run, so tonight's scheduled run would also skip ingestion unless someone re-enables the tasks."
+        },
+        {
+          "text": "Clone the job with only the three tasks and run the clone",
+          "why": "A one-off clone duplicates the job definition and splits the run history, while a partial run of the original job does the same work."
+        }
+      ],
+      "in_practice": "A partial run avoids re-ingesting hours of source data just to rebuild one mart, which can cut a recovery from a full nightly window to the 20 minutes the downstream tasks need.",
+      "source": "https://docs.databricks.com/aws/en/jobs/run-now",
+      "evidence": "When you run with different parameters, you can select a subset of tasks to run. You can optionally expand your selection to include each task's dependencies: its upstream tasks (the tasks that come before, that it depends on) or its downstream tasks (the tasks that come after it, and depend on it)."
+    },
+    {
+      "family": "recovery-execution-count-attempts",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's notebook task appends a day's rows to silver.orders and has 2 retries. Before appending, it must delete rows left by an earlier failed attempt of the same task in the same job run, whether that attempt was retried automatically or rerun by a manual repair. The notebook runs the delete only when an attempt counter shows this isn't the first attempt. Which dynamic value reference should supply that counter?",
+      "options": [
+        {
+          "text": "{{task.execution_count}}",
+          "correct": true,
+          "why": "{{task.execution_count}} is the number of times the current task has run, including retries and repairs, so it covers both kinds of re-attempt."
+        },
+        {
+          "text": "{{task_retry_count}}",
+          "average": true,
+          "why": "{{task_retry_count}} is a deprecated reference that counts retries after a failed first attempt; Databricks replaces it with {{task.execution_count}}, which also counts repairs."
+        },
+        {
+          "text": "{{job.repair_count}}",
+          "why": "{{job.repair_count}} counts repair attempts on the job run, so it stays at 0 during automatic retries and misses those re-attempts."
+        },
+        {
+          "text": "{{job.run_id}}",
+          "why": "{{job.run_id}} identifies the job run but carries no attempt count, so it can't tell a first attempt from a later one."
+        }
+      ],
+      "in_practice": "Pairing the counter with {{job.run_id}} as a row tag lets a re-attempt delete exactly its own partial rows, though an idempotent MERGE keyed on order ID avoids that bookkeeping altogether.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "{{task.execution_count}} The number of times the current task was run (including retries and repairs)."
+    },
+    {
+      "family": "recovery-serverless-auto-optimization-retries",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer runs a serverless job whose notebook task sends the day's payout instructions to a banking API that has no duplicate protection. The task has no retry policy configured, yet after a transient failure the payouts were sent twice. What explains this, and what should the engineer change?",
+      "options": [
+        {
+          "text": "Serverless auto-optimization retried it; clear that option in the task's retry policy",
+          "correct": true,
+          "why": "Serverless auto-optimization is on by default and retries failed tasks; for work that must run at most once, clear Enable serverless auto-optimization in the task's Retry Policy dialog."
+        },
+        {
+          "text": "The default task retry policy retried it; set the task's retries to 0",
+          "average": true,
+          "why": "Auto-optimization is a separate checkbox in the Retry Policy dialog that may add retries of its own, so it stays on until that checkbox is cleared."
+        },
+        {
+          "text": "Job queueing reran it after the failure; turn queueing off for the job",
+          "why": "Queueing holds runs that hit concurrency limits until capacity frees up; it doesn't rerun a run that failed."
+        },
+        {
+          "text": "Standard performance mode retried it; turn on Performance optimized",
+          "why": "The performance setting trades startup latency for cost; the extra attempt came from serverless auto-optimization."
+        }
+      ],
+      "in_practice": "Databricks recommends leaving auto-optimization on so critical work completes at least once; turning it off only for non-idempotent tasks such as payments keeps an at-most-once guarantee where it matters.",
+      "source": "https://docs.databricks.com/aws/en/jobs/run-serverless-jobs",
+      "evidence": "Auto-optimization is enabled by default, and Databricks recommends leaving it enabled to ensure critical workloads run successfully at least once. However, if you have workloads that must be executed at most once, for example, jobs that are not idempotent, you can turn off auto-optimization"
+    },
+    {
+      "family": "orchestration-sql-file-multi-statement",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer keeps refresh_gold.sql in the team's remote Git repository. The script holds several statements separated by semicolons that rebuild gold tables, and it must run as a job task on a serverless SQL warehouse. Which SQL task type should the engineer select?",
+      "options": [
+        {
+          "text": "File, with a Git provider source and the script's relative path",
+          "correct": true,
+          "why": "The File type runs a .sql file on the chosen SQL warehouse, the file can hold multiple statements separated by semicolons, and its source can be a workspace file or a Git provider."
+        },
+        {
+          "text": "Query, choosing the script as the saved query to run",
+          "average": true,
+          "why": "Query runs a saved SQL query against the warehouse; it doesn't point at a .sql file in a remote repository."
+        },
+        {
+          "text": "Alert, with the script as the condition to evaluate",
+          "why": "Alert evaluates an existing SQL alert and notifies subscribers; it doesn't execute a script of statements."
+        },
+        {
+          "text": "Query, saving each statement as its own query and task",
+          "why": "Splitting the script into many saved queries and tasks multiplies objects to maintain, while File runs the whole versioned script as one task."
+        }
+      ],
+      "in_practice": "Running the script straight from Git keeps the reviewed SQL as the single source of truth, so a production gold rebuild always matches the merged code.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/sql",
+      "evidence": "Use File to run a .sql file using the specified SQL warehouse. The file can contain multiple SQL statements separated by semicolons (;)."
+    },
+    {
+      "family": "orchestration-job-run-id-audit-column",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants every task in a multi-task job to write the same identifier of the current job run into an audit column, so that rows written by different tasks in one run can be grouped later. Which dynamic value reference should each task's parameter use?",
+      "options": [
+        {
+          "text": "{{job.run_id}}",
+          "correct": true,
+          "why": "{{job.run_id}} is the unique identifier assigned to the job run, so every task in that run receives the same value."
+        },
+        {
+          "text": "{{run_id}}",
+          "average": true,
+          "why": "{{run_id}} is a deprecated reference to the task run's identifier, so it differs from task to task; Databricks lists {{task.run_id}} as its replacement."
+        },
+        {
+          "text": "{{task.run_id}}",
+          "why": "{{task.run_id}} identifies the current task run, so each task writes a different value and the rows can't be grouped by job run."
+        },
+        {
+          "text": "{{job.id}}",
+          "why": "{{job.id}} identifies the job itself and is the same for every run, so it can't tell one night's rows from the next."
+        }
+      ],
+      "in_practice": "A shared run ID column lets an engineer audit or delete everything one bad run wrote with a single predicate, instead of matching timestamps across a dozen tables.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "{{job.run_id}} The unique identifier assigned to the job run. ... {{run_id}} The unique identifier assigned to a task run. Use task.run_id instead."
+    },
+    {
+      "family": "orchestration-sql-alert-task-subscribers",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "After the nightly load, a job must evaluate an existing SQL alert that checks for late shipments and email the logistics leads with the result. Which task should the data engineer add after the load task?",
+      "options": [
+        {
+          "text": "A SQL task of type Alert, with the leads added as subscribers",
+          "correct": true,
+          "why": "The SQL task's Alert type evaluates a selected SQL alert on the chosen SQL warehouse and can notify subscribers with the alert's results."
+        },
+        {
+          "text": "A Dashboard task, with the leads added as subscribers",
+          "average": true,
+          "why": "A Dashboard task refreshes a published dashboard and emails its subscribers; it doesn't evaluate the alert's condition."
+        },
+        {
+          "text": "A SQL task of type Query that reruns the alert's query",
+          "why": "Running the query only produces rows; nothing evaluates the alert condition or notifies the leads."
+        },
+        {
+          "text": "An If/else condition task that checks the alert's threshold",
+          "why": "An If/else condition task compares two operands such as parameters or task values; it can't run a query or evaluate an alert."
+        }
+      ],
+      "in_practice": "Evaluating the alert inside the job ties the check to the load that feeds it, so the leads hear about late shipments minutes after the data lands rather than on an unrelated schedule.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/sql",
+      "evidence": "Select a SQL alert to evaluate using the specified SQL warehouse. (Optional) Add Subscribers to notify with the results of the alert."
+    },
+    {
+      "family": "orchestration-job-parameter-precedence",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A job defines a job parameter region with the default value us. A data engineer adds a notebook task meant to process only EU data and gives it a task parameter region = eu. During runs, dbutils.widgets.get(\"region\") in that notebook returns us. What explains this, and what fixes it?",
+      "options": [
+        {
+          "text": "The job parameter wins over a task parameter with the same key; use a distinct task key",
+          "correct": true,
+          "why": "Job parameters are pushed down to key-value tasks, and when a job parameter and a task parameter share a key, the job parameter takes precedence. A distinct key such as task_region avoids the clash."
+        },
+        {
+          "text": "The widget's default of us overrides the task parameter; remove that widget default",
+          "average": true,
+          "why": "A widget default applies only when no value is passed in; here the job parameter us is pushed down to the task and takes precedence over its eu."
+        },
+        {
+          "text": "Task parameters reach a notebook only through dbutils.jobs.taskValues.get",
+          "why": "Notebook tasks receive their parameters through dbutils.widgets; task values are a separate mechanism for results produced by upstream tasks."
+        },
+        {
+          "text": "Task parameters apply only to manual runs; scheduled runs use job defaults",
+          "why": "Task parameters apply to every run of the task; the value is us because the job parameter with the same key takes precedence."
+        }
+      ],
+      "in_practice": "The UI warns when a task parameter reuses a job parameter's key; heeding it prevents an EU-only task from quietly processing US data every night, a bug that row counts alone rarely reveal.",
+      "source": "https://docs.databricks.com/aws/en/jobs/job-parameters",
+      "evidence": "For tasks that take key-value parameters, job parameters are pushed down automatically, and if a job parameter and a task parameter share a key, the job parameter takes precedence."
+    },
+    {
+      "family": "orchestration-git-source-run-snapshot",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team runs its production job's notebook tasks from a Git folder in the workspace. Twice this month the nightly run used old code because nobody pulled the latest release-branch commit into the folder. The team wants each run to get the current release branch automatically, with every task in a run using the same code version. What should the team configure?",
+      "options": [
+        {
+          "text": "A Git provider source on the job, set to the release branch, for its notebook tasks",
+          "correct": true,
+          "why": "With a remote Git source, Databricks takes a snapshot of the branch when each run begins, so new commits are picked up automatically and all tasks in the run use the same code version."
+        },
+        {
+          "text": "A first task in the job that pulls the latest commit into the Git folder",
+          "average": true,
+          "why": "This leaves the team managing the folder's sync; Databricks recommends Git folders for development and a remote Git source, which pulls new code at run time, for production jobs."
+        },
+        {
+          "text": "A different pinned commit hash on each of the job's notebook tasks",
+          "why": "All tasks in a job must reference the same commit, and pinned hashes would stop runs from picking up new release commits."
+        },
+        {
+          "text": "Copies of the notebooks in /Shared that a weekly script refreshes",
+          "why": "Copies refreshed weekly drift from the release branch for days at a time, which repeats the stale-code problem."
+        }
+      ],
+      "in_practice": "Each task run then records its commit SHA, so when a nightly result looks wrong the team can see exactly which code produced it instead of guessing which pull was missed.",
+      "source": "https://docs.databricks.com/aws/en/jobs/git",
+      "evidence": "All tasks in a job must reference the same commit in the remote repository. When a job run begins, Databricks takes a snapshot of the specified branch or commit, so that all tasks in that run use the same version of the code."
+    },
+    {
+      "family": "orchestration-dashboard-filter-job-parameter",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A job has a job parameter region that operators override with Run now with different parameters. Its Dashboard task refreshes a published dashboard and emails subscribers, and a data engineer must make each refresh show only that run's region. The dashboard's dataset filters on region through a dataset parameter. What is the simplest setup?",
+      "options": [
+        {
+          "text": "Attach the dataset parameter to a filter widget whose URL Identifier is region",
+          "correct": true,
+          "why": "Dataset parameters can't be set in the task, but a filter widget can carry one, and when a filter's URL Identifier matches a job parameter key, the Dashboard task applies that parameter's value automatically."
+        },
+        {
+          "text": "Set the dataset parameter in the Dashboard task to {{job.parameters.region}}",
+          "average": true,
+          "why": "A Dashboard task can't set dataset parameters directly; the parameter must first be attached to a filter widget, and the task then sets that filter."
+        },
+        {
+          "text": "Add a SQL task that edits the dataset's query for the region before each refresh",
+          "why": "Rewriting the dashboard's query from a job is fragile and changes the published dashboard for every viewer; filter values are applied per refresh instead."
+        },
+        {
+          "text": "Publish one dashboard per region and add a Dashboard task for each one",
+          "why": "Duplicating dashboards multiplies maintenance and still needs logic to choose the right task for each run's region."
+        }
+      ],
+      "in_practice": "One parameterized dashboard serves every region, so a new market is a new parameter value at run time rather than another dashboard to build, publish and keep in sync.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/dashboard",
+      "evidence": "Dataset parameters can't be set directly in the task. To use a dataset parameter, first attach it to a dashboard filter widget on the dashboard canvas, then set that filter's value here. If a dashboard filter's URL Identifier matches a job-level parameter key, the task automatically applies that parameter's value to the filter."
+    },
+    {
+      "family": "orchestration-git-task-workspace-write",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer switches a job's notebook task from a workspace path to a Git provider source. The notebook's last step writes a CSV summary to /Workspace/Shared/reports/daily.csv for the finance team. Since the switch, that step fails, even though the run-as identity can edit the folder. What should the engineer change?",
+      "options": [
+        {
+          "text": "Write the CSV to a Unity Catalog volume, since Git-sourced tasks can't write workspace files",
+          "correct": true,
+          "why": "Tasks that use a remote Git repository can't write to workspace files; they write temporary data to the driver's ephemeral storage and persistent data to a volume or table."
+        },
+        {
+          "text": "Grant the run-as identity CAN MANAGE on the /Workspace/Shared/reports folder",
+          "average": true,
+          "why": "Permissions aren't the cause: the identity can already edit the folder, and the block on writing workspace files comes from the task's Git source."
+        },
+        {
+          "text": "Write the CSV inside the repository checkout so it's saved with the code",
+          "why": "A run uses a snapshot of the code from the remote repository, not a place to keep outputs; persistent results belong in a volume or table."
+        },
+        {
+          "text": "Write the CSV to the driver's local disk for the finance team to fetch",
+          "why": "Storage attached to the driver is ephemeral and meant only for temporary data, so the file is lost when the compute shuts down."
+        }
+      ],
+      "in_practice": "A volume also gives the finance team governed access through Unity Catalog grants, so the report can be shared without granting anyone workspace folder permissions.",
+      "source": "https://docs.databricks.com/aws/en/jobs/git",
+      "evidence": "Tasks configured to use a remote Git repository cannot write to workspace files. These tasks must write temporary data to ephemeral storage attached to the driver node and persistent data to a volume or table."
+    },
+    {
+      "family": "orchestration-script-task-job-parameter",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's job defines a job parameter env. Its notebook tasks read it with dbutils.widgets.get(\"env\"). Its Python script task parses a required --env flag with argparse, but every run of that task fails with \"the following arguments are required: --env\". What should the engineer change?",
+      "options": [
+        {
+          "text": "Set the script task's Parameters to [\"--env\", \"{{job.parameters.env}}\"]",
+          "correct": true,
+          "why": "Python script tasks take a JSON array of arguments, and job parameters aren't pushed down to JSON-array tasks; referencing {{job.parameters.env}} in the array passes the value as the --env argument."
+        },
+        {
+          "text": "Add env = {{job.parameters.env}} to the script task as a key-value parameter",
+          "average": true,
+          "why": "Python script tasks don't take key-value parameters; their parameters are a JSON array passed as command-line arguments, so the flag has to appear in that array."
+        },
+        {
+          "text": "Read the value in the script with dbutils.widgets.get(\"env\") like the notebooks",
+          "why": "Python script tasks receive parameters as command-line arguments, read positionally or with argparse; widgets are how notebook tasks receive them."
+        },
+        {
+          "text": "Rename the job parameter to --env so that it is pushed down as the flag",
+          "why": "Job parameters aren't pushed down automatically to tasks that use JSON-array parameters, whatever the key is named, so renaming changes nothing."
+        }
+      ],
+      "in_practice": "Keeping env as one job parameter that every task references means a dev-to-prod switch is a single override at run time, not an edit to each task's arguments.",
+      "source": "https://docs.databricks.com/aws/en/jobs/task-parameters",
+      "evidence": "Job parameters are not automatically pushed down to tasks that use JSON arrays. You can reference job parameters in the task JSON-formatted array using the dynamic value reference {{job.parameters.<name>}}."
+    }
+  ]
 }

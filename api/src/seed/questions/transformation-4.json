@@ -1,3 +1,562 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "aggregation-group-by-all-columns",
+      "objective": "transformation.aggregation",
+      "guide": "3.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs SELECT region, product_line, date_trunc('MONTH', order_ts) AS order_month, sum(amount) AS revenue FROM silver.orders GROUP BY ALL. Which expressions does this query group by?",
+      "options": [
+        {
+          "text": "region, product_line and order_month",
+          "correct": true,
+          "why": "GROUP BY ALL adds every SELECT-list expression that contains no aggregate function to the grouping, so the query groups by region, product_line and the order_month expression."
+        },
+        {
+          "text": "Every column of silver.orders, so each distinct row forms a group",
+          "average": true,
+          "why": "Reading ALL as every table column is the common mistake. GROUP BY ALL looks only at the SELECT list, never at the columns of the source table."
+        },
+        {
+          "text": "Only region, the first expression in the SELECT list",
+          "why": "GROUP BY ALL is not limited to the first expression; it takes every non-aggregate expression in the SELECT list."
+        },
+        {
+          "text": "No expressions, so the query returns one global total",
+          "why": "A global aggregation happens only when the SELECT list has no non-aggregate expressions. Here three such expressions exist, so they become the grouping."
+        }
+      ],
+      "in_practice": "GROUP BY ALL keeps the grouping in step with the SELECT list, so adding a dimension to a gold aggregate is a one-line change and avoids the classic error of a selected column missing from GROUP BY.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-groupby",
+      "evidence": "ALL: A shorthand notation to add all SELECT-list expressions not containing aggregate functions as group_expressions. If no such expression exist GROUP BY ALL is equivalent to omitting the GROUP BY clause which results in a global aggregation."
+    },
+    {
+      "family": "aggregation-count-filter-clause",
+      "objective": "transformation.aggregation",
+      "guide": "3.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer writes a query over silver.orders that groups by region and returns count(*) AS total_orders. The same query must also return how many of each region's orders have status = 'RETURNED'. Which expression returns that count?",
+      "options": [
+        {
+          "text": "count(*) FILTER (WHERE status = 'RETURNED')",
+          "correct": true,
+          "why": "A FILTER clause passes only the rows that match its condition to the aggregate, so this counts just the returned orders while total_orders still counts every row in the group."
+        },
+        {
+          "text": "count(CASE WHEN status = 'RETURNED' THEN 1 ELSE 0 END)",
+          "average": true,
+          "why": "This pattern looks right but count counts every non-NULL value, and 0 is not NULL. Every order is counted, so the result equals total_orders instead of the number of returns."
+        },
+        {
+          "text": "count(DISTINCT status) FILTER (WHERE status = 'RETURNED')",
+          "why": "DISTINCT counts unique status values. After the filter only 'RETURNED' remains, so the result is 1 for any region with returns rather than the number of returned orders."
+        },
+        {
+          "text": "count(status)",
+          "why": "count(status) counts every order whose status is not NULL, whatever its value, so it matches total_orders unless some statuses are missing."
+        }
+      ],
+      "in_practice": "Conditional counts with FILTER keep a gold KPI query to one pass over the data: returns, cancellations and totals come from a single GROUP BY instead of several queries joined back together.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/count",
+      "evidence": "expr: Counts all rows for which all exprN are not NULL. cond: An optional boolean expression filtering the rows used for aggregation. SELECT count(col) FILTER(WHERE col < 10) FROM VALUES (NULL), (5), (5), (20) AS tab(col); returns 2."
+    },
+    {
+      "family": "aggregation-rollup-subtotals",
+      "objective": "transformation.aggregation",
+      "guide": "3.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer builds a gold revenue report for finance from silver.sales. Finance wants one result set with revenue for each region and product, a subtotal for each region, and a single grand total. They don't want subtotals for each product across all regions. Which GROUP BY clause produces exactly these levels?",
+      "options": [
+        {
+          "text": "GROUP BY ROLLUP (region, product)",
+          "correct": true,
+          "why": "ROLLUP (region, product) is shorthand for GROUPING SETS ((region, product), (region), ()), which returns the detail rows, a subtotal per region and a grand total, and nothing else."
+        },
+        {
+          "text": "GROUP BY CUBE (region, product)",
+          "average": true,
+          "why": "CUBE builds every combination of its columns, 2^N grouping sets, so it also adds a subtotal per product across all regions, which finance asked to leave out."
+        },
+        {
+          "text": "GROUP BY GROUPING SETS ((region, product), (product), ())",
+          "why": "These grouping sets produce per-product subtotals instead of per-region subtotals, so the region subtotal that finance needs is missing."
+        },
+        {
+          "text": "GROUP BY ALL",
+          "why": "GROUP BY ALL groups by the non-aggregate SELECT expressions, region and product, so it returns only the detail level, with no subtotals or grand total."
+        }
+      ],
+      "in_practice": "ROLLUP keeps the detail rows, subtotals and grand total in one statement, so the totals can't drift from the detail the way three separately maintained queries glued with UNION ALL can.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-groupby",
+      "evidence": "ROLLUP: Specifies multiple levels of aggregations in a single statement. ROLLUP is a shorthand for GROUPING SETS. For example, GROUP BY ROLLUP(warehouse, product) is equivalent to GROUP BY GROUPING SETS((warehouse, product), (warehouse), ())."
+    },
+    {
+      "family": "aggregation-lifetime-totals-materialized-view",
+      "objective": "transformation.aggregation",
+      "guide": "3.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer computes lifetime order count and revenue per customer with a Structured Streaming groupBy aggregation over the append-only silver.orders table, without a watermark. After four months, each micro-batch takes longer and the job fails with out-of-memory errors. Analysts read the totals a few times a day. What does Databricks recommend for this aggregate?",
+      "options": [
+        {
+          "text": "Define the totals as a materialized view that updates the aggregates on refresh",
+          "correct": true,
+          "why": "Databricks recommends materialized views, not stateful streaming aggregates, for statistics over an entire dataset. A materialized view tracks changes in the source and applies them to the aggregates on refresh."
+        },
+        {
+          "text": "Add a watermark on order_ts so the stream can drop aggregation state for old orders",
+          "average": true,
+          "why": "Watermarks bound state for time-bounded aggregates, but a lifetime total per customer has to remember every customer forever, and Databricks advises against stateful aggregates over a whole dataset."
+        },
+        {
+          "text": "Switch the output mode to complete so the full result is rewritten each micro-batch",
+          "why": "Complete mode changes how results are written, not how much state is kept; the stream still holds every customer's running totals in state."
+        },
+        {
+          "text": "Run the stream once a day with an availableNow trigger to rebuild its state each run",
+          "why": "Streaming state is stored in the checkpoint and carried from run to run, so a daily trigger reduces compute hours but does not shrink the state."
+        }
+      ],
+      "in_practice": "Moving an all-history aggregate from streaming state to a materialized view retires a job that needed ever more memory, and a few refreshes a day usually cost less than a stream running around the clock.",
+      "source": "https://docs.databricks.com/aws/en/transform/aggregation",
+      "evidence": "You should not use a stateful aggregate to calculate statistics over an entire dataset. Databricks recommends using materialized views for incremental aggregate calculation on an entire dataset. Materialized views automatically track changes in the data source and apply appropriate updates to aggregate values on refresh."
+    },
+    {
+      "family": "aggregation-row-number-tiebreak",
+      "objective": "transformation.aggregation",
+      "guide": "3.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer deduplicates each day's customer updates before a MERGE into silver.customers. The query keeps rows where RANK() OVER (PARTITION BY customer_id ORDER BY updated_at DESC) = 1. Some days the MERGE still fails because several source rows match one target row. Each failing customer has two updates with the same updated_at value. Which change guarantees exactly one row per customer_id?",
+      "options": [
+        {
+          "text": "Use row_number() with a unique tiebreaker, such as ingest_id, added to the ORDER BY",
+          "correct": true,
+          "why": "row_number breaks ties, so each partition gets exactly one row numbered 1. Its result is non-deterministic when the order is not unique, so a unique tiebreaker also makes the surviving row predictable."
+        },
+        {
+          "text": "Use dense_rank() instead of RANK() so that the numbering has no gaps after ties",
+          "average": true,
+          "why": "dense_rank only removes the gaps that follow ties. Rows that tie on updated_at still share rank 1, so both updates pass the filter and the MERGE still fails."
+        },
+        {
+          "text": "Add DISTINCT to the SELECT so that the duplicate updates collapse into one row",
+          "why": "DISTINCT removes only rows that are identical in every column. Two updates for one customer differ in their changed fields, so both remain."
+        },
+        {
+          "text": "Move the rank filter into a QUALIFY clause instead of an outer WHERE clause",
+          "why": "QUALIFY is a more concise place to filter on a window function, but with RANK() the tied rows still both equal 1 and pass the filter."
+        }
+      ],
+      "in_practice": "Deterministic deduplication makes reruns reproducible: with an ingestion sequence number as the tiebreaker, the same input always yields the same surviving row, so a retried MERGE writes identical silver data.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/row_number",
+      "evidence": "Assigns a unique, sequential number to each row, starting with one, according to the ordering of rows in the window partition. The OVER clause of the window function must include an ORDER BY clause. Unlike rank and dense_rank, row_number breaks ties. If the order is not unique, the result is non-deterministic."
+    },
+    {
+      "family": "tuning-notebook-conf-scope",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs spark.conf.set('spark.sql.shuffle.partitions', '400') in a notebook attached to an all-purpose cluster that other engineers also use. Which workloads use the new value?",
+      "options": [
+        {
+          "text": "Only the SparkSession of the notebook where the engineer set it",
+          "correct": true,
+          "why": "A Spark property set within a notebook applies only to the SparkSession for that notebook. Other notebooks and jobs on the same compute keep their own values."
+        },
+        {
+          "text": "All notebooks and jobs that run on that cluster until it restarts",
+          "average": true,
+          "why": "That is the scope of a property set in the compute configuration. Setting it with spark.conf.set inside a notebook changes only that notebook's session."
+        },
+        {
+          "text": "Every cluster in the workspace that runs the same Databricks Runtime",
+          "why": "A notebook-level setting does not reach other notebooks on the same cluster, let alone other clusters in the workspace."
+        },
+        {
+          "text": "Only the next cell that triggers a shuffle, after which it resets",
+          "why": "The setting stays in effect for the rest of the notebook's session; it does not reset after one cell or one shuffle."
+        }
+      ],
+      "in_practice": "Session-level settings let one engineer test a tuning value on a shared cluster without changing colleagues' notebooks or scheduled jobs; the value moves into the compute configuration only after it is re-measured.",
+      "source": "https://docs.databricks.com/aws/en/spark/conf",
+      "evidence": "Properties configured: Using compute configuration. Applies to: All notebooks and jobs run with the compute resource. Within a notebook: Only the SparkSession for the current notebook. To set a Spark property in a notebook, use spark.conf.set."
+    },
+    {
+      "family": "tuning-aqe-coalesce-partitions",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer reads that adaptive query execution (AQE) dynamically coalesces partitions. What does this AQE feature do?",
+      "options": [
+        {
+          "text": "Combines small post-shuffle partitions into fewer, reasonably sized partitions",
+          "correct": true,
+          "why": "At the end of a shuffle exchange, AQE uses the actual partition sizes to merge small partitions, which cuts the scheduling and task setup overhead of many tiny tasks."
+        },
+        {
+          "text": "Splits oversized post-shuffle partitions into several evenly sized tasks",
+          "average": true,
+          "why": "Splitting large partitions is AQE's skew join handling, a separate feature. Coalescing goes the other way and merges partitions that are too small."
+        },
+        {
+          "text": "Merges the small data files of a Delta table into larger files in storage",
+          "why": "Rewriting small files in storage is the job of OPTIMIZE and auto compaction. AQE coalescing changes only the partitions of a running query."
+        },
+        {
+          "text": "Lowers the number of input partitions created when a query reads its files",
+          "why": "Input partition size is set when files are read, by settings such as spark.sql.files.maxPartitionBytes. Coalescing acts after a shuffle exchange."
+        }
+      ],
+      "in_practice": "Coalescing is why a hand-tuned shuffle partition count matters less than it used to: a stage that would launch thousands of tiny tasks can run as a few dozen right-sized ones with less scheduling overhead.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/aqe",
+      "evidence": "Dynamically coalesces partitions (combine small partitions into reasonably sized partitions) after shuffle exchange. Very small tasks have worse I/O throughput and tend to suffer more from scheduling overhead and task setup overhead. Combining small tasks saves resources and improves cluster throughput."
+    },
+    {
+      "family": "tuning-broadcast-hint-before-runtime",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly job on a classic job cluster joins a 3 TB fact table to a 25 MB dimension table that always stays small. In the Spark UI, adaptive query execution (AQE) converts the sort merge join to a broadcast hash join, but only after both sides have been shuffled. Which change lets the job skip shuffling the fact table?",
+      "options": [
+        {
+          "text": "Add a BROADCAST hint for the dimension table so the broadcast is planned before the run",
+          "correct": true,
+          "why": "A broadcast join planned before the query runs usually beats one AQE plans at runtime, because AQE may switch only after shuffling both sides. AQE respects the hint, so the small table is broadcast from the start."
+        },
+        {
+          "text": "Raise spark.databricks.adaptive.autoBroadcastJoinThreshold so AQE converts the join sooner",
+          "average": true,
+          "why": "That threshold decides whether AQE switches at runtime, and the table already qualifies. AQE still learns the sizes only after the shuffle, so a higher threshold does not avoid it."
+        },
+        {
+          "text": "Disable AQE so that the static optimizer chooses the broadcast join on its own",
+          "why": "Turning AQE off removes the runtime switch and leaves the sort merge join that the initial plan chose, so both sides are shuffled and the slower join remains."
+        },
+        {
+          "text": "Increase spark.sql.shuffle.partitions so that the fact table shuffle runs in more tasks",
+          "why": "More shuffle partitions spread the same shuffle over more tasks; the 3 TB of fact data still moves across the network."
+        }
+      ],
+      "in_practice": "Skipping a multi-terabyte shuffle is often the biggest single win in a star-schema job. Hint only tables known to stay small, because broadcasting a table that later grows can exhaust memory.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/aqe",
+      "evidence": "Should I still use a broadcast join hint with AQE enabled? Yes, if you know your query well. A broadcast join that the optimizer plans before the query runs usually performs better than one that AQE plans at runtime. AQE might not switch to a broadcast join until after it shuffles both sides of the join."
+    },
+    {
+      "family": "tuning-remeasure-query-cache",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer compares two rewrites of a slow dashboard query on a SQL warehouse. To average out noise, the engineer runs version B five times in a row with identical text. The first run takes 48 seconds, the next four finish in under a second, and no query profile is available for those four. How should the engineer re-measure version B?",
+      "options": [
+        {
+          "text": "Make a trivial change, such as editing the LIMIT, so each run executes the query",
+          "correct": true,
+          "why": "The fast runs came from the query cache, and cached queries have no query profile. A trivial change such as changing or removing the LIMIT bypasses the cache, so each run executes and gets a profile to compare."
+        },
+        {
+          "text": "Record the sub-second runs as version B's speed, since the rewrite fixed the bottleneck",
+          "average": true,
+          "why": "The near-instant reruns returned a stored result from the query cache without executing the query, so they say nothing about the rewrite's real cost."
+        },
+        {
+          "text": "Ask for CAN MANAGE on the warehouse, since later profiles need a higher permission",
+          "why": "Viewing a profile needs only ownership of the query or CAN MONITOR on the warehouse. The profiles are missing because cached runs do not execute."
+        },
+        {
+          "text": "Rerun version B on a larger warehouse size so that the timings are more stable",
+          "why": "A larger warehouse changes the setup being measured instead of version B as it will really run, and it does nothing to make sure each run executes rather than reusing a cached result."
+        }
+      ],
+      "in_practice": "Benchmarks that include cache hits can make a rewrite look 50 times faster than it is; comparing the Top operators of profiles from runs that really executed shows which change actually cuts warehouse time.",
+      "source": "https://docs.databricks.com/aws/en/sql/user/queries/query-profile",
+      "evidence": "A query profile is not available for queries that run from the query cache. To circumvent the query cache, make a trivial change to the query, such as changing or removing the LIMIT."
+    },
+    {
+      "family": "tuning-drop-legacy-spark-confs",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team migrates 40 nightly jobs from an open-source Apache Spark cluster to Databricks job compute on a recent Databricks Runtime. To be safe, they copied each job's spark-defaults.conf, with dozens of hand-tuned properties, into the new compute configuration. Several jobs now run slower than expected. Before tuning anything else, what does Databricks recommend?",
+      "options": [
+        {
+          "text": "Remove the copied properties, then re-measure each job with the Databricks defaults",
+          "correct": true,
+          "why": "Databricks generally recommends against configuring most Spark properties. Legacy settings carried over from open-source Spark can override newer default behaviors that optimize workloads, so start from the defaults and re-measure."
+        },
+        {
+          "text": "Scale the copied shuffle and memory values up in proportion to the new cluster size",
+          "average": true,
+          "why": "Rescaling keeps the legacy settings in charge. The problem is that hand-set values override Databricks defaults that tune these behaviors, and bigger numbers keep overriding them."
+        },
+        {
+          "text": "Add the spark.dynamicAllocation properties so that executors scale with each job's load",
+          "why": "The spark.dynamicAllocation properties are not supported on Databricks classic compute; Databricks autoscaling manages executors instead."
+        },
+        {
+          "text": "Move every property into the notebooks with spark.conf.set so each applies per job",
+          "why": "Changing where the properties are set only narrows their scope; the same legacy values still override the defaults in every job that sets them."
+        }
+      ],
+      "in_practice": "Configuration carried over from another platform is a frequent cause of slow migrations; dropping it and re-measuring a few representative jobs often recovers more time than weeks of hand tuning, and leaves fewer settings to maintain.",
+      "source": "https://docs.databricks.com/aws/en/spark/conf",
+      "evidence": "Databricks generally recommends against configuring most Spark properties. Especially when migrating from open-source Apache Spark or upgrading Databricks Runtime versions, legacy Spark configurations can override new default behaviors that optimize workloads."
+    },
+    {
+      "family": "gold-temp-view-notebook-scope",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs CREATE TEMPORARY VIEW recent_orders AS SELECT ... in notebook A on an all-purpose cluster. A colleague's notebook B, attached to the same cluster, then queries recent_orders. What happens?",
+      "options": [
+        {
+          "text": "The query fails, because the view exists only in the notebook that declared it",
+          "correct": true,
+          "why": "Temporary views are not registered in a schema or catalog. In notebooks and jobs they are scoped to the notebook or script that declares them and stop existing when that notebook detaches."
+        },
+        {
+          "text": "The query succeeds, because temporary views are shared by all notebooks on a cluster",
+          "average": true,
+          "why": "Sharing across a compute resource describes legacy global temp views, which Databricks recommends against. A temporary view cannot be referenced outside the notebook that declared it."
+        },
+        {
+          "text": "The query succeeds if the colleague has SELECT on recent_orders in Unity Catalog",
+          "why": "A temporary view is not registered to a schema or catalog, so there is no Unity Catalog object to grant SELECT on."
+        },
+        {
+          "text": "The query succeeds until the cluster restarts, when all temporary views are dropped",
+          "why": "Notebook B cannot see the view at all. The view also disappears when notebook A detaches from the cluster, not only at a restart."
+        }
+      ],
+      "in_practice": "Temporary views are useful scratch space inside one notebook, but anything a BI team or a second job must read belongs in a Unity Catalog view or table, where it is named, governed and discoverable.",
+      "source": "https://docs.databricks.com/aws/en/views/",
+      "evidence": "A temporary view has limited scope and persistence and is not registered to a schema or catalog. In notebooks and jobs, temporary views are scoped to the notebook or script level. They cannot be referenced outside of the notebook in which they are declared, and no longer exist when the notebook detaches from the cluster."
+    },
+    {
+      "family": "gold-star-schema-over-3nf",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is designing a new gold layer in Unity Catalog for BI dashboards. Which data model does Databricks recommend for it?",
+      "options": [
+        {
+          "text": "A star schema of fact tables joined to a small set of dimension tables",
+          "correct": true,
+          "why": "Star and snowflake schemas perform well on Databricks because standard queries need fewer joins, fewer keys must be kept in sync, and wider tables let the optimizer skip data using file-level statistics."
+        },
+        {
+          "text": "A heavily normalized third normal form (3NF) model that removes all redundancy",
+          "average": true,
+          "why": "3NF suits transactional systems, but Databricks recommends against heavily normalized models for a new lakehouse because they need more joins and more keys kept in sync."
+        },
+        {
+          "text": "A key-value model that stores each attribute of an entity as a separate row",
+          "why": "A key-value layout turns every dashboard query into pivots and self-joins, the opposite of the few-join queries that a dimensional model gives BI tools."
+        },
+        {
+          "text": "The raw source schemas from bronze, so that analysts see the data unchanged",
+          "why": "Gold is modeled for business users and reporting. Raw source schemas belong in bronze and are not shaped for analytics."
+        }
+      ],
+      "in_practice": "A dashboard tile on a star schema usually joins one fact table to two or three dimensions; the same question on a 3NF model can need ten joins, which slows planning and makes every refresh more expensive.",
+      "source": "https://docs.databricks.com/aws/en/transform/data-modeling",
+      "evidence": "Databricks recommends against using a heavily normalized model such as third normal form (3NF). Models like the star schema or snowflake schema perform well on Databricks, as there are fewer joins present in standard queries and fewer keys to keep in sync."
+    },
+    {
+      "family": "gold-view-query-privileges",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer creates the view main.gold.region_sales over main.silver.orders and owns both objects. Analysts in the bi_users group query the view from a SQL warehouse. Governance policy says the analysts must never read main.silver.orders directly. Which grants let bi_users query the view?",
+      "options": [
+        {
+          "text": "SELECT on the view, USE SCHEMA on main.gold and USE CATALOG on main",
+          "correct": true,
+          "why": "On a SQL warehouse, Unity Catalog checks the view owner's permissions on the underlying table. Readers need SELECT on the view plus USE CATALOG and USE SCHEMA on its parents, and no grant on the table."
+        },
+        {
+          "text": "SELECT on the view and on main.silver.orders, plus USE SCHEMA and USE CATALOG",
+          "average": true,
+          "why": "SELECT on the underlying table is needed only on dedicated clusters running Databricks Runtime 15.3 and below. On a SQL warehouse it is unnecessary and would break the policy."
+        },
+        {
+          "text": "SELECT on the view alone, since it implies USE on the catalog and schema",
+          "why": "SELECT on a view does not imply the USE privileges; readers also need USE CATALOG on the parent catalog and USE SCHEMA on the parent schema."
+        },
+        {
+          "text": "Ownership of the view, transferred to the bi_users group",
+          "why": "Transferring ownership hands analysts control of the view, and the new owner would then need its own permissions on the silver table for the view to work."
+        }
+      ],
+      "in_practice": "Granting only on the view lets a platform team publish curated gold data to hundreds of analysts while silver stays restricted; the view owner must keep SELECT on the source, or every analyst's query fails.",
+      "source": "https://docs.databricks.com/aws/en/views/",
+      "evidence": "For the following, Unity Catalog checks the view owner's permissions on the underlying data: SQL warehouses. ... For all compute resources, you must have SELECT on the view itself, USE CATALOG on its parent catalog, and USE SCHEMA on its parent schema."
+    },
+    {
+      "family": "gold-mv-trigger-on-update",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer maintains a standalone materialized view, main.gold.stock_summary, that BI dashboards query all day. Its source, main.silver.stock_levels, is a managed Delta table that an upstream team updates in place at irregular times, sometimes twice an hour and sometimes once a day. With SCHEDULE EVERY 1 HOUR, the view is often stale or refreshes when nothing changed. Which change best fits this source?",
+      "options": [
+        {
+          "text": "Redefine the view with TRIGGER ON UPDATE so it refreshes when the source changes",
+          "correct": true,
+          "why": "TRIGGER ON UPDATE refreshes the materialized view when its upstream source data changes. Databricks recommends it for production workloads, especially when upstream dependencies do not run on predictable schedules."
+        },
+        {
+          "text": "Switch to a CRON schedule that refreshes the view every 10 minutes",
+          "average": true,
+          "why": "A tighter fixed schedule still follows the clock rather than the data, so it starts refreshes when nothing has changed and still lags behind each load."
+        },
+        {
+          "text": "Replace it with a standard view so that results always match the source",
+          "why": "A standard view recomputes on every query, so dashboards that query it all day would rerun the aggregation each time instead of reading precomputed results."
+        },
+        {
+          "text": "Convert it to a streaming table that reads main.silver.stock_levels",
+          "why": "A streaming table expects an append-only source. Stock levels that are updated in place need a recomputed result, which a materialized view provides."
+        }
+      ],
+      "in_practice": "Event-driven refresh ties cost to real changes: a source loaded 3 times on a quiet day triggers 3 refreshes instead of 24 hourly ones, while on a busy day dashboards stay within minutes of each load.",
+      "source": "https://docs.databricks.com/aws/en/views/materialized",
+      "evidence": "The following example creates a materialized view that automatically refreshes whenever the upstream source data changes using TRIGGER ON UPDATE. Use this approach for production workloads, especially when upstream dependencies don't run on predictable schedules."
+    },
+    {
+      "family": "gold-mv-row-tracking-recreated-source",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer owns a standalone materialized view that aggregates main.silver.orders for finance dashboards. Last month a platform team recreated main.silver.orders during a schema migration. Since then, the planning_information events in the event log show FULL_RECOMPUTE for every refresh, and refresh cost has tripled. Which action restores incremental refreshes?",
+      "options": [
+        {
+          "text": "Re-enable row tracking on the recreated main.silver.orders table",
+          "correct": true,
+          "why": "Incremental refresh from Delta sources needs row tracking enabled on those tables, and recreating a source table means row tracking must be enabled again. Until then, refreshes recompute the whole query."
+        },
+        {
+          "text": "Enable change data feed on main.silver.orders, which incremental refresh requires",
+          "average": true,
+          "why": "Change data feed is recommended for better incremental refresh performance, but row tracking is the setting incremental refresh needs on Delta sources, and the recreated table no longer has it."
+        },
+        {
+          "text": "Resize the SQL warehouse that created the view so that refreshes run faster",
+          "why": "Refreshes run on a serverless pipeline that is independent of the warehouse, so its size changes neither the refresh method nor its cost."
+        },
+        {
+          "text": "Set REFRESH POLICY INCREMENTAL on the view so that it stops recomputing",
+          "why": "INCREMENTAL only states a preference and falls back to a full refresh when incremental refresh is not possible, so the missing source setting still forces recomputes."
+        }
+      ],
+      "in_practice": "On a large orders table, the gap between full and incremental refreshes can be hours of serverless compute a day; adding a row-tracking check to schema migration runbooks prevents a silent cost jump.",
+      "source": "https://docs.databricks.com/aws/en/views/materialized",
+      "evidence": "To support incremental refreshes from Delta tables, row tracking must be enabled for those source tables. If you recreate a source table, you must re-enable row tracking. ALTER TABLE source_table SET TBLPROPERTIES (delta.enableRowTracking = true);"
+    },
+    {
+      "family": "medallion-bronze-minimal-validation",
+      "objective": "transformation.medallion",
+      "guide": "3.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer designs the bronze layer for JSON events from several partner systems whose schemas change without notice. Which approach does Databricks recommend for these bronze tables?",
+      "options": [
+        {
+          "text": "Store most fields as STRING, VARIANT or binary and leave validation to silver",
+          "correct": true,
+          "why": "Databricks performs only minimal validation in bronze and recommends storing most fields as string, VARIANT or binary so unexpected schema changes don't cause dropped data. Cleaning, casting and quality checks happen in silver."
+        },
+        {
+          "text": "Cast every field to its final type on ingest so that malformed rows fail early",
+          "average": true,
+          "why": "Strict typing in bronze makes unexpected schema changes fail loads or lose data. Bronze is meant to preserve the raw source; type casting and validation belong in silver."
+        },
+        {
+          "text": "Drop records that fail the quality rules before they are written to bronze",
+          "why": "Dropping data at bronze loses the raw records that bronze keeps for reprocessing and audit; Databricks performs only minimal validation there."
+        },
+        {
+          "text": "Write the events straight into silver tables and skip the bronze layer",
+          "why": "Databricks does not recommend writing to silver directly from ingestion, because schema changes and corrupt source records then cause failures in silver."
+        }
+      ],
+      "in_practice": "A loosely typed bronze layer means a partner renaming or retyping a field doesn't break ingestion overnight; the raw events are kept, and silver rules can be fixed and replayed from bronze.",
+      "source": "https://docs.databricks.com/aws/en/lakehouse/medallion",
+      "evidence": "Minimal data validation is performed in the bronze layer. To ensure against dropped data, Databricks recommends storing most fields as string, VARIANT, or binary to protect against unexpected schema changes."
+    },
+    {
+      "family": "medallion-standalone-expectation-metrics",
+      "objective": "transformation.medallion",
+      "guide": "3.7",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer creates a streaming table from the SQL editor on a SQL warehouse with CONSTRAINT valid_amount EXPECT (amount > 0) ON VIOLATION DROP ROW. A week later, a data steward asks how many rows the rule has dropped. The engineer opens the table's pipeline under Jobs & Pipelines but finds no Data quality tab. How can the engineer get these counts?",
+      "options": [
+        {
+          "text": "Query the pipeline event log, which records the expectation metrics",
+          "correct": true,
+          "why": "For streaming tables and materialized views backed by a standalone pipeline created in Databricks SQL, the Data quality tab is not available. Their expectation metrics, including dropped record counts, are read by querying the event log."
+        },
+        {
+          "text": "Run DESCRIBE HISTORY on the table and read the dropped rows from its metrics",
+          "average": true,
+          "why": "Table history records commit-level write metrics, not expectation results; the per-expectation counts of passed and dropped records are recorded in the pipeline event log."
+        },
+        {
+          "text": "Change the action to warn, because dropped rows are never counted",
+          "why": "The drop action does log the count of dropped records alongside other dataset metrics; it is the fail action whose metrics are not recorded."
+        },
+        {
+          "text": "Rebuild the table in a Lakeflow pipeline, since standalone tables keep no metrics",
+          "why": "Standalone streaming tables do record expectation metrics; only the Data quality tab is missing, so the event log is the place to read them."
+        }
+      ],
+      "in_practice": "Querying the event log turns data quality into a trend: a scheduled query can alert when the daily share of dropped rows jumps from 0.1% to 5%, long before a gold report looks wrong.",
+      "source": "https://docs.databricks.com/aws/en/ldp/expectations",
+      "evidence": "For streaming tables and materialized views backed by a standalone pipeline created in Databricks SQL, the Data quality tab in the pipeline UI is not available. Query the event log to view expectation metrics. The count of dropped records is logged alongside other dataset metrics."
+    },
+    {
+      "family": "medallion-referential-check-join",
+      "objective": "transformation.medallion",
+      "guide": "3.7",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's pipeline builds silver.orders and silver.customers. Gold reports break when an order references a customer_id that is missing from silver.customers. The engineer adds CONSTRAINT known_customer EXPECT (customer_id IN (SELECT customer_id FROM silver.customers)) to silver.orders, but the pipeline rejects the definition. How should the engineer check this rule?",
+      "options": [
+        {
+          "text": "Define a materialized view that left-joins orders to customers and expects the joined key to be non-null",
+          "correct": true,
+          "why": "Expectation constraints cannot contain subqueries that reference other tables. The documented pattern is a validation dataset that left-joins the records to the table they must match and expects the joined key IS NOT NULL."
+        },
+        {
+          "text": "Declare customer_id in silver.orders as a FOREIGN KEY that references silver.customers",
+          "average": true,
+          "why": "Foreign key constraints on Databricks are informational and not enforced, so orders with unknown customers would still load without any failure or metric."
+        },
+        {
+          "text": "Move the subquery into a Python UDF and call that function from the expectation",
+          "why": "Expectation constraints cannot contain custom Python functions any more than subqueries that reference other tables, so the definition is still rejected."
+        },
+        {
+          "text": "Rewrite the rule with @dp.expect_all_or_fail in Python, which allows subqueries",
+          "why": "The Python decorators apply the same constraint rules as SQL; grouping rules in a dictionary does not allow subqueries that reference other tables."
+        }
+      ],
+      "in_practice": "A join-based check catches orphaned keys at refresh time, so the team sees a failed validation instead of revenue silently vanishing through an inner join; if gold must wait for it, run it as a separate job task.",
+      "source": "https://docs.databricks.com/aws/en/ldp/expectation-patterns",
+      "evidence": "The following example validates that all expected records are present in the report table: CREATE OR REFRESH MATERIALIZED VIEW report_compare_tests( CONSTRAINT no_missing_records EXPECT (r_key IS NOT NULL) ) AS SELECT v.*, r.key as r_key FROM validation_copy v LEFT OUTER JOIN report r ON v.key = r.key"
+    }
+  ]
 }
