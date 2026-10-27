@@ -1,3 +1,691 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "patterns-checkpoint-one-per-query",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's notebook starts two Structured Streaming queries: one loads order files into bronze_orders and the other loads return files into bronze_returns. How should the engineer set checkpointLocation for these queries?",
+      "options": [
+        {
+          "text": "Give each query its own checkpoint location, such as a separate volume folder",
+          "correct": true,
+          "why": "Each streaming query must have a different checkpoint location, because the checkpoint records that one query's offsets, commits and state; Databricks says multiple queries should never share one."
+        },
+        {
+          "text": "Point both queries at one shared folder, since they run in the same notebook",
+          "average": true,
+          "why": "A shared folder looks tidy when the queries run together, but a checkpoint identifies a single query's progress, and Databricks states that multiple queries should never share the same location."
+        },
+        {
+          "text": "Leave the option out, because Databricks creates a temporary checkpoint per query",
+          "why": "Only some sinks, such as display() output and the memory sink, generate temporary checkpoints, and those give no fault-tolerance guarantees; the option must be set before a query writing to a table runs."
+        },
+        {
+          "text": "Keep each checkpoint in a _checkpoint folder inside the target table's directory",
+          "why": "Unity Catalog doesn't allow checkpoint files to be nested under a table directory; checkpoints belong in their own governed location, such as a volume path."
+        }
+      ],
+      "in_practice": "Separate checkpoints let each stream be restarted, reset or backfilled on its own, so a problem in the returns feed never forces the orders table to be reloaded from a fresh checkpoint.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/checkpoints",
+      "evidence": "Each query must have a different checkpoint location. Multiple queries should never share the same location. ... You must specify the checkpointLocation option before you run a streaming query."
+    },
+    {
+      "family": "patterns-read-files-source-file-path",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer loads a volume folder of CSV exports with CREATE TABLE bronze.invoices AS SELECT * FROM read_files('/Volumes/fin/raw/invoices'). Auditors now require every row to record the file it came from. How can the engineer add this?",
+      "options": [
+        {
+          "text": "Select _metadata.file_path alongside *, because SELECT * leaves _metadata out",
+          "correct": true,
+          "why": "read_files exposes a _metadata column with fields such as file_path and file_name; it isn't included in SELECT * results, so it must be selected explicitly to reach the table."
+        },
+        {
+          "text": "Change nothing, because SELECT * already returns the _metadata column",
+          "average": true,
+          "why": "Many expect SELECT * to return every available column, but read_files leaves the _metadata column out of SELECT * results, so the file path never reaches the table."
+        },
+        {
+          "text": "Read the path from _rescued_data, which records each row's source file",
+          "why": "The rescued data column holds the source file path only for rows that carried data not matching the schema; well-formed rows have no rescued value to read from."
+        },
+        {
+          "text": "Switch the format to binaryFile, which adds a path column to every row",
+          "why": "binaryFile returns one row per file with its raw bytes rather than the parsed CSV records, so the invoice rows themselves would be lost."
+        }
+      ],
+      "in_practice": "Storing the file path per row turns a data-quality complaint into a quick lookup: the team can trace bad values to one vendor file and reload or quarantine it instead of searching thousands of exports.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files",
+      "evidence": "read_files exposes a _metadata column with file-level metadata. This column is not included in SELECT * results and must be explicitly selected. It contains the following fields: file_path STRING The full path to the source file."
+    },
+    {
+      "family": "patterns-real-time-mode-trigger",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer builds a Structured Streaming job on dedicated compute that reads card transactions from Kafka, scores them, and writes decisions back to Kafka. The fraud team needs sub-second end-to-end latency. Which trigger does Databricks provide for this kind of workload?",
+      "options": [
+        {
+          "text": ".trigger(realTime='5 minutes')",
+          "correct": true,
+          "why": "Real-time mode targets sub-second operational workloads such as fraud detection; records are processed as they arrive, and '5 minutes' sets the long-running batch and checkpoint interval, not the per-record latency."
+        },
+        {
+          "text": ".trigger(continuous='1 second')",
+          "average": true,
+          "why": "Continuous processing sounds like the low-latency choice, but it is an experimental Spark OSS mode that Databricks doesn't support; Databricks says to use real-time mode instead."
+        },
+        {
+          "text": ".trigger(processingTime='0 seconds')",
+          "why": "A zero-interval processing-time trigger matches the default micro-batch behavior, which Databricks describes as general-purpose streaming with about 3 to 5 seconds of latency."
+        },
+        {
+          "text": ".trigger(availableNow=True)",
+          "why": "AvailableNow processes what is available when the job starts and then stops, which suits scheduled incremental batches rather than an always-on fraud check."
+        }
+      ],
+      "in_practice": "Real-time mode needs dedicated compute with enough task slots for every stage at once, so it costs more than micro-batches; teams keep it for decisions like blocking a card and run ETL on cheaper micro-batch triggers.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/triggers",
+      "evidence": "Real-time mode .trigger(realTime='5 minutes') Ultra-low-latency operational workloads requiring sub-second processing, such as fraud detection or real-time personalization. ... Continuous .trigger(continuous='1 second') Not supported. This is an experimental feature included in Spark OSS. Use real-time mode instead."
+    },
+    {
+      "family": "patterns-volume-upload-large-csv",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data analyst must turn a single 3.5 GB CSV export on her laptop into a Unity Catalog managed table today, without writing code. The Create or modify a table page rejects the file as too large. Which approach meets the requirement?",
+      "options": [
+        {
+          "text": "Upload it to a volume through Add or upload data, then use Create table on the file",
+          "correct": true,
+          "why": "Uploading to a volume through the UI accepts files up to 5 GB, and Catalog Explorer can create a managed table from a file stored in a volume, so no code is needed."
+        },
+        {
+          "text": "Split it into two smaller CSV files and upload both on the same page",
+          "average": true,
+          "why": "Splitting looks like a workaround, but the Create or modify a table page requires the total size of all uploaded files to stay under 2 GB, so two halves of 3.5 GB still fail."
+        },
+        {
+          "text": "Compress it into a zip archive and upload the archive on the same page",
+          "why": "The upload page doesn't accept compressed files such as zip or tar archives, so the archive is rejected whatever its size."
+        },
+        {
+          "text": "Retry the same page after picking serverless compute instead of a warehouse",
+          "why": "The size limit belongs to the upload page itself; choosing a different compute resource to preview and create the table doesn't change it."
+        }
+      ],
+      "in_practice": "Landing the file in a volume first also keeps the raw export under Unity Catalog governance, so it can be reloaded or audited later; files larger than 5 GB need the Databricks SDK for Python instead.",
+      "source": "https://docs.databricks.com/aws/en/volumes/volume-files",
+      "evidence": "Volumes support files up to the maximum size supported by the underlying cloud storage. However, when you upload files to a volume through the Databricks UI, there's a 5 GB file size limit. ... Databricks provides a UI to create a Unity Catalog managed table from a file, files, or directory of files stored in a Unity Catalog volume."
+    },
+    {
+      "family": "patterns-streaming-table-replaces-ctas",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A team of SQL analysts refreshes bronze.orders each morning with CREATE OR REPLACE TABLE bronze.orders AS SELECT * FROM read_files('/Volumes/sales/raw/orders'). The folder now holds thousands of daily JSON drops, and every run rereads all of them. The team wants each run to process only new files, using SQL on a SQL warehouse. Which approach meets this?",
+      "options": [
+        {
+          "text": "CREATE OR REFRESH STREAMING TABLE with SELECT * FROM STREAM read_files(...)",
+          "correct": true,
+          "why": "In a streaming table, read_files uses Auto Loader, which tracks the files it has already processed, so each refresh ingests only files that arrived since the last one; the STREAM keyword is required."
+        },
+        {
+          "text": "Keep the CTAS and add modifiedAfter set to yesterday's date",
+          "average": true,
+          "why": "Filtering by modification time does shrink the read, but CREATE OR REPLACE rebuilds the table on every run, so the table would end up holding only the latest day's files."
+        },
+        {
+          "text": "Change it to INSERT INTO bronze.orders SELECT * FROM read_files(...)",
+          "why": "A plain INSERT reads every file under the path on each run and appends all of them again, which duplicates earlier days instead of loading only new files."
+        },
+        {
+          "text": "Keep the CTAS and run it on a larger SQL warehouse",
+          "why": "More compute makes the full reread faster for a while, but its cost still grows with every file in the folder rather than with the new data."
+        }
+      ],
+      "in_practice": "Moving from a daily full rebuild to a streaming table typically turns a run that rereads a year of files into one that reads a single day's drop, and the table keeps its history instead of being replaced.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files",
+      "evidence": "read_files can be used in streaming tables to ingest files into Delta Lake. read_files leverages Auto Loader when used in a streaming table query. You must use the STREAM keyword with read_files."
+    },
+    {
+      "family": "patterns-checkpoint-safe-query-changes",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 2,
+      "type": "multiple",
+      "stem": "A data engineer runs a Structured Streaming query that reads files with Auto Loader, applies dropDuplicates(['event_id']), and writes to a Delta table. Its checkpoint holds a year of progress. Before restarting the query from the same checkpoint, the engineer plans some changes. Which two changes are generally safe to make? (Choose two.)",
+      "options": [
+        {
+          "text": "Change the trigger from processingTime='5 minutes' to availableNow=True",
+          "correct": true,
+          "why": "Trigger intervals can be changed between runs while using the same checkpoint, so moving between a time-based trigger and AvailableNow is a supported change."
+        },
+        {
+          "text": "Add a filter that drops rows whose event_type is null",
+          "correct": true,
+          "why": "Adding or removing filters is among the generally safe changes, because it doesn't alter the sources, the state schema or the sink recorded in the checkpoint."
+        },
+        {
+          "text": "Point Auto Loader at a new source path in a different bucket",
+          "average": true,
+          "why": "Changing the path looks like a simple option edit, but changes to Auto Loader paths generally require a new checkpoint, because the stored progress belongs to the old source."
+        },
+        {
+          "text": "Deduplicate on event_id and source_system instead of event_id",
+          "why": "dropDuplicates keeps state keyed on its columns, and any change in the number or type of those keys is not allowed when restarting from the same checkpoint."
+        },
+        {
+          "text": "Union in a second Auto Loader stream without naming the sources",
+          "why": "Sources are identified by their position in the query plan by default, so changing the number of input sources breaks checkpoint compatibility unless source naming is enabled."
+        }
+      ],
+      "in_practice": "Knowing which edits are checkpoint-safe avoids needless resets; restarting a year-old stream from a fresh checkpoint can mean rediscovering and reprocessing millions of files and cleaning up duplicates downstream.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/checkpoints",
+      "evidence": "Changes that generally require a new checkpoint include the number or type of input sources, subscribed Kafka topics or Auto Loader paths, stateful operation types, state schema, and output sink type. Changes that are generally safe include adding or removing filters, changing rate limits, trigger intervals"
+    },
+    {
+      "family": "patterns-failed-batch-scale-up-compute",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's Auto Loader stream with a processingTime trigger was paused for a week. After the restart, its next micro-batch fails repeatedly with executor out-of-memory errors. A teammate suggests switching to availableNow=True so the backlog runs as an incremental batch. What should the engineer do to recover the stream?",
+      "options": [
+        {
+          "text": "Scale up the compute, such as larger workers, and restart on the same checkpoint",
+          "correct": true,
+          "why": "The failed micro-batch must complete before the stream can move on, because Structured Streaming requires idempotent micro-batches; Databricks says to resolve this by scaling up compute capacity."
+        },
+        {
+          "text": "Switch to availableNow=True and restart on the same checkpoint",
+          "average": true,
+          "why": "Changing the trigger seems to split the work differently, but a trigger interval change doesn't solve a failed batch; the unsuccessful batch still has to complete as planned."
+        },
+        {
+          "text": "Restart from a new checkpoint so that the failed micro-batch is skipped",
+          "why": "A new checkpoint makes the query begin fresh and reprocess the source from the start; Databricks reserves it for rare cases, and it doesn't skip just the failed batch."
+        },
+        {
+          "text": "Set processingTime='30 minutes' so the batch has more time to finish",
+          "why": "The trigger interval only controls how often new batches start; it gives a failing batch no extra memory, and that batch must still complete as planned."
+        }
+      ],
+      "in_practice": "Sizing the cluster up for one catch-up run and back down afterwards is usually far cheaper than a fresh checkpoint, which can mean reprocessing months of files and deduplicating the results downstream.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/triggers",
+      "evidence": "If you try to recover from a query failure with an incremental batch, a trigger interval change doesn't solve the problem. The previous unsuccessful batch must complete because Structured Streaming requires idempotent micro-batches. ... To resolve the failure, scale up the compute capacity, such as increasing the size of worker nodes."
+    },
+    {
+      "family": "patterns-upload-mixed-header-files",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data analyst uploads three CSV exports together on the Create or modify a table page, with First row contains the header left on. Two files start with a header row; the third, produced by an older tool, does not. The table is created without errors, but reconciliation shows a record missing compared with the source files. What explains this, and what should the analyst do?",
+      "options": [
+        {
+          "text": "The header setting applies to every file, so make headers consistent before uploading",
+          "correct": true,
+          "why": "Header settings apply to all files in an upload, so the headerless file's first line is treated as a header rather than data; Databricks says to keep headers consistently present or absent to avoid data loss."
+        },
+        {
+          "text": "The schemas differ, so turn on Merge the schema across multiple files",
+          "average": true,
+          "why": "Merging the schema decides which columns the table gets across files; it doesn't change how the first line of each file is treated, so the lost record stays lost."
+        },
+        {
+          "text": "Records were split, so turn on Rows span multiple lines",
+          "why": "That option handles records containing line breaks; nothing points to multiline values here, and it doesn't change how headers are applied."
+        },
+        {
+          "text": "Type detection failed, so turn off Automatically detect column types",
+          "why": "Turning off type detection makes every column a STRING, and values that fail a cast become NULL rather than disappearing, so it doesn't explain a missing record."
+        }
+      ],
+      "in_practice": "One-off uploads skip the checks a pipeline would run, so a quick row-count reconciliation against the source catches silent losses like this before the numbers reach a finance report.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/create-or-modify-table",
+      "evidence": "When you upload multiple files, the following rules apply: Header settings apply to all files. Make sure headers are consistently absent or present in all uploaded files to avoid data loss. Uploaded files combine by appending all data as rows in the target table."
+    },
+    {
+      "family": "copy-into-temporary-credentials",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer needs a one-time COPY INTO backfill from an S3 bucket that isn't covered by any Unity Catalog external location or volume. A cloud admin provides short-lived AWS STS credentials. Where in the COPY INTO statement do these credentials go?",
+      "options": [
+        {
+          "text": "After the FROM path: WITH (CREDENTIAL (AWS_ACCESS_KEY = ..., AWS_SECRET_KEY = ..., AWS_SESSION_TOKEN = ...))",
+          "correct": true,
+          "why": "COPY INTO accepts inline temporary credentials on the source clause; for S3 they are AWS_ACCESS_KEY, AWS_SECRET_KEY and AWS_SESSION_TOKEN, used when the path isn't already covered by an external location."
+        },
+        {
+          "text": "In FORMAT_OPTIONS ('AWS_ACCESS_KEY' = ..., 'AWS_SECRET_KEY' = ..., 'AWS_SESSION_TOKEN' = ...)",
+          "average": true,
+          "why": "FORMAT_OPTIONS looks like the general options bag, but it passes reader options for parsing the file format, such as header or multiLine, not credentials for the storage location."
+        },
+        {
+          "text": "In COPY_OPTIONS ('AWS_ACCESS_KEY' = ..., 'AWS_SECRET_KEY' = ..., 'AWS_SESSION_TOKEN' = ...)",
+          "why": "COPY_OPTIONS controls the load itself through options such as force and mergeSchema; it has no settings for storage credentials."
+        },
+        {
+          "text": "After the target table: COPY INTO t WITH (CREDENTIAL (AWS_ACCESS_KEY = ..., ...)) FROM ...",
+          "why": "A credential on the target clause authorizes writing to the target's location; reading the source files needs the credential attached to the FROM path."
+        }
+      ],
+      "in_practice": "Inline keys end up in query text and history, so Databricks advises expirations just long enough for the task; for recurring loads, a volume or external location with READ VOLUME or READ FILES is the cleaner path.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/temporary-credentials",
+      "evidence": "you can use temporary credentials to access data from external cloud object storage and load files into a Delta Lake table. ... COPY INTO my_json_data FROM 's3://my-bucket/jsonData' WITH ( CREDENTIAL ( AWS_ACCESS_KEY = '...' , AWS_SECRET_KEY = '...' , AWS_SESSION_TOKEN = '...' ) ) FILEFORMAT = JSON"
+    },
+    {
+      "family": "copy-into-select-transform-on-load",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer loads Avro files from S3 into an existing Delta table with COPY INTO. During the load, the string field dt must become a DATE, the field event must be renamed measurement, and quantity must be cast to DOUBLE, with no staging table. Which COPY INTO form supports this?",
+      "options": [
+        {
+          "text": "FROM (SELECT to_date(dt) dt, event AS measurement, quantity::double FROM 's3://bucket/avro')",
+          "correct": true,
+          "why": "COPY INTO can select columns or expressions from the source before copying, so functions such as to_date, aliases and :: casts are applied during the load itself."
+        },
+        {
+          "text": "BY POSITION, so that the fields map to the target columns by their order",
+          "average": true,
+          "why": "BY POSITION maps columns by ordinal position only for headerless CSV files; it can't apply expressions such as to_date, and it isn't supported for Avro."
+        },
+        {
+          "text": "FORMAT_OPTIONS ('inferSchema' = 'true') so the types are inferred on load",
+          "why": "inferSchema decides whether parsed values get inferred types or stay strings; it can't rename event or apply to_date to one specific field."
+        },
+        {
+          "text": "COPY_OPTIONS ('mergeSchema' = 'true') so the new names are added",
+          "why": "mergeSchema lets the target schema evolve to match the incoming data, which would add the source's own column names instead of renaming or converting them."
+        }
+      ],
+      "in_practice": "Shaping columns in the load avoids a second pass: a daily load of a few million rows becomes one write instead of a staging table plus an INSERT, with one fewer object to govern and clean up.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/examples",
+      "evidence": "The following example loads Avro data in S3 using additional SQL expressions as part of the SELECT statement. COPY INTO my_delta_table FROM (SELECT to_date(dt) dt, event as measurement, quantity::double FROM 's3://my-bucket/avroData') FILEFORMAT = AVRO"
+    },
+    {
+      "family": "copy-into-single-variant-column",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer must load JSON files from a Unity Catalog volume into a bronze table with COPY INTO. Each sender's records have a different shape, so the team wants every record stored whole in one VARIANT column. The table is created with CREATE TABLE bronze.events (raw VARIANT). Which COPY INTO setting meets this requirement?",
+      "options": [
+        {
+          "text": "FORMAT_OPTIONS ('singleVariantColumn' = 'raw')",
+          "correct": true,
+          "why": "COPY INTO can ingest the entire contents of each record as a single column; naming the VARIANT column in singleVariantColumn lands every JSON record whole in raw."
+        },
+        {
+          "text": "COPY_OPTIONS ('mergeSchema' = 'true')",
+          "average": true,
+          "why": "mergeSchema evolves the table by adding a column for each new field, which spreads records across many columns instead of keeping each one whole in raw."
+        },
+        {
+          "text": "FILEFORMAT = VARIANT",
+          "why": "VARIANT is a column type, not a file format; COPY INTO reads formats such as JSON, CSV, Parquet, Avro or BINARYFILE."
+        },
+        {
+          "text": "BY POSITION (raw)",
+          "why": "Positional column matching is only supported for headerless CSV files and maps fields to columns; it doesn't encode JSON records as VARIANT."
+        }
+      ],
+      "in_practice": "Single-variant landing keeps bronze loads from failing as senders add fields; for continuous feeds Databricks recommends Auto Loader over COPY INTO, and Auto Loader supports the same option.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/variant",
+      "evidence": "COPY INTO supports ingesting the entire contents of a supported data source as a single column. The following example creates a new table with a single VARIANT column and then uses COPY INTO to ingest records from a JSON file source. ... FORMAT_OPTIONS ('singleVariantColumn' = 'variant_column')"
+    },
+    {
+      "family": "copy-into-schemaless-placeholder-first-load",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer must start loading a new vendor's CSV files from S3 into Unity Catalog before the column list is known, so the engineer creates bronze.vendor_x as an empty placeholder with a CREATE TABLE statement that lists no columns. The vendor's files don't all share the same header. A teammate's first attempt, INSERT INTO bronze.vendor_x SELECT * FROM read_files(...), fails. The load must rerun nightly and pick up only new files. Which approach meets these requirements?",
+      "options": [
+        {
+          "text": "COPY INTO with mergeSchema set to true in both FORMAT_OPTIONS and COPY_OPTIONS",
+          "correct": true,
+          "why": "A schemaless placeholder table gets its schema from COPY INTO when COPY_OPTIONS mergeSchema is true; mergeSchema in FORMAT_OPTIONS merges the inferred schema across source files, and reruns skip loaded files."
+        },
+        {
+          "text": "MERGE INTO bronze.vendor_x USING read_files(...) with schema evolution",
+          "average": true,
+          "why": "MERGE looks like a way to evolve and deduplicate in one step, but INSERT INTO and MERGE INTO can't write to a schemaless Delta table; it is usable only through COPY INTO until data lands."
+        },
+        {
+          "text": "COPY INTO with VALIDATE ALL, so the table's columns are created first",
+          "why": "VALIDATE checks whether the data can be parsed and loaded but writes nothing to the table, so it never gives the placeholder a schema."
+        },
+        {
+          "text": "CREATE OR REPLACE TABLE bronze.vendor_x AS SELECT * FROM read_files(...)",
+          "why": "Rebuilding the table from read_files each night rereads every file and replaces the earlier loads, so it can't load only the new files."
+        }
+      ],
+      "in_practice": "Placeholder tables let ingestion start the day a feed is announced; the schema settles from the files themselves, and a later file with an extra column evolves the table instead of failing the nightly job.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/",
+      "evidence": "In Databricks Runtime 11.3 LTS and above, you can create empty placeholder Delta tables so that the schema is inferred during a COPY INTO command by setting mergeSchema to true in COPY_OPTIONS. ... The empty Delta table is not usable outside COPY INTO. INSERT INTO and MERGE INTO are not supported to write data into schemaless Delta tables."
+    },
+    {
+      "family": "auto-loader-include-existing-files",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer starts a new Auto Loader stream on an S3 folder that already holds two years of files, which a legacy job has already loaded. The new stream must ingest only files that arrive after it starts. Which setting achieves this?",
+      "options": [
+        {
+          "text": "cloudFiles.includeExistingFiles = false on the first start",
+          "correct": true,
+          "why": "includeExistingFiles decides whether files already in the input path are processed or only files that arrive after setup; it is evaluated only when the stream starts for the first time."
+        },
+        {
+          "text": ".trigger(availableNow=True) on the stream's first run",
+          "average": true,
+          "why": "AvailableNow processes everything available when the run starts, so on a new stream with includeExistingFiles at its default of true it would ingest the two years of existing files too."
+        },
+        {
+          "text": "cloudFiles.useManagedFileEvents = true on the stream",
+          "why": "File events change how new files are discovered, but during the initial load with includeExistingFiles set to true, Auto Loader still lists the directory to find every file already present."
+        },
+        {
+          "text": "cloudFiles.maxFileAge = '1 day' on the stream",
+          "why": "maxFileAge sets how long file events are tracked for deduplication, and Databricks advises against tuning it aggressively; it is not a way to skip existing files."
+        }
+      ],
+      "in_practice": "The flag counts only on the first start, and changing it after a restart has no effect, so setting it before launch avoids reloading two years of files the legacy job already ingested.",
+      "source": "https://docs.databricks.com/aws/en/spark/api-options",
+      "evidence": "cloudFiles.includeExistingFiles true true , false Whether to include existing files in the stream processing input path or to only process new files arriving after initial setup. This option is evaluated only when you start a stream for the first time. Changing this option after restarting the stream has no effect."
+    },
+    {
+      "family": "auto-loader-new-partition-column",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's Auto Loader stream infers its schema from JSON files under /Volumes/iot/raw/events/, laid out as device=<id>/date=<day>/, and device and date appear as columns. The upstream team adds an hour level, device=<id>/date=<day>/hour=<hh>/. Analysts need an hour column, but it never appears, even after several restarts. Which change adds it?",
+      "options": [
+        {
+          "text": "Set cloudFiles.partitionColumns to 'device,date,hour'",
+          "correct": true,
+          "why": "Auto Loader doesn't consider partition columns for schema evolution, so a new directory level is ignored; listing the columns in cloudFiles.partitionColumns makes it parse hour from the key=value path."
+        },
+        {
+          "text": "Restart once more so that addNewColumns adds the column",
+          "average": true,
+          "why": "addNewColumns evolves the schema for new fields found in the data, but partition columns from the directory structure aren't part of schema evolution, so restarts never add hour."
+        },
+        {
+          "text": "Set cloudFiles.inferColumnTypes to true on the stream",
+          "why": "inferColumnTypes changes the data types chosen for inferred columns; it doesn't add columns taken from the directory path."
+        },
+        {
+          "text": "Set cloudFiles.useStrictGlobber to true on the stream",
+          "why": "The strict globber changes how glob patterns in the load path match files; the files in the hour folders are already being read, so it adds no column."
+        }
+      ],
+      "in_practice": "Declaring partition columns explicitly guards against layout changes; if a level such as hour appears mid-stream, rows from older files simply show it as null instead of the value silently never being captured.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/schema",
+      "evidence": "Auto Loader does not consider partition columns for schema evolution. If you had an initial directory structure like base_path/event=click/date=2021-04-01/f0.json, and then start receiving new files as base_path/event=click/date=2021-04-01/hour=01/f1.json, Auto Loader ignores the hour column. To capture information for new partition columns, set cloudFiles.partitionColumns"
+    },
+    {
+      "family": "auto-loader-type-widening-mode",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer ingests partner CSV files into a Unity Catalog Delta table with Auto Loader on Databricks Runtime 16.4 or above, using cloudFiles.inferColumnTypes and the default schema evolution mode. The order_id column was inferred as INT. Partner IDs recently passed the INT range, and those rows now land with order_id set to NULL and the value in _rescued_data, while the stream keeps running. The team wants order_id widened to BIGINT automatically, without rewriting data. Which change meets this?",
+      "options": [
+        {
+          "text": "Use addNewColumnsWithTypeWidening and enable delta.enableTypeWidening on the table",
+          "correct": true,
+          "why": "addNewColumnsWithTypeWidening widens supported type changes such as int to long after the stream stops and restarts; when the sink is a Delta table, delta.enableTypeWidening must also be set on it."
+        },
+        {
+          "text": "Keep addNewColumns and restart the stream so the column becomes BIGINT",
+          "average": true,
+          "why": "Under addNewColumns the data type doesn't evolve and a type change doesn't fail the stream; mismatched values keep landing as NULL with the original in the rescued data column, however often it restarts."
+        },
+        {
+          "text": "Use rescue mode so the oversized values stay in the rescued data column",
+          "why": "rescue never evolves the schema, so values outside the INT range stay in the rescued data column and order_id remains NULL for those rows."
+        },
+        {
+          "text": "Use failOnNewColumns so the type change stops the stream for review",
+          "why": "With failOnNewColumns the data type doesn't evolve and a type change doesn't stop the stream, so it neither widens order_id nor forces a review."
+        }
+      ],
+      "in_practice": "Widening in place avoids rewriting the table and backfilling values by hand from _rescued_data; because the feature is in Public Preview, teams usually enable it per table after testing it on a copy.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/type-widening",
+      "evidence": "If the write sink is a Delta Lake table, enable type widening for the Delta Lake table ... addNewColumns (default) The data type does not evolve, and the stream does not fail due to a data type change. ... addNewColumnsWithTypeWidening Stream fails. New columns are added to the schema, and supported data type changes are widened."
+    },
+    {
+      "family": "semi-structured-json-string-path-cast",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A bronze table stores each API response in a STRING column named raw that holds JSON. A data engineer needs the nested value order.total as a DOUBLE for a revenue calculation. Which expression returns it?",
+      "options": [
+        {
+          "text": "raw:order.total::double",
+          "correct": true,
+          "why": "The : operator extracts a field from a JSON string column and returns a string, and :: then casts that result to a basic type such as DOUBLE."
+        },
+        {
+          "text": "raw:order.total",
+          "average": true,
+          "why": "Path extraction on the JSON string is the right start, but its results are strings, so without a cast the value is still a STRING."
+        },
+        {
+          "text": "get_json_object(raw, '$.order.total')",
+          "why": "get_json_object also extracts the field from the JSON text, but it returns a string as well, so the value would still need a cast."
+        },
+        {
+          "text": "raw.order.total",
+          "why": "Dot notation navigates the fields of STRUCT columns; raw is a STRING, so it has no nested fields for dot notation to reach."
+        }
+      ],
+      "in_practice": "Extracting and casting once into a typed silver column avoids reparsing the whole JSON string in every query, which Databricks rates as the slowest read pattern for semi-structured data.",
+      "source": "https://docs.databricks.com/aws/en/semi-structured/json",
+      "evidence": "You extract a column from fields containing JSON strings using the syntax <column-name>:<extraction-path> ... The returned results are strings. ... You can use :: to cast values to basic data types."
+    },
+    {
+      "family": "semi-structured-from-json-schema-of-json",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants to convert a JSON STRING column named payload into a STRUCT with from_json, without writing the schema by hand. A representative sample record is available. Which expression does this?",
+      "options": [
+        {
+          "text": "from_json(payload, schema_of_json('<sample record>'))",
+          "correct": true,
+          "why": "from_json returns a struct and needs a schema, which can be a DDL string or an invocation of schema_of_json; schema_of_json derives that schema from a sample JSON string."
+        },
+        {
+          "text": "from_json(payload), letting Spark infer the schema",
+          "average": true,
+          "why": "Many expect from_json to infer types like a file reader, but you must specify the schema; only Lakeflow pipelines offer a mode that infers it, using a NULL schema and a schemaLocationKey."
+        },
+        {
+          "text": "schema_of_json(payload), applied to every row",
+          "why": "schema_of_json returns the schema of a JSON string as DDL-format text, not the parsed values, so the result describes the record instead of holding it."
+        },
+        {
+          "text": "parse_json(payload), stored as the new column",
+          "why": "parse_json returns a VARIANT value rather than a STRUCT, so the column would not carry the declared, enforced field types the engineer wants."
+        }
+      ],
+      "in_practice": "Deriving the schema from a vetted sample keeps silver typed while saving hand-written DDL for payloads with dozens of nested fields; when the shape drifts often, VARIANT is usually the better landing type.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/from_json",
+      "evidence": "Returns a struct value with the jsonStr and schema. ... schema: A STRING expression or invocation of schema_of_json function."
+    },
+    {
+      "family": "semi-structured-binaryfile-pdf-table",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer must build a table of PDF contracts stored in a Unity Catalog volume, with each file's path, size, modification time and raw bytes, so a later step can parse the documents. Which query returns these as fixed columns?",
+      "options": [
+        {
+          "text": "SELECT * FROM read_files('/Volumes/legal/raw/contracts', format => 'binaryFile')",
+          "correct": true,
+          "why": "With the binaryFile format, read_files returns a fixed schema of path, modificationTime, length and content, where content holds each file's raw bytes."
+        },
+        {
+          "text": "SELECT * FROM read_files('/Volumes/legal/raw/contracts', format => 'text')",
+          "average": true,
+          "why": "The text format also has a fixed schema, but it is a single STRING value column read from file contents, so it has no path, size or modification-time columns and treats PDF bytes as text."
+        },
+        {
+          "text": "LIST '/Volumes/legal/raw/contracts'",
+          "why": "LIST displays the files in a directory, but it doesn't return each file's contents, so the raw bytes needed for parsing are missing."
+        },
+        {
+          "text": "CREATE TABLE contracts LOCATION '/Volumes/legal/raw/contracts'",
+          "why": "Files in volumes can't be registered as tables in Unity Catalog; volumes are for path-based access to files, while tables hold tabular data."
+        }
+      ],
+      "in_practice": "Selecting * EXCEPT (content) lists thousands of documents cheaply for triage, and the bytes are read only for files that move on to parsing, for example with ai_parse_document.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files",
+      "evidence": "BINARYFILE : Returns a fixed schema: path STRING The full path to the file. modificationTime TIMESTAMP The last modification time of the file. length LONG The size of the file in bytes. content BINARY The binary content of the file."
+    },
+    {
+      "family": "semi-structured-try-parse-json-malformed",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly job converts webhook payloads from a bronze STRING column to VARIANT with INSERT INTO silver.events SELECT parse_json(body) FROM bronze.webhooks. Last night the job failed because a few payloads were truncated. The business wants valid payloads loaded and invalid ones kept as NULL for review, without the job failing. Which change meets this?",
+      "options": [
+        {
+          "text": "Replace parse_json(body) with try_parse_json(body)",
+          "correct": true,
+          "why": "try_parse_json returns a VARIANT when the string is valid JSON and NULL when parsing fails, while parse_json raises MALFORMED_RECORD_IN_PARSING on invalid input."
+        },
+        {
+          "text": "Keep parse_json and add WHERE body IS NOT NULL",
+          "average": true,
+          "why": "Filtering out NULL strings is a common first fix, but truncated payloads are non-null strings that still fail to parse, so the job keeps failing."
+        },
+        {
+          "text": "Keep parse_json and enable automatic retries on the task",
+          "why": "A malformed payload fails the same way on every attempt, so retries only repeat the error before the job gives up."
+        },
+        {
+          "text": "Replace parse_json(body) with to_json(body)",
+          "why": "to_json converts complex values into JSON strings, the opposite direction; it doesn't produce a VARIANT from the payload text."
+        }
+      ],
+      "in_practice": "Loading bad payloads as NULL keeps the nightly load on time while bronze still holds the original text, and a daily count of NULL variants becomes the alert that a webhook sender has started truncating messages.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/parse_json",
+      "evidence": "Returns a VARIANT value from the jsonStr. ... If the JSON string is not valid, Databricks raises MALFORMED_RECORD_IN_PARSING. To return NULL instead of an error, use the try_parse_json function."
+    },
+    {
+      "family": "semi-structured-variant-cluster-extracted-field",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team lands clickstream events in a Delta table as a single VARIANT column named raw. Most dashboard queries filter on the customer_id field inside raw, and the team wants liquid clustering to speed them up. Which design should the team choose?",
+      "options": [
+        {
+          "text": "Store customer_id in its own typed column and cluster by that column",
+          "correct": true,
+          "why": "VARIANT columns can't be clustering keys, so Databricks recommends extracting frequently queried fields into non-variant columns, which can then serve as clustering keys."
+        },
+        {
+          "text": "Cluster the table by the raw column so every field is covered",
+          "average": true,
+          "why": "Clustering on the whole document sounds broad, but VARIANT columns can't be used as clustering keys, partitions or Z-order keys."
+        },
+        {
+          "text": "Partition the table by the raw column instead of clustering it",
+          "why": "VARIANT columns can't be used as partition columns either, so the table can't be partitioned on raw."
+        },
+        {
+          "text": "Run OPTIMIZE with ZORDER BY on the raw column each night",
+          "why": "Z-ordering is also unavailable for VARIANT columns, so a nightly OPTIMIZE can't use raw as its Z-order key."
+        }
+      ],
+      "in_practice": "Pulling a few hot fields such as customer_id and event_date into typed columns keeps the flexible payload in raw while letting clustering and data skipping prune most files for dashboard filters.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/variant",
+      "evidence": "Databricks recommends extracting frequently queried fields and storing them as non-variant columns to accelerate queries and optimize storage layout. VARIANT columns cannot be used for clustering keys, partitions, or Z-order keys."
+    },
+    {
+      "family": "semi-structured-array-of-structs-field",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's silver table orders has a column items of type ARRAY<STRUCT<sku: STRING, qty: INT>>. To list every SKU in each order, the engineer writes SELECT order_id, items[*].sku FROM orders, as on the bronze JSON strings, and gets an INVALID_USAGE_OF_STAR_OR_REGEX error. Which expression returns an array of all SKUs per order while keeping one row per order?",
+      "options": [
+        {
+          "text": "items.sku",
+          "correct": true,
+          "why": "Dot notation on an array of structs returns an array of that field's values from every element, and Databricks names array_column.field_name as the replacement for [*] on native arrays."
+        },
+        {
+          "text": "explode(items), then item.sku from each row",
+          "average": true,
+          "why": "explode is the common reflex for arrays, but it returns one row per element, so each order becomes several rows instead of one row holding an array."
+        },
+        {
+          "text": "items[0].sku",
+          "why": "Indexing with [0] reads only the first element of the array, so orders with several items would lose every SKU after the first."
+        },
+        {
+          "text": "items:sku",
+          "why": "The : path operator extracts fields from JSON string and VARIANT columns; items is a native ARRAY column, so that path syntax doesn't apply."
+        }
+      ],
+      "in_practice": "Keeping one row per order preserves the table's grain, so order counts and revenue sums stay correct; exploding is right only when the analysis really works at the line-item level.",
+      "source": "https://docs.databricks.com/aws/en/semi-structured/json",
+      "evidence": "The [*] syntax is only valid inside a JSON path expression, following the : operator on a JSON string column. It is not supported for: Native ARRAY columns. Applying [*] to an array column returns the error [INVALID_USAGE_OF_STAR_OR_REGEX]. To extract a field from every element of an array of structs, use array_column.field_name, transform, or explode instead."
+    },
+    {
+      "family": "semi-structured-variant-dotted-field-name",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer queries an IoT bronze table whose VARIANT column raw has top-level keys literally named geo.lat and geo.lon. SELECT raw:`geo.lat` FROM readings returns NULL for every row, although the key is present in each record. Which expression returns the latitude?",
+      "options": [
+        {
+          "text": "raw:['geo.lat']",
+          "correct": true,
+          "why": "The ['<field>'] syntax escapes any special character in a variant field name, including periods; backticks don't escape periods, which is why the backtick form returns NULL."
+        },
+        {
+          "text": "raw:geo.lat",
+          "average": true,
+          "why": "Without escaping, the period is read as a path separator, so the query looks for a lat field nested inside a geo object, which doesn't exist."
+        },
+        {
+          "text": "raw:`geo.lat`::double",
+          "why": "The cast changes only the result type; the backtick-escaped path still fails to match a name containing a period, so it casts a NULL."
+        },
+        {
+          "text": "variant_get(raw, '$.geo.lat', 'double')",
+          "why": "In this path the period again separates nested fields, so variant_get looks for geo and then lat and returns NULL; the escaped path would be $['geo.lat']."
+        }
+      ],
+      "in_practice": "Vendor payloads often use dotted or spaced keys; standardizing on the ['…'] form in shared silver views avoids columns that are silently NULL in every dashboard built on them.",
+      "source": "https://docs.databricks.com/aws/en/semi-structured/variant",
+      "evidence": "The ['<field>'] syntax escapes any special character in a field name, including spaces, periods (.), colons (:), and square brackets ([ ]). ... A field name that contains a period or square brackets returns NULL when escaped with backticks, so use the ['<field>'] syntax for those names."
+    }
+  ]
 }
