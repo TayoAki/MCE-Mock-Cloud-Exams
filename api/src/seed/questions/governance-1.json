@@ -1,1 +1,277 @@
-{"items": []}
+{
+  "items": [
+    {
+      "family": "tables-path-option-creates-external",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs the following PySpark code in a Unity Catalog workspace. The S3 path is covered by a registered external location.\n\ndf.write.option(\"path\", \"s3://acme-raw/landing/events\").saveAsTable(\"main.raw.events\")\n\nWhat kind of object does this create?",
+      "options": [
+        { "text": "An external table whose data files live at the given S3 path", "correct": true, "why": "Passing a path option to saveAsTable registers an external table: Unity Catalog governs its metadata, while the data files stay at the specified location inside a registered external location." },
+        { "text": "A managed table that Unity Catalog stores at the given S3 path", "average": true, "why": "A managed table never takes a user-chosen path; its files go to the managed storage location of its schema or catalog. Naming a path is exactly what makes the table external." },
+        { "text": "A volume that exposes the S3 path as a set of governed files", "why": "A volume governs non-tabular file access and is created with CREATE VOLUME, not by writing a DataFrame with saveAsTable." },
+        { "text": "A temporary view that disappears when the Spark session ends", "why": "saveAsTable persists a table in the catalog; temporary views come from createOrReplaceTempView and are never registered in Unity Catalog." }
+      ],
+      "in_practice": "Leaving the path out gives you a managed table with automatic optimization. Adding it is a deliberate choice for data other tools must read in place, and it means a later DROP TABLE leaves the files behind for someone to clean up.",
+      "source": "https://docs.databricks.com/aws/en/tables/external",
+      "evidence": "When you define a Unity Catalog external table, you must specify a storage location. ... To create an external table in S3 from a DataFrame: df.write.option(\"path\", \"s3://<bucket-path>/<table-directory>\").saveAsTable(\"<catalog>.<schema>.<table-name>\")"
+    },
+    {
+      "family": "tables-set-managed-convert",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants to turn the Unity Catalog external Delta table main.sales.orders into a managed table while keeping its name, its grants and its Delta history. Which command does Databricks recommend?",
+      "options": [
+        { "text": "ALTER TABLE main.sales.orders SET MANAGED", "correct": true, "why": "SET MANAGED converts an external Delta table in place and keeps its name, settings, permissions, views and table history, while minimizing reader and writer downtime." },
+        { "text": "CREATE TABLE main.sales.orders_v2 AS SELECT * FROM main.sales.orders", "average": true, "why": "CTAS can produce a managed copy, but it writes a separate new table without the original's grants or history, and it gives none of SET MANAGED's concurrent-write handling or rollback. Databricks recommends SET MANAGED." },
+        { "text": "ALTER TABLE main.sales.orders SET MANAGED COPY", "why": "MOVE and COPY apply only to foreign tables. Adding either to an external table conversion makes the command fail with an unsupported-syntax error." },
+        { "text": "CONVERT TO DELTA main.sales.orders", "why": "CONVERT TO DELTA turns Parquet data into a Delta table. The table is already Delta, and the command doesn't change whether Unity Catalog manages its storage." }
+      ],
+      "in_practice": "Because the name and grants survive, dashboards, jobs and permissions keep working, so a team can move dozens of tables to managed storage and pick up predictive optimization without a coordinated cutover.",
+      "source": "https://docs.databricks.com/aws/en/tables/convert-to-managed",
+      "evidence": "To convert an external or foreign Delta Lake table to a Unity Catalog managed table in Databricks, use the ALTER TABLE ... SET MANAGED command... The conversion retains table configurations, including name, settings, permissions, and views, and retains table history."
+    },
+    {
+      "family": "tables-create-external-privilege",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer has USE CATALOG, USE SCHEMA and CREATE TABLE on the target schema, but a CREATE TABLE statement with LOCATION 's3://acme-raw/clickstream' fails with a permission error. Which additional privilege does the engineer need?",
+      "options": [
+        { "text": "CREATE EXTERNAL TABLE on the external location that covers the path", "correct": true, "why": "Creating an external table requires CREATE EXTERNAL TABLE on the external location that grants access to the table's LOCATION, on top of USE CATALOG, USE SCHEMA and CREATE TABLE." },
+        { "text": "WRITE FILES on the external location that covers the path", "average": true, "why": "WRITE FILES lets a principal write files directly to the storage path; it doesn't authorize registering a table there. Table creation at a path is governed by CREATE EXTERNAL TABLE." },
+        { "text": "CREATE MANAGED STORAGE on the external location", "why": "CREATE MANAGED STORAGE lets someone set a custom managed storage location for a catalog or schema. It has nothing to do with registering an external table." },
+        { "text": "MODIFY on the target schema", "why": "MODIFY governs inserting, updating and deleting rows in the schema's tables. It doesn't authorize creating a table at a storage path." }
+      ],
+      "in_practice": "Granting CREATE EXTERNAL TABLE per external location, rather than on a storage credential, scopes each team to its own bucket prefix, so one team can't register tables over another team's raw data.",
+      "source": "https://docs.databricks.com/aws/en/tables/external",
+      "evidence": "To create an external table, you must meet the following permission requirements: The CREATE EXTERNAL TABLE privilege on an external location that grants access to the LOCATION accessed by the external table. The USE CATALOG ... USE SCHEMA ... and CREATE TABLE permission on the table's parent schema."
+    },
+    {
+      "family": "tables-drop-requires-manage",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer on the ingestion team has USE CATALOG, USE SCHEMA, SELECT and MODIFY on the managed table main.staging.tmp_orders, which a colleague created. A nightly cleanup job running as the engineer fails on DROP TABLE main.staging.tmp_orders with a permission error. Which change lets the job drop the table?",
+      "options": [
+        { "text": "Grant the engineer MANAGE on the table, or make the engineer its owner", "correct": true, "why": "Dropping a managed table requires MANAGE on the table or ownership of it, plus USE CATALOG and USE SCHEMA on its parents, which the engineer already has." },
+        { "text": "Grant the engineer ALL PRIVILEGES on the table", "average": true, "why": "ALL PRIVILEGES on a table implies SELECT, MODIFY and APPLY TAG but never includes MANAGE, so it still doesn't allow dropping the table." },
+        { "text": "Grant the engineer CREATE TABLE on the staging schema", "why": "CREATE TABLE lets the engineer create new tables in the schema. It gives no rights over a table that someone else owns." },
+        { "text": "Delete all rows from the table first, then drop it", "why": "Deleting rows only needs MODIFY, but an empty table still can't be dropped without MANAGE on it or ownership of it." }
+      ],
+      "in_practice": "Granting a cleanup service principal MANAGE on a staging schema lets it drop scratch tables other jobs create, because MANAGE on a container reaches its child objects, without making it a metastore admin.",
+      "source": "https://docs.databricks.com/aws/en/tables/managed",
+      "evidence": "To drop a managed table, you must have: MANAGE on the table or you must be the table owner. USE SCHEMA on the table's parent schema. USE CATALOG on the table's parent catalog."
+    },
+    {
+      "family": "tables-undrop-managed",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "On Thursday, a data engineer finds that a teammate ran DROP TABLE on the Unity Catalog managed table main.finance.invoices on Monday. The catalog and schema use the default recovery settings, and month-end reports depend on the table. What is the quickest way to bring the table back?",
+      "options": [
+        { "text": "Run UNDROP TABLE main.finance.invoices", "correct": true, "why": "Unity Catalog keeps dropped managed tables recoverable for 7 days by default, so UNDROP TABLE restores the table three days after the drop." },
+        { "text": "Accept the loss, because dropping a managed table deletes its files at once", "average": true, "why": "Unity Catalog does delete a dropped managed table's files, but only through an asynchronous purge after the recovery period ends, which is 7 days by default." },
+        { "text": "Run RESTORE TABLE main.finance.invoices TO VERSION AS OF its last version", "why": "RESTORE rolls an existing table back to an earlier version. It can't target a table whose definition has been dropped from the catalog." },
+        { "text": "Re-create the table with CREATE TABLE ... LOCATION pointing at its old files", "why": "Managed table files sit in Unity Catalog's managed storage, and path-based access to managed tables isn't supported, so registering the old files by path isn't a recovery route." }
+      ],
+      "in_practice": "The recovery window turns an accidental drop into a one-line fix instead of a restore from backups. Teams that churn staging tables can set it to 0 to purge faster, while critical catalogs can extend it to as much as 30 days.",
+      "source": "https://docs.databricks.com/aws/en/tables/managed",
+      "evidence": "Unity Catalog supports the UNDROP TABLE command to recover accidentally dropped managed tables. By default, tables are recoverable for 7 days after being dropped. After the recovery period ends, an asynchronous purge process deletes the underlying data files from your cloud tenant."
+    },
+    {
+      "family": "tables-set-managed-downtime",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 2,
+      "type": "multiple",
+      "stem": "A platform team plans to convert a 1 TB Unity Catalog external Delta table to a managed table with ALTER TABLE ... SET MANAGED. Hourly jobs write to the table, and dashboards read it from Databricks Runtime 16.4 LTS. What should the team expect during the conversion? (Choose two.)",
+      "options": [
+        { "text": "The data and Delta log are copied to the managed location while readers and writers keep running", "correct": true, "why": "In its first step, SET MANAGED copies the table data and transaction log to the managed location with no downtime, so active readers and writers continue." },
+        { "text": "Writes are blocked briefly while recent commits move over and the table switches location", "correct": true, "why": "In the second step, commits made during the copy are moved and the metadata is switched. Writes are blocked for this short step, while readers on 16.4 LTS or above see no downtime." },
+        { "text": "The table is offline to readers and writers for the whole copy, about 30 minutes for 1 TB", "average": true, "why": "The roughly 30-minute figure is the data copy, which runs without downtime. Only the final switch blocks writers, for an estimated 1 to 2 minutes at 1 TB." },
+        { "text": "The table is re-created under a new name, so its grants must be applied again", "why": "The conversion keeps the table's name, settings, permissions and views, so no grants need to be re-applied." },
+        { "text": "The command must include COPY so that the original external files stay readable", "why": "MOVE and COPY are only for foreign tables. Adding either to an external table conversion makes the command fail." }
+      ],
+      "in_practice": "Running the conversion on a 64-core cluster or 2X-Large SQL warehouse and pausing OPTIMIZE jobs for the window keeps a 1 TB move to about half an hour of background copying and a minute or two of blocked writes.",
+      "source": "https://docs.databricks.com/aws/en/tables/convert-to-managed",
+      "evidence": "Initial data copy (no downtime): The command copies table data and Delta transaction log from the external location to the managed location. Active readers and writers ... run without interruption. Switch to managed location (brief downtime): ... all writes to the external location are temporarily blocked."
+    },
+    {
+      "family": "tables-converted-storage-cleanup",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A platform team converted a 5 TB external Delta table to a managed table with SET MANAGED. Predictive optimization is turned off in their account. Finance wants the storage still held by the old external location released, but the team must keep the option to roll back during the supported window. What should the team do?",
+      "options": [
+        { "text": "Wait 14 days after the conversion, then run VACUUM on the converted managed table", "correct": true, "why": "Databricks keeps the old external data for 14 days so the conversion can be rolled back. Without predictive optimization nothing removes it automatically, so running VACUUM on the managed table after 14 days reclaims the storage." },
+        { "text": "Do nothing, because Databricks always deletes the old data after 14 days", "average": true, "why": "The automatic cleanup after 14 days happens only when predictive optimization is enabled. With it turned off, the team must run VACUUM themselves." },
+        { "text": "Delete the files under the old external location as soon as the conversion succeeds", "why": "Deleting the old files right away destroys the data a rollback within 14 days points back to, and removes the Delta logs that path-based redirect relies on." },
+        { "text": "Run DROP TABLE on the original external table to release its files", "why": "After conversion there is no separate external table: the name now refers to the managed table, so DROP TABLE would drop the converted table instead of freeing the old files." }
+      ],
+      "in_practice": "On a 5 TB table the retained copy doubles storage for two weeks. Scheduling a VACUUM for day 15 caps that cost instead of leaving terabytes of unused files in the bucket indefinitely.",
+      "source": "https://docs.databricks.com/aws/en/tables/convert-to-managed",
+      "evidence": "Databricks retains the data in your Unity Catalog external location for 14 days to allow rollback. ... After 14 days, with predictive optimization enabled, Databricks automatically deletes this data ... If you turn off predictive optimization, run VACUUM ... on the newly converted managed table after 14 days to reclaim the storage yourself."
+    },
+    {
+      "family": "tables-path-redirect-latency",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team converted an external table to a managed table with SET MANAGED. A low-latency lookup service on Databricks Runtime 18.1 still queries it with SELECT * FROM delta.`s3://acme-lake/customers`. The queries keep working, but each one is now several hundred milliseconds slower. What should the team do?",
+      "options": [
+        { "text": "Change the service to query the table by its catalog.schema.table name", "correct": true, "why": "Path-based reads of a converted table are redirected to the new managed location, which adds several hundred milliseconds per read. Name-based reads have no extra overhead, so migrating the code removes the delay." },
+        { "text": "Run OPTIMIZE on the managed table to compact the files the queries read", "average": true, "why": "Compaction helps when small files slow a scan, but this delay comes from redirecting each path-based read to the managed location, which OPTIMIZE doesn't change." },
+        { "text": "Upgrade the service to Databricks Runtime 18.2 so redirected reads have no overhead", "why": "Databricks Runtime 18.2 adds redirect support for streaming writes; it doesn't remove the per-read overhead of path-based redirect. Only name-based access avoids it." },
+        { "text": "Grant the service principal READ FILES on the old external location", "why": "READ FILES allows reading raw files from storage. The reads already succeed, and the slowdown comes from the redirect, not from a permission check." }
+      ],
+      "in_practice": "Redirect buys time to migrate legacy code, but at thousands of lookups an hour a few hundred extra milliseconds each adds up. Replacing delta.`path` references with table names removes the overhead and lets Unity Catalog govern every read.",
+      "source": "https://docs.databricks.com/aws/en/tables/convert-to-managed",
+      "evidence": "For low latency use cases, Databricks recommends that you migrate path-based access to name-based access. Path-based redirect adds several hundred milliseconds of overhead for each path-based read or write... Name-based reads and writes do not have additional performance overhead."
+    },
+    {
+      "family": "privileges-service-principal-grant",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer needs to give the service principal that runs a nightly Lakeflow Jobs pipeline SELECT on main.sales.orders using SQL. How is the service principal identified in the GRANT statement?",
+      "options": [
+        { "text": "By its application ID, enclosed in backticks", "correct": true, "why": "In Unity Catalog SQL, a service principal is represented by its applicationId value, and principal names with special characters such as hyphens are wrapped in backticks." },
+        { "text": "By its display name, enclosed in single quotes", "average": true, "why": "GRANT doesn't identify a service principal by display name, and principal names are quoted with backticks, not string quotes." },
+        { "text": "By the email address of the user who created it", "why": "Granting to the creator's email gives the privilege to that user, not to the service principal the job runs as." },
+        { "text": "Only through a group, since it can't receive grants", "why": "A service principal is a principal in its own right: GRANT accepts a user, a service principal or a group directly." }
+      ],
+      "in_practice": "Granting to the job's service principal instead of a person keeps production pipelines running when people change teams or leave, and the access shows up in reviews as the job's own identity.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/",
+      "evidence": "<principal> is a user, service principal (represented by its applicationId value), or group. You must enclose users, service principals, and group names that include special characters in backticks."
+    },
+    {
+      "family": "privileges-deny-hive-metastore-only",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer plans to run DENY SELECT ON TABLE main.hr.salaries TO `contractors` to keep a group away from a table in a Unity Catalog catalog. What is the problem with this plan?",
+      "options": [
+        { "text": "DENY applies only to the legacy hive_metastore catalog, not to Unity Catalog objects", "correct": true, "why": "The DENY statement applies only to the hive_metastore catalog and its objects and isn't supported by Unity Catalog, so access to main.hr.salaries is managed through grants and revokes instead." },
+        { "text": "There is none; DENY overrides any SELECT the group inherits from the schema", "average": true, "why": "Deny-over-grant precedence describes DENY in the legacy hive_metastore. It doesn't help here because Unity Catalog doesn't support the DENY statement at all." },
+        { "text": "DENY must be run on the catalog, because it can't target a single table", "why": "DENY can target individual tables in hive_metastore; the issue is that Unity Catalog doesn't support the statement at any level." },
+        { "text": "DENY lasts only until someone next grants SELECT to the same group", "why": "Where DENY is supported, it takes precedence over grants and is removed only by REVOKE. In Unity Catalog the statement isn't supported in the first place." }
+      ],
+      "in_practice": "Teams moving from hive_metastore table ACLs often carry DENY-based scripts along. In Unity Catalog the equivalent is a least-privilege design that grants each group only what it needs, so there is nothing to subtract.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/security-deny",
+      "evidence": "This function is not supported by Unity Catalog. ... This statement applies only to the hive_metastore catalog and its objects."
+    },
+    {
+      "family": "privileges-catalog-explorer-grant",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer prefers the UI over SQL and needs to give the `marketing-analysts` group SELECT on a Unity Catalog table. Where does the engineer do this?",
+      "options": [
+        { "text": "In Catalog Explorer, on the table's Permissions tab, by clicking Grant", "correct": true, "why": "Catalog Explorer manages privileges on securable objects: select the table, open its Permissions tab, click Grant, choose the group and privileges, and confirm." },
+        { "text": "In workspace admin settings, by adding it to the group's entitlements", "average": true, "why": "Group entitlements in workspace settings control access to workspace features such as Databricks SQL, not privileges on Unity Catalog tables." },
+        { "text": "In the sharing dialog of the notebook that created the table", "why": "Notebook sharing controls who can view or edit the notebook. It doesn't grant access to the tables the notebook writes." },
+        { "text": "On the SQL warehouse's Permissions tab, by giving the group Can use", "why": "Warehouse permissions decide who can run queries on that compute; reading the table is still checked against Unity Catalog privileges." }
+      ],
+      "in_practice": "The same Permissions tab lists existing grants, so a reviewer can confirm who can read a sensitive table in one screen before an audit, without writing SHOW GRANTS queries.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/",
+      "evidence": "Grant permissions on an object (Catalog Explorer): In your Databricks workspace, click Catalog. Select the object, such as a catalog, schema, table, or view. Go to the Permissions tab. Click Grant. Enter the email address for a user or the name of a group. Select the permissions to grant. Click OK."
+    },
+    {
+      "family": "privileges-browse-for-discovery",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data platform team wants every employee, through the `all-employees` group, to find tables in the main catalog, see their names, descriptions and tags, and request access. Employees must not read any data or see sensitive metadata such as grants and column masks. Which grant meets these requirements?",
+      "options": [
+        { "text": "GRANT BROWSE ON CATALOG main TO `all-employees`", "correct": true, "why": "BROWSE lets users see that objects exist, view their names, descriptions and tags, and request access, without USE CATALOG or USE SCHEMA and without access to the data." },
+        { "text": "GRANT READ METADATA ON CATALOG main TO `all-employees`", "average": true, "why": "READ METADATA exposes owner-level metadata, including grants, row filters, column masks and ABAC policies. Databricks recommends BROWSE when users only need discovery." },
+        { "text": "GRANT USE CATALOG ON CATALOG main TO `all-employees`", "why": "USE CATALOG is a usage privilege that doesn't by itself give access to any object in the catalog, so it isn't how discovery and access requests are enabled." },
+        { "text": "GRANT SELECT ON CATALOG main TO `all-employees`", "why": "SELECT on a catalog is inherited by every current and future table and view in it, which hands out the data itself rather than just discovery." }
+      ],
+      "in_practice": "Opening discovery with BROWSE lets people find the right dataset and file an access request instead of copying data into personal schemas, while data owners still approve every grant that exposes rows.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/privileges-reference",
+      "evidence": "Users with BROWSE can: See that an object exists; View its name, description, and tags; Request access to it ... Users with BROWSE do not need usage privileges like USE CATALOG or USE SCHEMA to discover and view metadata."
+    },
+    {
+      "family": "privileges-modify-requires-select",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer sets up a service principal for a Lakeflow Jobs task that runs a MERGE to insert, update and delete rows in main.silver.customers. The service principal should get what this MERGE needs and nothing broader. Which set of grants should the engineer apply?",
+      "options": [
+        { "text": "USE CATALOG on main, USE SCHEMA on main.silver, and SELECT and MODIFY on the table", "correct": true, "why": "MODIFY allows inserting, updating and deleting rows in a table, and it requires SELECT on the table plus USE CATALOG and USE SCHEMA on its parents." },
+        { "text": "USE CATALOG on main, USE SCHEMA on main.silver, and MODIFY on the table", "average": true, "why": "This set misses SELECT: a principal that modifies a table must also have SELECT on it, so the MERGE would still be denied." },
+        { "text": "USE CATALOG on main, USE SCHEMA on main.silver, and MANAGE on the table", "why": "MANAGE covers privileges, ownership and dropping the table, but it doesn't itself include SELECT or MODIFY, so the MERGE would be denied." },
+        { "text": "MODIFY on the main catalog, relying on inheritance for everything else", "why": "MODIFY on the catalog reaches every table in it, which is far broader than needed, and it still lacks SELECT and the usage privileges." }
+      ],
+      "in_practice": "Scoping a job's service principal to one table's SELECT and MODIFY means a bug or a leaked credential can damage only that table, not every table in the catalog.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/privileges-reference",
+      "evidence": "MODIFY: When applied to a table, allows a user to insert, update, and delete data in the table. The user must also have SELECT on the table, USE SCHEMA on the parent schema, and USE CATALOG on the parent catalog."
+    },
+    {
+      "family": "privileges-undo-deny-with-revoke",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer maintains a legacy workspace whose hive_metastore tables still use SQL privileges. Months ago an admin ran DENY SELECT ON TABLE sales TO `maria@example.com`. Maria's group already has SELECT on the table, and she now needs to query it again. What should the engineer run?",
+      "options": [
+        { "text": "REVOKE SELECT ON TABLE sales FROM `maria@example.com`", "correct": true, "why": "A DENY is undone by revoking the same privilege from the same principal. REVOKE removes an explicitly granted or denied privilege, so this lifts the DENY that blocks her." },
+        { "text": "GRANT SELECT ON TABLE sales TO `maria@example.com`", "average": true, "why": "A DENY takes precedence over any explicit or implicit grant, so adding a direct grant leaves Maria blocked." },
+        { "text": "GRANT SELECT ON SCHEMA default TO `maria@example.com`", "why": "A schema-level grant is still an implicit grant on the table, and the DENY on the table takes precedence over it." },
+        { "text": "Remove Maria from her group and add her back to it", "why": "Changing group membership doesn't touch the DENY recorded for Maria; it stays in force until the same privilege is revoked from her." }
+      ],
+      "in_practice": "Because a DENY outranks every grant, a forgotten one can block a user for months. Auditing and revoking these entries before a Unity Catalog migration avoids surprises, since Unity Catalog doesn't support the DENY statement.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/security-deny",
+      "evidence": "Denying a privilege takes precedent over any explicit or implicit grant. ... To undo a DENY you REVOKE the same privilege from the principal."
+    },
+    {
+      "family": "privileges-use-catalog-boundary",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "An analyst still can't query main.finance.forecasts. The table owner has granted the analyst SELECT on the table, and the schema owner has granted USE SCHEMA on main.finance. When the table owner tries to grant USE CATALOG on main to the analyst, the statement fails. Who can grant the missing privilege?",
+      "options": [
+        { "text": "The catalog owner or a user with MANAGE on the main catalog", "correct": true, "why": "USE CATALOG is the catalog owner's access boundary: only the catalog owner or a user with MANAGE on the catalog can grant it (metastore admins can also manage privileges)." },
+        { "text": "The schema owner, because the schema contains the table", "average": true, "why": "Owning a schema lets someone grant privileges on the schema and the objects inside it, but USE CATALOG is a privilege on the catalog above it." },
+        { "text": "Any user who holds ALL PRIVILEGES on the table", "why": "ALL PRIVILEGES on a table covers actions on that table and never includes MANAGE, so it gives no right to grant privileges on the parent catalog." },
+        { "text": "The table owner, after receiving SELECT on the catalog", "why": "SELECT on a catalog lets someone read the tables in it; granting USE CATALOG still requires catalog ownership or MANAGE on the catalog." }
+      ],
+      "in_practice": "This boundary lets a domain team that owns a catalog approve every consumer of its data even when individual table owners hand out SELECT, which keeps access reviews to one place per catalog.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/privileges-reference",
+      "evidence": "Even if a table owner grants SELECT on a table to another user, that user cannot access the table unless they also have USE CATALOG on the parent catalog. Because only catalog owners or users with MANAGE on the catalog can grant USE CATALOG, catalog owners retain control over which users can access their objects."
+    },
+    {
+      "family": "privileges-manage-without-select",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data governance lead grants a data steward MANAGE on the schema main.marketing so the steward can handle access requests. The steward already has USE CATALOG on main and USE SCHEMA on main.marketing, and successfully grants SELECT on several tables to analysts. Yet the steward's own query on main.marketing.campaigns fails with a permission error. What explains this?",
+      "options": [
+        { "text": "MANAGE doesn't include data privileges, so the steward must first grant themselves SELECT", "correct": true, "why": "Users with MANAGE aren't automatically granted all privileges on an object; each one must be granted separately, although a user with MANAGE can grant those privileges to themselves." },
+        { "text": "MANAGE on a schema doesn't reach its tables, so it must be granted on each table", "average": true, "why": "MANAGE on a container also applies to all its child objects, which is why the steward could grant SELECT on the tables. The gap is the missing SELECT, not missing MANAGE." },
+        { "text": "Only a table's owner can query it; MANAGE holders can administer but never read", "why": "Reading data depends on SELECT, not ownership. A MANAGE holder who grants themselves SELECT can query the table." },
+        { "text": "The steward also needs READ METADATA on the schema before querying its tables", "why": "READ METADATA shows metadata such as grants and masks without letting anyone read data, so it wouldn't make the query work." }
+      ],
+      "in_practice": "Separating MANAGE from SELECT lets a steward run access requests for a sensitive schema without routinely reading its data, and any self-grant is an explicit grant that shows up in reviews.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/privileges-reference",
+      "evidence": "Users with MANAGE are not automatically granted all privileges on the object. They must be granted each specific privilege separately, but users with MANAGE can explicitly grant themselves these privileges. ... If MANAGE is granted on a container object, the user also gets MANAGE on all child objects."
+    }
+  ]
+}
