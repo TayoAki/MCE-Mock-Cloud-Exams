@@ -92,13 +92,13 @@ The backoffice covers the plan's content workflow: draft → human review → pu
 
 - **MongoDB instead of PostgreSQL.** You specified MongoDB, so the plan's 38-table reference schema became 35 collections. Join tables are embedded and the plan's uniqueness and idempotency constraints are unique indexes; the mapping is in [`api/README.md`](api/README.md). Grading and completion use multi-document transactions, so MongoDB must run as a replica set.
 - **"Customer and rider app" is the learner app.** CertPath has no riders, so `mobile/` serves learners and `admin/` serves staff.
-- **Content.** The plan shipped five sample questions. The seed now holds 500 original draft questions across all seven domains, each domain sized to its exam weight. 78 were written by hand (including the newer formats and stories). The other 422 come from the [question factory](api/question-factory/README.md) in two batches, which:
+- **Content.** The plan shipped five sample questions. The seed now holds 1,000 original draft questions across all seven domains, each domain sized to its exam weight. 78 were written by hand (including the newer formats and stories). The other 922 come from the [question factory](api/question-factory/README.md) in three batches, which:
   - maps the August 2026 exam guide's 33 objectives to the app;
-  - scrapes the cited documentation (with Firecrawl when `FIRECRAWL_API_KEY` is set);
+  - discovers and scrapes the documentation with Firecrawl (`FIRECRAWL_API_KEY`), or a plain fetch without it;
   - writes every item to one authoring spec;
   - validates each one automatically.
   
-  The full 45-question mock now fills from every domain. **None of the questions has had independent subject-matter review.** The seed marks them reviewed by a fixture account so they can be published, and the backoffice labels them "Dev fixture — not subject-matter approval". Each factory item keeps its supporting documentation quote in the reviewer notes, so review can go quickly.
+  The full 45-question mock now fills from every domain. **None of the questions has had independent subject-matter review.** The seed marks them reviewed by a fixture account so they can be published, and the backoffice labels them "Dev fixture — not subject-matter approval". Each factory item keeps its supporting documentation quote in the reviewer notes, so review can go quickly. Learners can rate each question 1–5 stars after seeing its answer, and the backoffice's low-rated queue puts the questions they rate poorly in front of reviewers first.
 - **Guests are server-side identities.** Grading never happens on the device. Registering upgrades the guest in place, keeping all progress. Merging a guest into a different existing account is not implemented; the sign-in screen says so.
 - **AI help** uses Claude at low effort with server-side refusal fallbacks, per-user and global daily caps, and a timeout. The reviewed rationale is shown whenever generation fails, is refused, or no `ANTHROPIC_API_KEY` is set.
 

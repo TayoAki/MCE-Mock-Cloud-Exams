@@ -120,11 +120,12 @@ The API logs what each start changed, for example `Question bank: 24 added, 3 re
 
 ## Status of the bank
 
-The factory holds 422 items in two batches, both written in October 2026 from documentation read that month:
+The factory holds 922 items in three batches, all written in October 2026 from documentation read that month:
 
 | Batch | Files | Items | Bank after |
 |---|---|---|---|
 | 1 | `platform`, `ingestion-1`, `ingestion-2`, `transformation-1`, `transformation-2`, `jobs-1`, `jobs-2`, `cicd`, `troubleshooting`, `governance-1`, `governance-2` | 222 | 300 |
 | 2 | `platform-2`, `ingestion-3`, `ingestion-4`, `transformation-3`, `transformation-4`, `jobs-3`, `jobs-4`, `cicd-2`, `troubleshooting-2`, `governance-3`, `governance-4` | 200 | 500 |
+| 3 | `platform-3`, `ingestion-5` to `-8`, `transformation-5` to `-8`, `jobs-5` to `-7`, `cicd-3`, `cicd-4`, `troubleshooting-3`, `troubleshooting-4`, `governance-5` to `-8` | 501 | 1,000 |
 
-Batch 2 was written against batch 1, testing facts the earlier questions don't. All of them are drafts. Like the rest of the pilot bank they still need independent subject-matter review before CertPath presents them as reviewed content.
+Each batch was written against the ones before it, testing facts the earlier questions don't. Batch 3 researched from 597 more pages that Firecrawl discovered. Its drafts were checked with `--overlap` and a whole-bank review for questions that test the same fact. Two items were withdrawn as duplicates (see `withdrawn.ts`), and drafts that repeated another file's fact were rewritten before publishing. All of them are drafts. Like the rest of the pilot bank they still need independent subject-matter review before CertPath presents them as reviewed content.
