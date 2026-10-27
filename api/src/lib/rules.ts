@@ -22,6 +22,10 @@ export type FeatureKey = (typeof PLUS_FEATURES)[number];
 
 /** "x% of learners got this right" appears only once this many learners answered on their first try. */
 export const PEER_MIN_SAMPLE = 5;
+/** A question's average rating is shown to learners once this many have rated it. */
+export const RATING_MIN_SAMPLE = 5;
+/** Staff's "needs attention" queue: questions averaging at or below this with enough ratings. */
+export const RATING_ATTENTION = { maxAverage: 2.5, minCount: 3 } as const;
 export const FLAGGED_QUIZ = { defaultSize: 10, maxSize: 20 } as const;
 
 /** Level Up: levels 1–3 follow question difficulty, level 4 mixes everything with misses first. */

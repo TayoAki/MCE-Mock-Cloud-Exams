@@ -7,7 +7,7 @@ import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSh
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bump, SPRING, pop, popIn, riseIn, useShake } from '@/components/motion';
 import { ListenPrompt, MatchAnswer, OrderAnswer, TypeAnswer, answerBody, answerReady, formatHint } from '@/components/questions';
-import { FlagButton, PeerLine } from '@/components/study';
+import { FlagButton, PeerLine, RatingStars } from '@/components/study';
 import { Banner, Button, ErrorState, Icon, LoadingState, ProgressBar, Screen, Small } from '@/components/ui';
 import { trackEvent } from '@/lib/analytics';
 import { ApiError, post } from '@/lib/api';
@@ -260,6 +260,7 @@ export default function SessionScreen() {
                       submitted_at: new Date().toISOString(),
                       feedback: receipt.feedback,
                       peer: receipt.peer ?? null,
+                      rating: receipt.rating ?? null,
                     },
                   }
                 : i,
@@ -483,6 +484,16 @@ export default function SessionScreen() {
                     <Text className="text-primary text-[14px] font-bold">Read the documentation ›</Text>
                   </Pressable>
                 ))}
+                {current.submission ? (
+                  <RatingStars
+                    key={current.session_item_id}
+                    sessionId={s.id}
+                    familyId={current.family_id}
+                    questionVersionId={current.question_version_id}
+                    rating={current.submission.rating}
+                    onReport={() => setReporting(true)}
+                  />
+                ) : null}
               </View>
               </Animated.View>
             ) : null}

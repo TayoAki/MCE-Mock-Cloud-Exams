@@ -93,3 +93,21 @@ const tutorThreadSchema = new Schema(
 );
 tutorThreadSchema.index({ userId: 1, sessionItemId: 1 }, { unique: true });
 export const TutorThread = model('TutorThread', tutorThreadSchema);
+
+/** A learner's 1–5 star rating of a question family, given after seeing its answer. One per learner per family. */
+const questionRatingSchema = new Schema(
+  {
+    userId: { type: String, required: true },
+    examVersionId: { type: String, required: true },
+    familyId: { type: String, required: true },
+    /** The revision the learner rated, so staff can tell ratings of an old revision from the current one. */
+    questionVersionId: { type: String, required: true },
+    stars: { type: Number, required: true, min: 1, max: 5 },
+    ratedAt: { type: Date, required: true, default: Date.now },
+  },
+  opts,
+);
+questionRatingSchema.index({ userId: 1, familyId: 1 }, { unique: true });
+questionRatingSchema.index({ familyId: 1 });
+questionRatingSchema.index({ examVersionId: 1, familyId: 1 });
+export const QuestionRating = model('QuestionRating', questionRatingSchema);

@@ -6,6 +6,7 @@ import { aiLimiter, writeLimiter } from '../lib/rate-limit.js';
 import { flagQuestion, listFlags, unflagQuestion } from '../services/flags.js';
 import { levelUpOverview } from '../services/levelup.js';
 import { qotdView } from '../services/qotd.js';
+import { clearRating, rateQuestion } from '../services/ratings.js';
 import { askTutor, getTutorThread } from '../services/tutor.js';
 
 /** Question of the Day, flagged questions, Level Up and the tutor. */
@@ -28,6 +29,16 @@ studyRouter.put('/flags/:familyId', requireAuth, writeLimiter, async (req, res) 
 
 studyRouter.delete('/flags/:familyId', requireAuth, writeLimiter, async (req, res) => {
   res.json(await unflagQuestion(currentUser(req)._id, idParam(req, 'familyId')));
+});
+
+/** Ratings are per question family: PUT sets or changes the learner's stars, DELETE clears them. */
+studyRouter.put('/ratings/:familyId', requireAuth, writeLimiter, async (req, res) => {
+  const body = parseBody(req, z.strictObject({ question_version_id: uuidParam, stars: z.int().min(1).max(5) }));
+  res.json(await rateQuestion(currentUser(req)._id, idParam(req, 'familyId'), body));
+});
+
+studyRouter.delete('/ratings/:familyId', requireAuth, writeLimiter, async (req, res) => {
+  res.json(await clearRating(currentUser(req)._id, idParam(req, 'familyId')));
 });
 
 /** Each domain's Level Up progress: Foundations, Applied, Advanced, then Mastery. */

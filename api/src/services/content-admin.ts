@@ -11,6 +11,7 @@ import {
   ObjectiveProgress,
   QuestionFamily,
   QuestionKey,
+  QuestionRating,
   QuestionVersion,
   Unit,
   User,
@@ -19,6 +20,7 @@ import {
 import { config } from '../config.js';
 import { HttpError, badRequest, conflict, notFound } from '../lib/errors.js';
 import { allocateBlueprint } from '../lib/rules.js';
+import { lowRatedFamilies, ratingStats } from './ratings.js';
 import { keyMatchPairs, keyOrderSteps } from '../lib/answers.js';
 import type { AnswerType } from '../models/bank.js';
 
@@ -391,13 +393,26 @@ function toQuestionRow(q: { _id: string; familyId: string; examVersionId: string
   };
 }
 
-export async function listQuestions(filter: { exam_version_id: string; status?: string; objective_id?: string; q?: string; needs_review?: boolean }) {
+/** Enough rows for every revision of a full bank; the backoffice filters from there. */
+const QUESTION_LIST_LIMIT = 3000;
+
+export async function listQuestions(filter: {
+  exam_version_id: string;
+  status?: string;
+  objective_id?: string;
+  q?: string;
+  needs_review?: boolean;
+  /** Only families learners rate poorly (see RATING_ATTENTION). */
+  low_rated?: boolean;
+  sort?: 'newest' | 'lowest_rated';
+}) {
   const query: Record<string, unknown> = { examVersionId: filter.exam_version_id };
   if (filter.status) query.status = filter.status;
   if (filter.objective_id) query.objectiveId = filter.objective_id;
   if (filter.needs_review) Object.assign(query, { status: 'draft', reviewedBy: null });
   if (filter.q) query.prompt = { $regex: filter.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
-  const rows = await QuestionVersion.find(query).sort({ createdAt: -1 }).limit(500).lean();
+  if (filter.low_rated) query.familyId = { $in: await lowRatedFamilies(filter.exam_version_id) };
+  const rows = await QuestionVersion.find(query).sort({ createdAt: -1 }).limit(QUESTION_LIST_LIMIT).lean();
   const [families, openIssues] = await Promise.all([
     QuestionFamily.find({ _id: { $in: [...new Set(rows.map((r) => r.familyId))] } }).select({ familyKey: 1 }).lean(),
     IssueReport.aggregate<{ _id: string; n: number }>([
@@ -407,13 +422,23 @@ export async function listQuestions(filter: { exam_version_id: string; status?: 
   ]);
   const keys = new Map(families.map((f) => [f._id, f.familyKey]));
   const issues = new Map(openIssues.map((i) => [i._id, i.n]));
-  return rows.map((r) => ({ ...toQuestionRow(r), family_key: keys.get(r.familyId) ?? '', open_issues: issues.get(r._id) ?? 0 }));
+  const ratings = await ratingStats(rows.map((r) => r.familyId));
+  const list = rows.map((r) => ({
+    ...toQuestionRow(r),
+    family_key: keys.get(r.familyId) ?? '',
+    open_issues: issues.get(r._id) ?? 0,
+    rating_average: ratings.get(r.familyId)?.average ?? null,
+    rating_count: ratings.get(r.familyId)?.count ?? 0,
+  }));
+  // Lowest average first; among equals, the one more learners rated. Unrated questions go last.
+  if (filter.sort === 'lowest_rated') list.sort((a, b) => (a.rating_average ?? 6) - (b.rating_average ?? 6) || b.rating_count - a.rating_count);
+  return list;
 }
 
 export async function questionDetail(questionVersionId: string) {
   const q = await QuestionVersion.findById(questionVersionId).lean();
   if (!q) throw notFound('Question');
-  const [key, family, revisions, auditTrail, issues, attemptStats] = await Promise.all([
+  const [key, family, revisions, auditTrail, issues, attemptStats, ratings, revisionRatings] = await Promise.all([
     QuestionKey.findById(q._id).lean(),
     QuestionFamily.findById(q.familyId).lean(),
     QuestionVersion.find({ familyId: q.familyId }).sort({ revision: -1 }).select({ revision: 1, status: 1, createdAt: 1 }).lean(),
@@ -423,7 +448,10 @@ export async function questionDetail(questionVersionId: string) {
       { $match: { questionVersionId: q._id, gradedAt: { $ne: null }, invalidatedAt: null } },
       { $group: { _id: null, total: { $sum: 1 }, correct: { $sum: { $cond: ['$isCorrect', 1, 0] } } } },
     ]),
+    ratingStats([q.familyId]),
+    QuestionRating.countDocuments({ questionVersionId: q._id }),
   ]);
+  const rating = ratings.get(q.familyId);
   const actors = new Map(
     (await User.find({ _id: { $in: [...new Set(auditTrail.map((a) => a.actorId))] } }).select({ displayName: 1 }).lean()).map((u) => [u._id, u.displayName]),
   );
@@ -449,6 +477,8 @@ export async function questionDetail(questionVersionId: string) {
     audit: auditTrail.map((a) => ({ action: a.action, actor_id: a.actorId, actor: actors.get(a.actorId) ?? a.actorId, note: a.note, recorded_at: a.recordedAt.toISOString() })),
     issues: issues.map((i) => ({ id: i._id, reason: i.reason, note: i.note, status: i.status, created_at: i.createdAt.toISOString() })),
     attempts: { total: attemptStats[0]?.total ?? 0, correct: attemptStats[0]?.correct ?? 0 },
+    // Ratings follow the family, like flags; this_revision says how many were given on this revision.
+    ratings: { average: rating?.average ?? null, count: rating?.count ?? 0, distribution: rating?.distribution ?? [0, 0, 0, 0, 0], this_revision: revisionRatings },
   };
 }
 

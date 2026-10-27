@@ -68,9 +68,14 @@ export function DashboardPage() {
               </div>
             ))}
           </dl>
-          <Link to="/questions?needs_review=true" className="mt-3 inline-block text-sm font-medium text-primary hover:underline">
-            Drafts awaiting review →
-          </Link>
+          <div className="mt-3 flex flex-col gap-1">
+            <Link to="/questions?needs_review=true" className="text-sm font-medium text-primary hover:underline">
+              Drafts awaiting review →
+            </Link>
+            <Link to="/questions?low_rated=true&sort=lowest_rated" className="text-sm font-medium text-primary hover:underline">
+              {data.low_rated_questions} low-rated by learners →
+            </Link>
+          </div>
         </Card>
 
         <Card title="Sessions started by mode" padded={false}>

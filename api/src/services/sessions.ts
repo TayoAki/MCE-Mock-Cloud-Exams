@@ -23,6 +23,7 @@ import { loadQuestionVersions } from './content.js';
 import { flaggedFamilies } from './flags.js';
 import { DELAYED_FEEDBACK_MODES, buildFeedback, type Feedback } from './grading.js';
 import { peerStats } from './peer.js';
+import { ratingViews } from './ratings.js';
 import { selectItems } from './selection.js';
 
 export interface StartInput {
@@ -192,8 +193,9 @@ export async function sessionView(session: SessionLean) {
   const keys = new Map((await QuestionKey.find({ _id: { $in: keyIds } }).lean()).map((k) => [k._id, k]));
   const familyIds = session.items.map((i) => i.familyId);
   const flagged = await flaggedFamilies(session.userId, familyIds);
-  // Peer accuracy shows with feedback, so it is only looked up for revealed answers.
-  const peers = await peerStats(revealFeedback ? attempts.filter((a) => a.isCorrect != null).map((a) => a.familyId) : []);
+  // Peer accuracy and ratings show with feedback, so they are only looked up for revealed answers.
+  const revealedFamilies = revealFeedback ? attempts.filter((a) => a.isCorrect != null).map((a) => a.familyId) : [];
+  const [peers, ratings] = await Promise.all([peerStats(revealedFamilies), ratingViews(session.userId, revealedFamilies)]);
 
   const items = session.items.map((item) => {
     const q = byQuestion.get(item.questionVersionId);
@@ -224,6 +226,7 @@ export async function sessionView(session: SessionLean) {
             submitted_at: attempt.submittedAt.toISOString(),
             feedback,
             peer: feedback ? (peers.get(item.familyId) ?? null) : null,
+            rating: feedback ? (ratings.get(item.familyId) ?? null) : null,
           }
         : null,
     };
@@ -337,7 +340,8 @@ export async function sessionFeedback(userId: string, sessionId: string) {
   const visible = session.items.filter((i) => finalized || byItem.has(i._id));
   const keys = new Map((await QuestionKey.find({ _id: { $in: visible.map((i) => i.questionVersionId) } }).lean()).map((k) => [k._id, k]));
   const byQuestion = new Map(questions.map((q) => [q._id, q]));
-  const [peers, flagged] = await Promise.all([peerStats(visible.map((i) => i.familyId)), flaggedFamilies(userId, visible.map((i) => i.familyId))]);
+  const visibleFamilies = visible.map((i) => i.familyId);
+  const [peers, flagged, ratings] = await Promise.all([peerStats(visibleFamilies), flaggedFamilies(userId, visibleFamilies), ratingViews(userId, visibleFamilies)]);
   return {
     session_id: session._id,
     status: session.status,
@@ -347,6 +351,7 @@ export async function sessionFeedback(userId: string, sessionId: string) {
       const key = keys.get(item.questionVersionId)!;
       return {
         session_item_id: item._id,
+        question_version_id: q._id,
         position: item.position,
         prompt: q.prompt,
         answer_type: q.answerType,
@@ -360,6 +365,7 @@ export async function sessionFeedback(userId: string, sessionId: string) {
         flagged: flagged.has(item.familyId),
         feedback: buildFeedback(attempt?.isCorrect === true, key, q.sourceUrl, q.answerType as AnswerType),
         peer: peers.get(item.familyId) ?? null,
+        rating: ratings.get(item.familyId) ?? null,
       };
     }),
   };

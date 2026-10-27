@@ -18,6 +18,7 @@ import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { uuid } from '../lib/ids.js';
 import { PLUS_FEATURES, type FeatureKey } from '../lib/rules.js';
 import { toEntitlement } from './access.js';
+import { lowRatedFamilies } from './ratings.js';
 import { audit } from './content-admin.js';
 import { habitSummary, xpTotal } from './progress.js';
 import { toProfile } from './account.js';
@@ -89,6 +90,8 @@ export async function overview(now = new Date()) {
     sessions_by_mode: sessionsByMode.map((r) => ({ mode: r._id, sessions: r.n })),
     questions_by_status: Object.fromEntries(questionsByStatus.map((r) => [r._id, r.n])),
     open_issues: openIssues,
+    // Questions learners rate poorly, for the backoffice's attention queue.
+    low_rated_questions: (await lowRatedFamilies()).length,
     preview_starts: previewStarts,
     outcomes: outcomes.map((o) => ({ result: o._id.result, verification_status: o._id.verification, count: o.n })),
   };

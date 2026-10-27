@@ -127,6 +127,13 @@ export interface PeerStat {
   answered: number;
 }
 
+/** A question's rating: the learner's own stars and, once enough learners rated, the average. */
+export interface RatingView {
+  mine: number | null;
+  average: number | null;
+  count: number;
+}
+
 export interface SessionItem {
   session_item_id: string;
   question_version_id: string;
@@ -152,6 +159,7 @@ export interface SessionItem {
     submitted_at: string;
     feedback: Feedback | null;
     peer?: PeerStat | null;
+    rating?: RatingView | null;
   } | null;
 }
 
@@ -375,6 +383,7 @@ export interface AnswerReceipt {
   accepted: boolean;
   feedback: Feedback | null;
   peer?: PeerStat | null;
+  rating?: RatingView | null;
   xp_granted?: number;
 }
 
@@ -478,9 +487,11 @@ export interface SessionFeedback {
     attempt_id: string | null;
     answered: boolean;
     family_id?: string;
+    question_version_id?: string;
     flagged?: boolean;
     feedback: Feedback;
     peer?: PeerStat | null;
+    rating?: RatingView | null;
   }[];
 }
 

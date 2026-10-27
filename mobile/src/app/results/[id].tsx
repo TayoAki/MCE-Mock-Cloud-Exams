@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { DomainBar } from '@/components/DomainBar';
+import { RatingStars } from '@/components/study';
 import { Banner, Body, Button, Card, ErrorState, Icon, LoadingState, Pill, Screen, Small, Title } from '@/components/ui';
 import { get } from '@/lib/api';
 import { useRefreshLearning } from '@/lib/queries';
@@ -106,6 +107,9 @@ export default function MockResults() {
                 );
               })}
               <Text className="text-ink text-[14px] leading-5">{item.feedback.rationale}</Text>
+              {item.answered && item.family_id && item.question_version_id ? (
+                <RatingStars sessionId={id} familyId={item.family_id} questionVersionId={item.question_version_id} rating={item.rating} />
+              ) : null}
             </Card>
           ))
         : null}

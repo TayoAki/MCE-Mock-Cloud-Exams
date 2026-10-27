@@ -5,12 +5,12 @@ import { Pressable, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { popIn, riseIn } from '@/components/motion';
 import { Button, Card, Icon, type IconName } from '@/components/ui';
-import { del, put } from '@/lib/api';
+import { ApiError, del, put } from '@/lib/api';
 import { feedback as play } from '@/lib/feedback';
 import { useNextSteps } from '@/lib/queries';
 import { useStartSession } from '@/lib/sessions';
 import { colors } from '@/lib/theme';
-import type { PeerStat, QotdView, Session, SessionItem, Suggestion } from '@/lib/types';
+import type { PeerStat, QotdView, RatingView, Session, SessionFeedback, SessionItem, Suggestion } from '@/lib/types';
 
 /** "62% of learners got this right": shown with feedback once enough learners have answered. */
 export function PeerLine({ peer, qotd }: { peer?: PeerStat | null; qotd?: boolean }) {
@@ -73,6 +73,86 @@ export function FlagButton({ sessionId, item, size = 44 }: { sessionId: string; 
     >
       <Icon name={item.flagged ? 'bookmark' : 'bookmark-outline'} size={24} color={item.flagged ? colors.streak : colors.muted} />
     </Pressable>
+  );
+}
+
+const STAR_LABELS = ['Poor', 'Weak', 'OK', 'Good', 'Great'];
+
+/**
+ * "Rate this question": 1–5 stars once the answer is shown. Optimistic, like
+ * flags. A low rating offers the issue report, which says what's wrong.
+ */
+export function RatingStars({
+  sessionId,
+  familyId,
+  questionVersionId,
+  rating,
+  onReport,
+}: {
+  sessionId: string;
+  familyId: string;
+  questionVersionId: string;
+  rating?: RatingView | null;
+  onReport?: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [view, setView] = useState<RatingView>(rating ?? { mine: null, average: null, count: 0 });
+  const [error, setError] = useState<string | null>(null);
+  // Keep both caches this question appears in up to date, so it shows the same stars on return.
+  const store = (next: RatingView) => {
+    setView(next);
+    queryClient.setQueryData<Session>(['session', sessionId], (old) =>
+      old ? { ...old, items: old.items.map((i) => (i.family_id === familyId && i.submission ? { ...i, submission: { ...i.submission, rating: next } } : i)) } : old,
+    );
+    queryClient.setQueryData<SessionFeedback>(['feedback', sessionId], (old) =>
+      old ? { ...old, items: old.items.map((i) => (i.family_id === familyId ? { ...i, rating: next } : i)) } : old,
+    );
+  };
+  async function rate(stars: number) {
+    const before = view;
+    setError(null);
+    play.select();
+    setView({ ...view, mine: stars, count: view.mine === null ? view.count + 1 : view.count });
+    try {
+      store(await put<RatingView>(`/ratings/${familyId}`, { question_version_id: questionVersionId, stars }));
+    } catch (e) {
+      setView(before);
+      setError(e instanceof ApiError ? e.message : 'Could not save your rating');
+    }
+  }
+  const mine = view.mine;
+  return (
+    <View className="gap-1.5 pt-1">
+      <View className="flex-row flex-wrap items-center gap-x-2">
+        <Text className="text-muted text-[13px] font-semibold">{mine ? `You rated it ${STAR_LABELS[mine - 1]!.toLowerCase()}` : 'Rate this question'}</Text>
+        <View accessibilityRole="radiogroup" accessibilityLabel="Rate this question from 1 to 5 stars" className="flex-row">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <Pressable
+              key={n}
+              accessibilityRole="radio"
+              accessibilityLabel={`${n} star${n === 1 ? '' : 's'}, ${STAR_LABELS[n - 1]}`}
+              accessibilityState={{ checked: mine === n }}
+              onPress={() => rate(n)}
+              hitSlop={4}
+              className="h-[40px] w-[36px] items-center justify-center"
+            >
+              <Icon name={mine !== null && n <= mine ? 'star' : 'star-outline'} size={22} color={mine !== null && n <= mine ? colors.streak : colors.muted} />
+            </Pressable>
+          ))}
+        </View>
+        {view.average !== null ? (
+          <Text accessibilityLabel={`Learners rate it ${view.average} out of 5 from ${view.count} ratings`} className="text-muted text-[13px]">
+            {view.average.toFixed(1)} avg · {view.count} ratings
+          </Text>
+        ) : null}
+      </View>
+      {mine !== null && mine <= 2 && onReport ? (
+        <Pressable accessibilityRole="button" onPress={onReport} className="min-h-[40px] justify-center self-start">
+          <Text className="text-primary text-[14px] font-bold">Tell us what’s wrong ›</Text>
+        </Pressable>
+      ) : null}
+      {error ? <Text className="text-coral-dark text-[13px]">{error}</Text> : null}
+    </View>
   );
 }
 

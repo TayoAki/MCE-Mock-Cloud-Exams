@@ -19,6 +19,7 @@ import { uuid } from '../lib/ids.js';
 import { BOOST, XP, nextReview } from '../lib/rules.js';
 import { effectiveTimezone, localDate, startOfLocalDay } from '../lib/time.js';
 import { peerStats, type PeerStat } from './peer.js';
+import { ratingViews, type RatingView } from './ratings.js';
 
 /** Feedback is withheld for these modes until the session is finalized. */
 export const DELAYED_FEEDBACK_MODES = new Set(['mock']);
@@ -205,11 +206,14 @@ export interface AnswerReceipt {
   feedback: Feedback | null;
   /** How learners did on this question on their first try, shown with the feedback. */
   peer: PeerStat | null;
+  /** The learner's rating of this question and the learners' average, once feedback is shown. */
+  rating: RatingView | null;
   xp_granted?: number;
 }
 
 async function receiptFor(attempt: {
   _id: string;
+  userId: string;
   questionVersionId: string;
   familyId: string;
   isCorrect?: boolean | null;
@@ -220,13 +224,14 @@ async function receiptFor(attempt: {
     // Mock answers stay sealed until the form is finalized.
     const session = await PracticeSession.findById(attempt.sessionId).select({ status: 1 }).lean();
     if (!session || session.status === 'active' || attempt.isCorrect == null) {
-      return { attempt_id: attempt._id, accepted: true, feedback: null, peer: null };
+      return { attempt_id: attempt._id, accepted: true, feedback: null, peer: null, rating: null };
     }
   }
-  const [qv, key, peers] = await Promise.all([
+  const [qv, key, peers, ratings] = await Promise.all([
     QuestionVersion.findById(attempt.questionVersionId).select({ sourceUrl: 1, answerType: 1 }).lean(),
     QuestionKey.findById(attempt.questionVersionId).lean(),
     peerStats([attempt.familyId]),
+    ratingViews(attempt.userId, [attempt.familyId]),
   ]);
   if (!qv || !key) throw new HttpError(500, 'content_missing', 'Grading data is missing for this question');
   return {
@@ -234,6 +239,7 @@ async function receiptFor(attempt: {
     accepted: true,
     feedback: buildFeedback(attempt.isCorrect!, key, qv.sourceUrl, qv.answerType as AnswerType),
     peer: peers.get(attempt.familyId) ?? null,
+    rating: ratings.get(attempt.familyId) ?? null,
   };
 }
 

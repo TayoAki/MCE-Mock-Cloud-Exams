@@ -26,6 +26,8 @@ export interface Overview {
   sessions_by_mode: { mode: string; sessions: number }[];
   questions_by_status: Partial<Record<'draft' | 'published' | 'retired', number>>;
   open_issues: number;
+  /** Questions learners rate poorly: a low average from several learners. */
+  low_rated_questions: number;
   preview_starts: number;
   outcomes: { result: 'passed' | 'failed'; verification_status: string; count: number }[];
   events: { event: string; count: number }[];
@@ -127,6 +129,9 @@ export interface QuestionRow {
   created_at: string;
   family_key: string;
   open_issues: number;
+  /** Learners' 1–5 star average for the question family; null when nobody has rated it. */
+  rating_average: number | null;
+  rating_count: number;
 }
 
 export interface QuestionOption {
@@ -134,7 +139,7 @@ export interface QuestionOption {
   text: string;
 }
 
-export interface QuestionDetail extends Omit<QuestionRow, 'open_issues'> {
+export interface QuestionDetail extends Omit<QuestionRow, 'open_issues' | 'rating_average' | 'rating_count'> {
   difficulty: number;
   options: QuestionOption[];
   match_targets: QuestionOption[];
@@ -154,6 +159,8 @@ export interface QuestionDetail extends Omit<QuestionRow, 'open_issues'> {
   audit: { action: string; actor_id: string; actor: string; note: string; recorded_at: string }[];
   issues: { id: string; reason: string; note: string; status: string; created_at: string }[];
   attempts: { total: number; correct: number };
+  /** Ratings follow the family across revisions; distribution counts 1 to 5 stars. */
+  ratings: { average: number | null; count: number; distribution: number[]; this_revision: number };
   repaired_enrollments?: number;
 }
 

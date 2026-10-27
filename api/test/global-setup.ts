@@ -9,7 +9,8 @@ declare module 'vitest' {
 
 /** One single-node replica set for the run; transactions require a replica set. */
 export default async function setup(project: TestProject) {
-  const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
+  // A cold or busy machine can take longer than the 10 s default to start mongod.
+  const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' }, instanceOpts: [{ launchTimeout: 60_000 }] });
   project.provide('mongoUri', replSet.getUri());
   return async () => {
     await replSet.stop();

@@ -22,6 +22,7 @@ export const EVENT_PROPERTIES = {
   explanation_generated: ['origin', 'style'],
   tutor_message: ['phase', 'origin', 'guard_tripped'],
   question_flagged: ['flagged'],
+  question_rated: ['stars'],
   issue_reported: ['reason'],
   // Client
   onboarding_viewed: ['step'],

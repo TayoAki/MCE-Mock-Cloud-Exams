@@ -14,6 +14,8 @@ export function QuestionsPage() {
     objective_id: params.get('objective_id') ?? '',
     q: params.get('q') ?? '',
     needs_review: params.get('needs_review') === 'true',
+    low_rated: params.get('low_rated') === 'true',
+    sort: params.get('sort') ?? '',
   };
   const update = (patch: Partial<typeof filters>) => {
     const next = { ...filters, ...patch };
@@ -22,6 +24,8 @@ export function QuestionsPage() {
     if (next.objective_id) search.set('objective_id', next.objective_id);
     if (next.q) search.set('q', next.q);
     if (next.needs_review) search.set('needs_review', 'true');
+    if (next.low_rated) search.set('low_rated', 'true');
+    if (next.sort) search.set('sort', next.sort);
     setParams(search, { replace: true });
   };
 
@@ -29,7 +33,15 @@ export function QuestionsPage() {
     queryKey: ['questions', versionId, filters],
     queryFn: () =>
       api.get<{ questions: QuestionRow[] }>(
-        `/admin/questions${qs({ exam_version_id: versionId, status: filters.status, objective_id: filters.objective_id, q: filters.q, needs_review: filters.needs_review || undefined })}`,
+        `/admin/questions${qs({
+          exam_version_id: versionId,
+          status: filters.status,
+          objective_id: filters.objective_id,
+          q: filters.q,
+          needs_review: filters.needs_review || undefined,
+          low_rated: filters.low_rated || undefined,
+          sort: filters.sort || undefined,
+        })}`,
       ),
     enabled: !!versionId,
   });
@@ -74,7 +86,12 @@ export function QuestionsPage() {
             ))}
           </Select>
           <Checkbox label="Needs review" checked={filters.needs_review} onChange={(e) => update({ needs_review: e.target.checked, status: '' })} />
-          <span className="ml-auto text-xs text-muted">{data ? `${data.questions.length} revisions` : ''}</span>
+          <Checkbox label="Low rated" checked={filters.low_rated} onChange={(e) => update({ low_rated: e.target.checked })} />
+          <Select aria-label="Sort" value={filters.sort} onChange={(e) => update({ sort: e.target.value })}>
+            <option value="">Newest first</option>
+            <option value="lowest_rated">Lowest rated first</option>
+          </Select>
+          <span className="ml-auto text-xs text-muted">{data ? `${data.questions.length} revision${data.questions.length === 1 ? '' : 's'}` : ''}</span>
         </div>
         {isLoading && <Loading />}
         <div className="p-3">
@@ -82,7 +99,7 @@ export function QuestionsPage() {
         </div>
         {data && (
           <Table
-            head={['Question', 'Objective', 'Rev', 'Status', 'Review', 'Issues', 'Created']}
+            head={['Question', 'Objective', 'Rev', 'Status', 'Review', 'Issues', 'Rating', 'Created']}
             empty={data.questions.length === 0 ? <div className="p-4"><Empty title="No questions match these filters" /></div> : undefined}
           >
             {data.questions.map((q) => {
@@ -114,6 +131,16 @@ export function QuestionsPage() {
                   </Td>
                   <Td>{q.status === 'draft' ? q.reviewed ? <Badge tone="success">approved</Badge> : <Badge tone="warning">needs review</Badge> : <span className="text-xs text-muted">—</span>}</Td>
                   <Td>{q.open_issues > 0 ? <Badge tone="danger">{q.open_issues} open</Badge> : <span className="text-xs text-muted">—</span>}</Td>
+                  <Td className="text-xs whitespace-nowrap tabular-nums">
+                    {q.rating_average === null ? (
+                      <span className="text-muted">—</span>
+                    ) : (
+                      <span title={`${q.rating_count} learner rating${q.rating_count === 1 ? '' : 's'}`}>
+                        {q.rating_average <= 2.5 && q.rating_count >= 3 ? <Badge tone="danger">{q.rating_average.toFixed(1)}</Badge> : <span className="font-medium">{q.rating_average.toFixed(1)}</span>}
+                        <span className="ml-1 text-muted">({q.rating_count})</span>
+                      </span>
+                    )}
+                  </Td>
                   <Td className="text-xs whitespace-nowrap text-muted">{formatDate(q.created_at)}</Td>
                 </tr>
               );

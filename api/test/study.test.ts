@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Attempt, Celebration, Domain, GemLedger, PracticeSession, QotdStreak, QuestionFamily } from '../src/models/index.js';
+import { Attempt, Celebration, Domain, GemLedger, PracticeSession, QotdStreak, QuestionFamily, QuestionVersion } from '../src/models/index.js';
 import { addDays } from '../src/lib/time.js';
 import { SEED_DIFFICULTY } from '../src/seed/difficulty.js';
-import { as, completeLesson, enroll, guest, id, pilotVersionId, playSession, registered, startLesson } from './helpers.js';
+import { admin, as, completeLesson, correctBody, enroll, guest, id, pilotVersionId, playSession, registered, startLesson, wrongBody } from './helpers.js';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -274,5 +274,77 @@ describe('lesson flow still works', () => {
     const completion = await completeLesson(l.token, l.enrollmentId);
     expect(completion.level_up).toBeNull();
     expect(completion.qotd).toBeNull();
+  });
+});
+
+describe('question ratings', () => {
+  it('lets a learner rate a question once its answer is shown, and shows the average once five have rated', async () => {
+    const raters = await Promise.all([1, 2, 3, 4, 5].map(() => learner()));
+    const [first] = raters;
+    const session = await startLesson(first!.token, first!.enrollmentId);
+    const item = session.items[0];
+    const rate = (token: string, stars: number, versionId = item.question_version_id) =>
+      as(token).put(`/ratings/${item.family_id}`, { question_version_id: versionId, stars });
+
+    // Not before answering, not out of range, and only for the family's own revision.
+    await rate(first!.token, 4).expect(400, /not_answered/);
+    const receipt = (await as(first!.token).post(`/sessions/${session.id}/answers`, { session_item_id: item.session_item_id, client_submission_id: id(), ...(await correctBody(item)) }).expect(200)).body;
+    expect(receipt.rating).toEqual({ mine: null, average: null, count: 0 });
+    await rate(first!.token, 6).expect(400);
+    await rate(first!.token, 4, session.items[1].question_version_id).expect(404);
+
+    expect((await rate(first!.token, 4).expect(200)).body).toEqual({ family_id: item.family_id, mine: 4, average: null, count: 1 });
+    // Rating again replaces the stars rather than adding a rating.
+    expect((await rate(first!.token, 2).expect(200)).body).toMatchObject({ mine: 2, count: 1 });
+    const view = (await as(first!.token).get(`/sessions/${session.id}`).expect(200)).body;
+    expect(view.items[0].submission.rating).toEqual({ mine: 2, average: null, count: 1 });
+    expect(view.items[1].submission).toBeNull();
+
+    for (const [i, r] of raters.slice(1).entries()) {
+      const s = await startLesson(r.token, r.enrollmentId);
+      await as(r.token).post(`/sessions/${s.id}/answers`, { session_item_id: s.items[0].session_item_id, client_submission_id: id(), ...(await wrongBody(s.items[0])) }).expect(200);
+      await rate(r.token, [5, 4, 4, 3][i]!).expect(200);
+    }
+    // (2 + 5 + 4 + 4 + 3) / 5 = 3.6, shown now that five learners rated.
+    expect((await rate(first!.token, 2).expect(200)).body).toMatchObject({ mine: 2, average: 3.6, count: 5 });
+
+    expect((await as(first!.token).delete(`/ratings/${item.family_id}`).expect(200)).body).toEqual({ family_id: item.family_id, mine: null, average: null, count: 4 });
+  });
+
+  it('waits for a mock to be submitted before its questions can be rated', async () => {
+    const l = await learner();
+    const mock = (await start(l.token, { enrollment_id: l.enrollmentId, mode: 'mock', question_count: 10 }).expect(201)).body;
+    const item = mock.items[0];
+    const receipt = (await as(l.token).post(`/sessions/${mock.id}/answers`, { session_item_id: item.session_item_id, client_submission_id: id(), selected_options: ['A'] }).expect(200)).body;
+    expect(receipt.rating).toBeNull();
+    await as(l.token).put(`/ratings/${item.family_id}`, { question_version_id: item.question_version_id, stars: 3 }).expect(400, /not_answered/);
+    await as(l.token).post(`/sessions/${mock.id}/complete`).expect(200);
+    await as(l.token).put(`/ratings/${item.family_id}`, { question_version_id: item.question_version_id, stars: 3 }).expect(200);
+    const review = (await as(l.token).get(`/sessions/${mock.id}/feedback`).expect(200)).body;
+    expect(review.items.find((i: { family_id: string }) => i.family_id === item.family_id).rating).toMatchObject({ mine: 3, count: 1 });
+  });
+
+  it('puts poorly rated questions in front of staff', async () => {
+    const examVersionId = await pilotVersionId();
+    const raters = await Promise.all([1, 2, 3].map(() => learner()));
+    let target: { family_id: string; question_version_id: string } | undefined;
+    for (const r of raters) {
+      const s = await startLesson(r.token, r.enrollmentId);
+      const item = s.items[2];
+      target = item;
+      await as(r.token).post(`/sessions/${s.id}/answers`, { session_item_id: item.session_item_id, client_submission_id: id(), ...(await correctBody(item)) }).expect(200);
+      await as(r.token).put(`/ratings/${item.family_id}`, { question_version_id: item.question_version_id, stars: 1 }).expect(200);
+    }
+    const { token } = await admin();
+    const low = (await as(token).get(`/admin/questions?exam_version_id=${examVersionId}&low_rated=true`).expect(200)).body.questions;
+    expect(low.map((q: { family_id: string }) => q.family_id)).toContain(target!.family_id);
+    expect(low.every((q: { rating_average: number; rating_count: number }) => q.rating_average <= 2.5 && q.rating_count >= 3)).toBe(true);
+    const sorted = (await as(token).get(`/admin/questions?exam_version_id=${examVersionId}&status=published&sort=lowest_rated`).expect(200)).body.questions;
+    expect(sorted[0]).toMatchObject({ rating_average: 1, rating_count: 3 });
+    // Every published question is listed, not just the first 500.
+    expect(sorted.length).toBe(await QuestionVersion.countDocuments({ examVersionId, status: 'published' }));
+    const detail = (await as(token).get(`/admin/questions/${target!.question_version_id}`).expect(200)).body;
+    expect(detail.ratings).toEqual({ average: 1, count: 3, distribution: [3, 0, 0, 0, 0], this_revision: 3 });
+    expect((await as(token).get('/admin/overview').expect(200)).body.low_rated_questions).toBeGreaterThanOrEqual(1);
   });
 });

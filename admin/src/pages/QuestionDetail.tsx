@@ -159,6 +159,7 @@ export function QuestionDetailPage() {
               </Row>
             </dl>
           </Card>
+          <RatingsCard ratings={q.ratings} />
           <Card title="Revisions" padded={false}>
             <ul className="divide-y divide-border">
               {q.revisions.map((r) => (
@@ -337,5 +338,38 @@ function RetireModal({ question, onClose, onSaved }: { question: QuestionDetail;
         </>
       )}
     </Modal>
+  );
+}
+
+/** Learners' star ratings for the family, with how they spread across 1–5 stars. */
+function RatingsCard({ ratings }: { ratings: QuestionDetail['ratings'] }) {
+  const top = Math.max(1, ...ratings.distribution);
+  return (
+    <Card title={`Learner ratings (${ratings.count})`}>
+      {ratings.count === 0 ? (
+        <p className="text-sm text-muted">No ratings yet. Learners rate a question after they see its answer.</p>
+      ) : (
+        <div className="flex flex-wrap items-start gap-6">
+          <div>
+            <div className="text-3xl font-semibold tabular-nums">{ratings.average?.toFixed(1)}</div>
+            <div className="text-xs text-muted">average of 5 · {ratings.this_revision} on this revision</div>
+          </div>
+          <dl className="min-w-56 flex-1 space-y-1 text-xs">
+            {[5, 4, 3, 2, 1].map((stars) => {
+              const n = ratings.distribution[stars - 1] ?? 0;
+              return (
+                <div key={stars} className="flex items-center gap-2">
+                  <dt className="w-12 text-muted">{stars} star{stars === 1 ? '' : 's'}</dt>
+                  <dd className="flex flex-1 items-center gap-2">
+                    <span className="h-2 rounded-full bg-primary" style={{ width: `${(n / top) * 100}%`, minWidth: n ? 4 : 0 }} />
+                    <span className="tabular-nums text-muted">{n}</span>
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+        </div>
+      )}
+    </Card>
   );
 }

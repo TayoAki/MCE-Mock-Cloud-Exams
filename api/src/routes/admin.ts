@@ -163,6 +163,8 @@ adminRouter.get('/admin/questions', async (req, res) => {
       objective_id: uuidParam.optional(),
       q: z.string().max(100).optional(),
       needs_review: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+      low_rated: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+      sort: z.enum(['newest', 'lowest_rated']).optional(),
     }),
   );
   res.json({ questions: await content.listQuestions(query) });
