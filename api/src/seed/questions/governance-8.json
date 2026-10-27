@@ -1,3 +1,277 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "abac-create-or-replace-restates-policy",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A governance admin must add the `compliance_team` group to the exempt principals of `mask_ssn`, an existing column mask policy on the schema `prod.customers`. The admin will make the change with CREATE OR REPLACE POLICY in SQL. What must that statement contain?",
+      "options": [
+        { "text": "Every clause of the policy, with the same policy name and the same schema scope", "correct": true, "why": "CREATE OR REPLACE POLICY replaces the entire policy definition, so the statement restates the UDF, TO, EXCEPT, FOR TABLES and column clauses in full. The replacement must keep the policy's name and the securable it is attached to." },
+        { "text": "Only the changed EXCEPT clause, since omitted clauses keep their current values", "average": true, "why": "Treating the statement as a patch is the common assumption, but the SQL replacement isn't partial: you specify all clauses, not just the field you want to change. Partial updates are what the Python SDK's update_policy with an update_mask offers." },
+        { "text": "A new policy name, because a replaced policy can't keep its old name", "why": "The opposite is true: the replacement policy must have the same name and be on the same securable object as the policy it replaces." },
+        { "text": "A DROP POLICY statement first, because policies can't be replaced in place", "why": "CREATE OR REPLACE POLICY exists to replace a policy in place; dropping it first only adds a window in which the masking isn't enforced at all." }
+      ],
+      "in_practice": "Teams that keep each policy's full CREATE OR REPLACE statement in version control can add an exemption by editing one line and redeploying, instead of rebuilding clauses from DESCRIBE POLICY output under time pressure.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policies",
+      "evidence": "CREATE OR REPLACE POLICY replaces the entire policy definition. Specify all clauses, not just the fields you want to change. The replacement policy must have the same name and be on the same securable object."
+    },
+    {
+      "family": "abac-governed-tag-set-values-replaces",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "The governed tag `sensitivity_level` allows the values 'low', 'medium' and 'high'. A governance admin must add 'restricted' as a fourth allowed value with SQL, and the three existing values must stay allowed. Which statement does this?",
+      "options": [
+        { "text": "ALTER GOVERNED TAG sensitivity_level SET VALUES ('low', 'medium', 'high', 'restricted')", "correct": true, "why": "SET VALUES is declarative: the list it receives replaces every allowed value in the tag policy, so adding one value means restating the existing three alongside it." },
+        { "text": "ALTER GOVERNED TAG sensitivity_level SET VALUES ('restricted')", "average": true, "why": "Reading SET VALUES as an append is the common mistake. Because the provided list replaces all existing allowed values, this statement would leave 'restricted' as the only allowed value." },
+        { "text": "CREATE GOVERNED TAG sensitivity_level VALUES ('restricted')", "why": "CREATE GOVERNED TAG defines a new governed tag and its tag policy; changing the allowed values of a governed tag that already exists is done with ALTER GOVERNED TAG." },
+        { "text": "SET TAG ON CATALOG prod sensitivity_level = restricted", "why": "SET TAG assigns a tag to a securable object; it doesn't change which values the governed tag's policy allows, and a governed tag can only be assigned values from its allowed list." }
+      ],
+      "in_practice": "Because a short list silently drops values, teams often apply tag-policy changes from a reviewed file; dropping 'high' by accident would stop stewards from assigning it to newly classified tables until someone notices.",
+      "source": "https://docs.databricks.com/aws/en/admin/governed-tags/manage-governed-tags",
+      "evidence": "Use the ALTER GOVERNED TAG statement. Replace the allowed values list: ALTER GOVERNED TAG sensitivity_level SET VALUES ('low', 'medium', 'high'); SET VALUES is declarative: the provided list replaces all existing allowed values."
+    },
+    {
+      "family": "abac-policy-definitions-inventory",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A security auditor asks a governance admin, who holds MANAGE on every catalog in the metastore, for one result set listing all row filter and column mask policies across those catalogs, showing where each is attached and which principals it applies to. Which source should the admin query?",
+      "options": [
+        { "text": "system.information_schema.abac_policy_definitions", "correct": true, "why": "The ABAC_POLICY_DEFINITIONS view lists policy definitions, including where each is attached, its principals and its action. A catalog's own view covers that catalog; the system catalog's version spans catalogs. Users see only policies on securables where they hold MANAGE." },
+        { "text": "SHOW EFFECTIVE POLICIES, run once against each catalog", "average": true, "why": "SHOW EFFECTIVE POLICIES answers which policies affect one securable, so it yields a separate result per catalog rather than one inventory that can be filtered and joined in SQL." },
+        { "text": "The ROW_FILTERS and COLUMN_MASKS views of each catalog's information schema", "why": "Those views describe filters and masks set directly on tables with ALTER TABLE; they are not where ABAC policy definitions are recorded." },
+        { "text": "system.tags.governed_tags, filtered to the tags that policies use", "why": "The governed tags system table holds tag definitions, such as each tag key and when it changed or was deleted; it records nothing about policies, their scope or their principals." }
+      ],
+      "in_practice": "A scheduled query over this view can feed a quarterly access review, for example flagging any policy whose TO list names individual users instead of groups, without opening hundreds of policies one by one.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policies",
+      "evidence": "INFORMATION_SCHEMA.ABAC_POLICY_DEFINITIONS returns ABAC policy definitions in the current catalog. To query policies across catalogs, use SYSTEM.INFORMATION_SCHEMA.ABAC_POLICY_DEFINITIONS. You can use these views to audit your policy inventory at scale, including where policies are attached, which principals they apply to"
+    },
+    {
+      "family": "abac-identity-functions-resolved-once",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A governance admin is choosing between two UDFs for a row filter policy on a large table. One returns TRUE when is_account_group_member() matches any of three groups; the other returns TRUE when EXISTS finds session_user() in an `access_lease` table. Which statement about their performance is accurate?",
+      "options": [
+        { "text": "The group-check UDF is cheaper, because identity functions resolve once during query analysis", "correct": true, "why": "Identity functions such as is_account_group_member() are resolved once while the query is analyzed, not per row, and several of them collapse into a single Unity Catalog API call. The lease version adds a lookup against a second table." },
+        { "text": "The group-check UDF is costlier, because each group check is an API call made for every row", "average": true, "why": "It feels natural that a membership check repeats per row, but identity functions are resolved once during query analysis, and checking three groups still results in one Unity Catalog API call." },
+        { "text": "Both cost the same, because the optimizer inlines every SQL UDF into the query plan", "why": "Inlining doesn't remove the extra work: the lease version still needs a lookup against a secondary table, which Databricks calls out as the slower design." },
+        { "text": "The lease-table UDF is cheaper, because a lookup table is always broadcast to executors", "why": "A small lookup table can become a broadcast hash join, but that isn't guaranteed and each row still pays a hash lookup; a large table falls back to a slower shuffle join." }
+      ],
+      "in_practice": "Encoding access in group membership keeps the filter's cost flat as data grows; a lease table that swells to millions of rows can quietly turn a broadcast join into a shuffle join on every protected query.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/performance",
+      "evidence": "These functions are resolved once during query analysis, not per row. Multiple calls to identity functions like is_account_group_member() with different group arguments result in a single UC API call. In contrast, the following UDF is slower because it encodes privileges in a secondary table, which requires an additional table lookup."
+    },
+    {
+      "family": "abac-single-governed-taxonomy",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Before writing any ABAC policies, a governance admin finds three teams classifying data with their own overlapping tags: `confidential_flag`, `data_tier` and `pii_grade`. Which tagging approach follows Databricks best practices for ABAC?",
+      "options": [
+        { "text": "Agree on one governed sensitivity tag with a controlled set of allowed values", "correct": true, "why": "Databricks recommends settling a consistent taxonomy before creating policies: agreed key names, allowed values and naming conventions. One governed tag with controlled values is easier to manage than overlapping ad-hoc tags." },
+        { "text": "Govern all three tags and write a matching set of policies for each one", "average": true, "why": "Keeping every team's tag avoids a migration, but it multiplies policies around overlapping meanings; ABAC is meant to reduce the number of access rules, and Databricks warns against tag and policy sprawl." },
+        { "text": "Keep the three tags ungoverned and reference all of them in policy conditions", "why": "ABAC policies use governed tags, not ungoverned ones, and ungoverned tags can be changed by anyone with APPLY TAG, which undermines tagging as a security boundary." },
+        { "text": "Encode sensitivity in table names so policies can match tables by pattern", "why": "Policy conditions match tables and columns through governed tags with has_tag() and has_tag_value(); ABAC offers no name-pattern matching to rely on." }
+      ],
+      "in_practice": "A small taxonomy, such as one sensitivity key with four values, lets a handful of catalog-level policies cover the estate; three overlapping keys tend to produce policies that disagree about the same column.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/best-practices",
+      "evidence": "Establish a consistent tagging taxonomy before creating policies. Agree on tag key names, allowed values, and naming conventions across teams. A small, well-defined set of tags is easier to manage than a proliferation of ad-hoc tags. For example, use a single sensitivity tag with controlled values"
+    },
+    {
+      "family": "abac-drop-tagged-column-unset-tag",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's schema migration runs ALTER TABLE hr.core.people DROP COLUMN legacy_ssn, and the statement fails. The column carries the governed tag `pii : ssn`, which a catalog-level column mask policy matches. What must happen before the column can be dropped?",
+      "options": [
+        { "text": "A user with ASSIGN on the tag and APPLY TAG on the table removes the tag from the column", "correct": true, "why": "Databricks blocks dropping a column that has a governed tag applied. Someone holding ASSIGN on the governed tag and APPLY TAG on the table must remove the tag first; then the DROP COLUMN succeeds." },
+        { "text": "The column mask policy that matches the tag is dropped from the catalog", "average": true, "why": "Removing the policy looks like the way to free the column, but the block comes from the governed tag on the column, not the policy; dropping the policy would also unmask SSNs in every other table it covers." },
+        { "text": "The governed tag pii is deleted from the account's tag definitions", "why": "Deleting a governed tag that a policy references makes every query in that policy's scope fail with UC_ABAC_UNKNOWN_TAG_POLICY, and the tag stays on objects as an ungoverned tag." },
+        { "text": "The column is renamed first so that the policy no longer matches it", "why": "Policies match columns by their governed tags, not by name, so a rename leaves the tag in place and the column still can't be dropped." }
+      ],
+      "in_practice": "Building the unset-tag step into migration runbooks, run by a steward with ASSIGN, keeps an automated schema change from stalling on a tagged column and leaves every tag removal as an auditable event.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policy-evaluation",
+      "evidence": "Databricks prevents deleting a column that has a governed tag applied. To drop the column, a user with ASSIGN on the tag and APPLY TAG on the object must first remove the tag, then the column can be deleted."
+    },
+    {
+      "family": "abac-governing-existing-tag-key",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "Hundreds of tables in the `ops` catalog carry an ungoverned `department` tag with values such as 'finance', 'eng' and 'mktg', set by anyone with APPLY TAG. A governance admin now creates a governed tag with the key `department` and the allowed values 'finance', 'engineering' and 'marketing'. What happens to the existing tag assignments?",
+      "options": [
+        { "text": "They become governed at once; 'eng' and 'mktg' remain but can't be reassigned", "correct": true, "why": "Creating a governed tag with a key already in use governs every existing assignment of that key immediately, with no reassignment. Out-of-policy values aren't removed but can't be set again, and later changes need ASSIGN on the tag." },
+        { "text": "They stay ungoverned until each table is retagged under the new governed key", "average": true, "why": "Retagging every table sounds necessary, but governance attaches to the key itself: all existing assignments with that key become governed automatically when the governed tag is created." },
+        { "text": "Assignments with values outside the allowed list are removed automatically", "why": "Values outside the allowed list are left in place on the objects; the tag policy only stops anyone from assigning those out-of-policy values again." },
+        { "text": "Creating the governed tag fails until the existing department tags are unset", "why": "Creating a governed tag over a key that is already assigned is supported, and it is the documented way to add governance to tags already in use." }
+      ],
+      "in_practice": "Governance becomes a one-step change for a tag already on thousands of objects, though the team should still clean up legacy values like 'eng' so policy conditions written against 'engineering' cover every table.",
+      "source": "https://docs.databricks.com/aws/en/admin/governed-tags/manage-governed-tags",
+      "evidence": "If you create a governed tag with the same key as tags that are already assigned to objects, all existing tag assignments with that key automatically become governed. You do not need to reassign them. Existing tag assignments that use values outside the allowed list are not removed, but they cannot be reassigned with the same out-of-policy value."
+    },
+    {
+      "family": "abac-tag-introspection-column-value",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A governance admin maintains three column mask policies on the `main` catalog, one per value of the governed tag `pii` ('email', 'ssn', 'phone'), each with its own UDF, and every new PII type means another policy. The admin wants one policy whose UDF learns each matched column's `pii` value and redacts accordingly. Which clause makes this possible?",
+      "options": [
+        { "text": "USING COLUMNS (get_column_tag_value(col, 'pii')) after ON COLUMN col", "correct": true, "why": "get_column_tag_value() is a tag introspection function: at query time it returns the pii value set on the matched column and passes it to the UDF, which branches on it. Creating such a policy requires Databricks Runtime 18 LTS or above." },
+        { "text": "USING COLUMNS (get_tag_value('pii')) after ON COLUMN col", "average": true, "why": "get_tag_value() reads the tag from the table being accessed or its parent schema or catalog, not from the column. Column tags don't inherit, so it returns NULL here unless the table itself carries a pii tag." },
+        { "text": "MATCH COLUMNS get_column_tag_value(col, 'pii') AS col", "why": "Tag introspection functions can appear only in USING COLUMNS; MATCH COLUMNS takes boolean conditions built from has_tag() and has_tag_value()." },
+        { "text": "WHEN has_tag('pii'), which hands the table's tag to the UDF", "why": "WHEN is a table condition that decides which tables a policy applies to; it evaluates to a boolean and passes no value to the UDF." }
+      ],
+      "in_practice": "Collapsing per-value policies into one cuts the policy count and turns onboarding a new PII type into a one-branch UDF change instead of a new policy review, lowering the chance that a type is forgotten.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/core-concepts",
+      "evidence": "Tag introspection functions extract the value of a governed tag and pass it to a UDF through the USING COLUMNS clause. They can appear only in the USING COLUMNS clause, not in WHEN or MATCH COLUMNS conditions. get_column_tag_value(column_alias, 'tag_key'): Returns the value of the specified tag applied directly to a matched column."
+    },
+    {
+      "family": "abac-metastore-level-policy-beta",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A privacy office requires that columns tagged `pii : ssn` be masked for all account users in every catalog of the company's metastore, including catalogs that teams create in the future, with no setup by catalog owners. The governance lead is willing to use Beta features. Which approach meets these requirements?",
+      "options": [
+        { "text": "A metastore admin attaches one column mask policy with ON METASTORE", "correct": true, "why": "Metastore-level policies (Beta) apply to every catalog in the metastore, including objects created after the policy is defined. Creating, updating and deleting them requires the metastore admin role." },
+        { "text": "Each catalog owner attaches the same column mask policy to their catalog", "average": true, "why": "Per-catalog copies mask the same way only while every owner remembers to add one; a catalog created next year stays unprotected until someone acts, which the requirement rules out." },
+        { "text": "A data steward tags the metastore itself with pii : ssn to cover every catalog", "why": "A metastore can't be tagged directly. Tag conditions in a metastore-level policy match governed tags on catalogs and lower-level objects instead." },
+        { "text": "One column mask policy on an existing catalog, which newer catalogs inherit", "why": "Catalogs don't inherit policies from one another; a catalog-level policy evaluates only against the tables within that catalog." }
+      ],
+      "in_practice": "One metastore-level rule replaces dozens of copies, so an audit question like 'are SSNs masked everywhere?' has a single answer, and a new catalog is covered as soon as its columns carry the tag.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/metastore-policies",
+      "evidence": "A policy attached to the metastore applies to every catalog, schema, and object supported by each policy type within the metastore, including objects created after you define the policy. Creating, updating, and deleting metastore-level policies requires the metastore admin role."
+    },
+    {
+      "family": "abac-audit-tag-and-policy-events",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 2,
+      "type": "multiple",
+      "stem": "Analysts report that SSNs in `crm.core.contacts` were visible unmasked for two days last week and are masked again now. A security engineer must find out who changed what during that window. Which two sources hold the relevant history? (Choose two.)",
+      "options": [
+        { "text": "Audit log rows for tag assignment actions such as deleteEntityTagAssignment", "correct": true, "why": "Tag assignment and deletion events on Unity Catalog objects are logged in the audit log system table, so these rows show who removed the column's governed tag, who added it back and when." },
+        { "text": "Audit log rows for ABAC policy actions such as createPolicy and deletePolicy", "correct": true, "why": "ABAC policy operations are also logged in system.access.audit under the unityCatalog service, so a policy that was dropped and later recreated shows up with the actor and time." },
+        { "text": "Rows in system.tags.governed_tags for the pii governed tag", "average": true, "why": "The governed tags system table is a snapshot of tag definitions, such as a key's change and deletion times; it doesn't record which objects a tag was assigned to or removed from." },
+        { "text": "The COLUMN_TAGS view in the crm catalog's information schema", "why": "COLUMN_TAGS shows the tags currently on each column; once the tag was re-added it looks normal and holds no record of the two-day gap." },
+        { "text": "The output of SHOW EFFECTIVE POLICIES on the contacts table", "why": "SHOW EFFECTIVE POLICIES lists the policies that apply now, including inherited ones; it can't show a policy that was dropped and recreated last week." }
+      ],
+      "in_practice": "Because tagging is a security boundary, many teams alert on tag-removal and policy-deletion events for sensitive catalogs, which can turn a two-day exposure into one caught within the hour.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policies",
+      "evidence": "Databricks logs governed tag and ABAC policy operations in the audit log system table. All tag assignment and deletion events: WHERE service_name = 'unityCatalog' AND action_name IN ('createEntityTagAssignment', 'deleteEntityTagAssignment'). All ABAC policy CRUD operations: action_name IN ('createPolicy', 'deletePolicy', 'getPolicy', 'listPolicies')"
+    },
+    {
+      "family": "abac-clone-needs-exempt-principal",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer needs a shallow clone of `claims.core.members` for a test workspace. Two catalog-level ABAC policies cover the table, a row filter and a column mask, and the engineer's CREATE TABLE … SHALLOW CLONE statement fails. Which change lets the clone run?",
+      "options": [
+        { "text": "Run it as a service principal listed in the EXCEPT clause of both policies", "correct": true, "why": "Deep and shallow clones aren't supported on tables with ABAC policies, so the operation fails closed. A principal exempt from every policy on the table isn't subject to enforcement, so Databricks can allow the clone." },
+        { "text": "Use a deep clone instead, since it copies the data files rather than referencing them", "average": true, "why": "Switching clone types looks like a workaround, but deep and shallow clones are both unsupported on ABAC-secured tables; the clone type doesn't change the enforcement problem." },
+        { "text": "Grant the engineer MANAGE on the table so the clone can skip the policies", "why": "Table-level privileges can't override catalog-level policies: individual table owners can't remove, modify or bypass them. Only the EXCEPT clause exempts a principal." },
+        { "text": "Run the statement on compute with Databricks Runtime 16.4 or above", "why": "Runtime 16.4 is the minimum for reading ABAC-secured tables at all, but cloning remains unsupported on any runtime unless the principal running it is exempt." }
+      ],
+      "in_practice": "The exempt principal reads unfiltered, unmasked data, so the test copy holds raw member records and needs production-grade protection, or the team should copy a masked extract instead.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/requirements",
+      "evidence": "Deep and shallow clones aren't supported on tables with ABAC policies. To clone a table, use a service principal or group that is listed in the EXCEPT clause of every policy that applies to the table."
+    },
+    {
+      "family": "abac-masked-column-as-policy-input",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A governance admin's column mask policy on the `hr` catalog masks columns tagged `pii : birth_date` for all account users. The admin then adds a row filter policy on the same catalog whose UDF receives that same birth date column through USING COLUMNS, to hide employees under 18 from analysts. Analysts' queries on `hr.core.people` now fail. What explains the failure?",
+      "options": [
+        { "text": "A column masked by one policy can't be passed to another policy through USING COLUMNS", "correct": true, "why": "Databricks treats this as a policy conflict: once a column is masked by one policy, it can't be an input argument in another policy's USING COLUMNS clause, so access to the table is blocked with an error." },
+        { "text": "The row filter receives masked dates, so it removes every row from the results", "average": true, "why": "Expecting the filter to run on masked values is a reasonable guess, but Databricks doesn't evaluate that combination at all; it detects the conflict and blocks the query with an error." },
+        { "text": "Row filter and column mask policies can't both apply to the same table", "why": "A table can carry a row filter and column masks together; the limits are one distinct row filter per table and one distinct mask per column for a given user." },
+        { "text": "Analysts need EXECUTE on the masking UDF before the row filter can read the column", "why": "EXECUTE on a UDF is required of the admin who creates a policy; the failure here comes from a conflict between the two policies, which no grant to analysts resolves." }
+      ],
+      "in_practice": "Keeping filter inputs separate from masked data, for example filtering on an unmasked age-band column derived at ingestion, avoids the conflict and keeps both policies easy to reason about.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policy-evaluation",
+      "evidence": "If multiple distinct filters or masks apply to the same user and table (or column), Databricks blocks access and returns an error. For example: A masked column is referenced in the USING COLUMNS clause of another policy. If a column is masked by one policy, it cannot be used as an input argument in the USING COLUMNS clause of another policy."
+    },
+    {
+      "family": "abac-view-querier-policy-identity",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "Bob, a data engineer, owns the view `crm.reporting.contacts_v`, built on `crm.core.contacts`. A catalog-level column mask policy masks columns tagged `pii : email` for all account users, and Bob is on its exemption list. Alice, an analyst, has SELECT on the view but no privileges on the underlying table, and the policy applies to her. What does Alice see when she queries the view's email column?",
+      "options": [
+        { "text": "Masked emails, since policies are evaluated for Alice while table access is checked for Bob", "correct": true, "why": "Querying through a view involves two identities: Unity Catalog checks access to the underlying table against the view owner, but evaluates ABAC policies against the querying user, so Alice gets the masking that applies to her." },
+        { "text": "Raw emails, since the view reads the table as Bob and Bob is exempt from the policy", "average": true, "why": "The owner's identity does govern table access, which is why Alice needs no grant on the table, but policies follow the user running the query; Bob's exemption doesn't pass to Alice." },
+        { "text": "An error, since Alice also needs SELECT on crm.core.contacts to query the view", "why": "Alice needs SELECT on the view; access to the underlying table is checked against Bob as the view owner, so she doesn't need her own grant on the table." },
+        { "text": "Raw emails, since column mask policies apply to tables and never to queries through views", "why": "The policy on the base table is enforced however the table is reached; querying through a view still applies every policy that matches the querying user." }
+      ],
+      "in_practice": "A team can publish curated views to hundreds of analysts without granting base-table access, while one catalog policy still decides what each analyst sees, so the view owner's exemption never leaks to readers.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policy-evaluation",
+      "evidence": "When querying a table through a view or calling a function that queries a table, two identities are involved. Access to the underlying tables is checked against the identity of the view or function owner, while policies are evaluated against the identity of the querying user"
+    },
+    {
+      "family": "abac-ambiguous-using-columns-alias",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A governance admin attaches a row filter policy to the `sales` catalog with no WHEN clause, MATCH COLUMNS has_tag('region') AS rgn and USING COLUMNS (rgn). It works on most tables, but every query on `sales.core.shipments`, where both `ship_region` and `bill_region` are tagged `region`, now fails with an error for users the policy applies to. What causes the failure, and what fixes it?",
+      "options": [
+        { "text": "The alias matches two columns, so the UDF input is ambiguous; narrow the condition or tags", "correct": true, "why": "When a MATCH COLUMNS alias used in USING COLUMNS matches more than one column, the engine can't tell which value to pass to the UDF and the query fails. A more specific condition, such as has_tag_value(), or corrected tags leaves one match." },
+        { "text": "The filter runs once per tagged column and the results conflict; add a second policy", "average": true, "why": "Per-column evaluation is a natural guess, but the filter isn't run that way, and a second distinct row filter for the same users would itself be a conflict that blocks access to the table." },
+        { "text": "The table needs a region tag of its own so that the policy's table condition matches it", "why": "With no WHEN clause the table condition defaults to TRUE and covers every table in scope; a table tag doesn't decide which column feeds the UDF." },
+        { "text": "Catalog policies can't reach tables with several tagged columns; attach it to the table", "why": "Scope isn't the problem: a table-level policy with the same MATCH COLUMNS clause would hit the same ambiguous alias on this table." }
+      ],
+      "in_practice": "Tag values that describe a column's role, such as region : shipping versus region : billing, keep catalog-wide filters from breaking when a new table happens to carry two columns with the same broad tag.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policy-evaluation",
+      "evidence": "If a MATCH COLUMNS alias in the USING COLUMNS clause matches more than one column, the engine cannot determine which column to pass to the UDF, and the query fails with an error. Refining policy conditions. Update WHEN or MATCH COLUMNS clauses to be more specific"
+    },
+    {
+      "family": "abac-python-mask-deterministic-pushdown",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A governance admin's column mask policy on `web.core.clicks` pseudonymizes `user_id` through a SQL UDF that wraps a Python UDF. The Python UDF uses a library with no SQL equivalent, always returns the same output for the same input, and was registered without a DETERMINISTIC declaration. Analysts filter on the unmasked, clustered `event_date` column with simple equality predicates, yet every query reads every file. Which change lets those filters skip files while keeping the mask?",
+      "options": [
+        { "text": "Re-register the Python UDF with the DETERMINISTIC keyword", "correct": true, "why": "The optimizer can't inspect a Python UDF's body, so it treats it as non-deterministic unless declared otherwise, and it won't move a filter below a non-deterministic mask. Declared DETERMINISTIC, the UDF and its SQL wrapper let the event_date filter skip files." },
+        { "text": "Rewrite the analysts' predicates so they call no functions on event_date", "average": true, "why": "Function-free predicates do help filters pass the SecureView barrier, but these are already simple equality predicates; the blocker is the non-deterministic mask, which keeps every filter above it." },
+        { "text": "Exempt the analysts from the policy so the SecureView barrier is removed", "why": "An exemption does remove the barrier for those users, but it also removes their masking, which breaks the requirement to keep user_id pseudonymized." },
+        { "text": "Run OPTIMIZE on the table so the clustering on event_date is refreshed", "why": "Better clustering can't help while the plan applies the mask to every scanned row before filtering; the filter has to move below the mask before files can be skipped." }
+      ],
+      "in_practice": "On a clickstream table holding years of data, restoring file skipping can turn a full scan into a read of a few days' files; declaring determinism is safe only when the function truly returns the same result for the same input.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/performance",
+      "evidence": "For Python and Scala UDFs, the optimizer can't inspect the function body, so these UDFs are NOT DETERMINISTIC unless you declare them DETERMINISTIC. A column mask that wraps one blocks filter pushdown by default. Mark these UDFs DETERMINISTIC when they always return the same result for the same arguments."
+    },
+    {
+      "family": "abac-all-match-conditions-required",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A governance admin attaches a column mask policy with no WHEN clause to the `customers` schema, using two column conditions, has_tag_value('pii', 'email') AS m and has_tag('marketing_consent') AS c, to mask m unless c is TRUE. A data steward finds analysts reading raw addresses in `customers.web.signups`, whose email column is tagged `pii : email` but which has no column tagged `marketing_consent`. Why does this happen?",
+      "options": [
+        { "text": "Every column condition must match a column, so the policy skips that table entirely", "correct": true, "why": "When a policy has several MATCH COLUMNS conditions, all of them must match for it to apply. A table with no consent-tagged column fails one condition, so the policy doesn't apply and its emails are returned unmasked." },
+        { "text": "The UDF receives NULL for the missing consent column and returns the raw email", "average": true, "why": "Passing NULL for a missing argument sounds plausible, but the UDF never runs on this table: with one condition unmatched, the policy doesn't apply at all." },
+        { "text": "Schema-level policies cover only tables that existed when the policy was created", "why": "Policies are evaluated dynamically at query time, so tables created later in the schema are covered whenever their tags meet the policy's conditions." },
+        { "text": "The policy also needs a table-level pii tag on signups before it masks any column", "why": "With no WHEN clause the table condition defaults to TRUE, so no table tag is needed; the gap comes from the column conditions." }
+      ],
+      "in_practice": "Multi-condition policies quietly skip tables that lack one of the columns, so teams that use them add a periodic check for pii-tagged columns on tables without the consent column instead of assuming every email column is covered.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/core-concepts",
+      "evidence": "All expressions must match for the policy to apply. This policy only applies to tables that have both a column tagged pii : email and a column tagged consent_to_contact. If a table does not have columns matching both conditions, the policy does not apply and the data is returned unmasked."
+    }
+  ]
 }
