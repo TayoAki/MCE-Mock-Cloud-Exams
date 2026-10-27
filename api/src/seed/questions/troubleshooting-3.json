@@ -408,6 +408,23 @@
       "in_practice": "Noise from planned cancellations trains people to ignore the channel; muting canceled runs at both levels keeps every remaining notification worth reading.",
       "source": "https://docs.databricks.com/aws/en/jobs/notifications",
       "evidence": "When you select Mute notifications for skipped runs or Mute notifications for canceled runs for a job, it doesn't filter out notifications configured for job tasks. To filter all notifications for skipped or canceled runs, you must also filter out any task-level notifications you have configured."
+    },
+    {
+      "family": "monitoring-jobs-list-last-five-runs",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineering lead wants a quick morning check of whether each job in the workspace has been succeeding lately, without opening the jobs one by one. Which part of the Lakeflow Jobs UI lists every job the lead can access together with the result of its last five runs?",
+      "options": [
+        { "text": "The Jobs & pipelines tab under Jobs & Pipelines", "correct": true, "why": "The Jobs & pipelines tab lists all jobs and pipelines the user can access, with details such as the creator, the trigger and the result of the last five runs, so a job with recent failures stands out without being opened." },
+        { "text": "The Runs tab under Jobs & Pipelines", "average": true, "why": "The Runs tab lists individual runs across jobs, with a Finished runs count graph and the top error types, but it doesn't summarize each job's recent results job by job." },
+        { "text": "The matrix view on each job's Runs tab", "why": "The matrix view shows the run and task history of a single job, so the lead would still have to open every job to see it." },
+        { "text": "The Timeline view of the job run details page", "why": "The Timeline view shows how long the tasks of one run took and how they overlapped; it describes a single run, not each job's recent outcomes." }
+      ],
+      "in_practice": "A lead scanning 150 jobs each morning can spot the few with failed recent runs in seconds and open only those jobs' matrix views, instead of paging through thousands of individual runs.",
+      "source": "https://docs.databricks.com/aws/en/jobs/monitor",
+      "evidence": "To view the list of jobs you have access to, click Jobs & Pipelines in the sidebar. The Jobs & pipelines tab in the Lakeflow Jobs UI lists information about all available jobs and pipelines, such as the creator, the trigger (if any), and the result of the last five runs."
     }
   ]
 }

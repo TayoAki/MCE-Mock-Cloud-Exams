@@ -8,10 +8,24 @@
       "type": "single",
       "stem": "An orders domain feeds two audiences: analysts who drill into individual orders and executives whose reports read daily totals. As a data engineer plans the silver tables, which practice should they follow?",
       "options": [
-        { "text": "Keep at least one validated, non-aggregated version of every order record", "correct": true, "why": "Databricks recommends that silver always include at least one validated, non-aggregated representation of each record. Aggregates that feed dashboards typically belong in gold, so record-level detail stays available for analysis." },
-        { "text": "Store most fields as strings or VARIANT to absorb upstream schema changes", "average": true, "why": "Storing most fields as string, VARIANT or binary is the bronze-layer recommendation for protecting raw data. Silver is where schema enforcement and type casting happen, so typed, validated columns belong there." },
-        { "text": "Keep only the daily totals in silver, since gold reads from silver anyway", "why": "Replacing records with daily totals throws away the detail analysts need. Aggregates typically live in gold, while silver keeps a validated record-level representation." },
-        { "text": "Limit silver to data engineers and point every analyst to gold only", "why": "Databricks lists data analysts among silver's intended users, because silver is a refined dataset that still retains the detail needed for in-depth analysis." }
+        {
+          "text": "Keep at least one validated, non-aggregated version of every order record",
+          "correct": true,
+          "why": "Databricks recommends that silver always include at least one validated, non-aggregated representation of each record. Aggregates that feed dashboards typically belong in gold, so record-level detail stays available for analysis."
+        },
+        {
+          "text": "Store most fields as strings or VARIANT to absorb upstream schema changes",
+          "average": true,
+          "why": "Storing most fields as string, VARIANT or binary is the bronze-layer recommendation for protecting raw data. Silver is where schema enforcement and type casting happen, so typed, validated columns belong there."
+        },
+        {
+          "text": "Keep only the daily totals in silver, since gold reads from silver anyway",
+          "why": "Replacing records with daily totals throws away the detail analysts need. Aggregates typically live in gold, while silver keeps a validated record-level representation."
+        },
+        {
+          "text": "Limit silver to data engineers and point every analyst to gold only",
+          "why": "Databricks lists data analysts among silver's intended users, because silver is a refined dataset that still retains the detail needed for in-depth analysis."
+        }
       ],
       "in_practice": "A validated record-level silver table lets an analyst trace a surprising daily total back to the ~2,000 orders behind it, instead of asking engineering to reprocess bronze to find them.",
       "source": "https://docs.databricks.com/aws/en/lakehouse/medallion",
@@ -25,10 +39,24 @@
       "type": "single",
       "stem": "A data engineer wants every future write to the existing Delta table silver.customers to fail when customer_id is null. The column currently holds no null values. Which statement adds this rule?",
       "options": [
-        { "text": "ALTER TABLE silver.customers ALTER COLUMN customer_id SET NOT NULL", "correct": true, "why": "NOT NULL constraints are added or dropped after table creation with ALTER TABLE ... ALTER COLUMN. Databricks first verifies that existing rows satisfy the constraint, then rejects later writes that put a null in the column." },
-        { "text": "ALTER TABLE silver.customers ADD CONSTRAINT pk_cust PRIMARY KEY (customer_id)", "average": true, "why": "A primary key is informational and isn't enforced, so it rejects nothing. Its key column must already be defined as NOT NULL, which is exactly the rule still missing here." },
-        { "text": "ALTER TABLE silver.customers ADD CONSTRAINT nn_cust NOT NULL (customer_id)", "why": "ADD CONSTRAINT adds CHECK constraints and informational key constraints; it has no NOT NULL form. Nullability is changed on the column itself with ALTER COLUMN." },
-        { "text": "ALTER TABLE silver.customers SET TBLPROPERTIES ('customer_id.nullable' = 'false')", "why": "No table property sets a column's nullability. The documented way to add a NOT NULL constraint after creation is ALTER TABLE ... ALTER COLUMN ... SET NOT NULL." }
+        {
+          "text": "ALTER TABLE silver.customers ALTER COLUMN customer_id SET NOT NULL",
+          "correct": true,
+          "why": "NOT NULL constraints are added or dropped after table creation with ALTER TABLE ... ALTER COLUMN. Databricks first verifies that existing rows satisfy the constraint, then rejects later writes that put a null in the column."
+        },
+        {
+          "text": "ALTER TABLE silver.customers ADD CONSTRAINT pk_cust PRIMARY KEY (customer_id)",
+          "average": true,
+          "why": "A primary key is informational and isn't enforced, so it rejects nothing. Its key column must already be defined as NOT NULL, which is exactly the rule still missing here."
+        },
+        {
+          "text": "ALTER TABLE silver.customers ADD CONSTRAINT nn_cust NOT NULL (customer_id)",
+          "why": "ADD CONSTRAINT adds CHECK constraints and informational key constraints; it has no NOT NULL form. Nullability is changed on the column itself with ALTER COLUMN."
+        },
+        {
+          "text": "ALTER TABLE silver.customers SET TBLPROPERTIES ('customer_id.nullable' = 'false')",
+          "why": "No table property sets a column's nullability. The documented way to add a NOT NULL constraint after creation is ALTER TABLE ... ALTER COLUMN ... SET NOT NULL."
+        }
       ],
       "in_practice": "Enforcing not-null on a join key in silver catches a broken upstream extract at write time, instead of letting null keys silently drop rows from every inner join that builds gold.",
       "source": "https://docs.databricks.com/aws/en/tables/constraints",
@@ -42,10 +70,24 @@
       "type": "single",
       "stem": "During an audit, a data engineer is asked which CHECK constraints are currently defined on the Delta table silver.payments. Which command shows them?",
       "options": [
-        { "text": "SHOW TBLPROPERTIES silver.payments", "correct": true, "why": "Databricks documents SHOW TBLPROPERTIES and DESCRIBE DETAIL as the commands that display a table's CHECK constraints, so either one answers the auditor's question directly from the table." },
-        { "text": "SELECT * FROM information_schema.check_constraints", "average": true, "why": "The information schema looks like the natural place, but its CHECK_CONSTRAINTS relation is documented as reserved for future use, so it isn't the documented way to list a table's CHECK constraints today." },
-        { "text": "DESCRIBE HISTORY silver.payments", "why": "DESCRIBE HISTORY lists past operations on the table rather than the set of constraints in force now, so it doesn't answer the question directly." },
-        { "text": "SHOW COLUMNS IN silver.payments", "why": "SHOW COLUMNS returns only the names of the table's columns; it doesn't include any constraint definitions." }
+        {
+          "text": "SHOW TBLPROPERTIES silver.payments",
+          "correct": true,
+          "why": "Databricks documents SHOW TBLPROPERTIES and DESCRIBE DETAIL as the commands that display a table's CHECK constraints, so either one answers the auditor's question directly from the table."
+        },
+        {
+          "text": "SELECT * FROM information_schema.check_constraints",
+          "average": true,
+          "why": "The information schema looks like the natural place, but its CHECK_CONSTRAINTS relation is documented as reserved for future use, so it isn't the documented way to list a table's CHECK constraints today."
+        },
+        {
+          "text": "DESCRIBE HISTORY silver.payments",
+          "why": "DESCRIBE HISTORY lists past operations on the table rather than the set of constraints in force now, so it doesn't answer the question directly."
+        },
+        {
+          "text": "SHOW COLUMNS IN silver.payments",
+          "why": "SHOW COLUMNS returns only the names of the table's columns; it doesn't include any constraint definitions."
+        }
       ],
       "in_practice": "Reading constraints from the table itself gives auditors a definitive answer in seconds, rather than trusting pipeline code or a wiki page that may have drifted from what the table actually enforces.",
       "source": "https://docs.databricks.com/aws/en/tables/constraints",
@@ -59,10 +101,24 @@
       "type": "single",
       "stem": "A data engineer wants a pipeline expectation on silver.products that checks every sku is three capital letters, a dash and four digits. Which constraint expression can the expectation use?",
       "options": [
-        { "text": "sku RLIKE '^[A-Z]{3}-[0-9]{4}$'", "correct": true, "why": "Expectations use standard SQL Boolean expressions, and built-in operators such as RLIKE are valid SQL, so a pattern match on sku works as the constraint." },
-        { "text": "is_valid_sku(sku), a Python function in the pipeline", "average": true, "why": "Reusing an existing Python helper is tempting, but expectation constraints can't contain custom Python functions. The rule has to be written as a SQL Boolean expression." },
-        { "text": "sku IN (SELECT sku FROM ref.valid_skus)", "why": "Constraints can't contain subqueries that reference other tables. A check against another table needs its own dataset, such as a join, rather than an inline subquery." },
-        { "text": "A call to the product service's REST API per sku", "why": "External service calls aren't allowed in expectation constraints. They would also make every update depend on an outside system's availability and latency." }
+        {
+          "text": "sku RLIKE '^[A-Z]{3}-[0-9]{4}$'",
+          "correct": true,
+          "why": "Expectations use standard SQL Boolean expressions, and built-in operators such as RLIKE are valid SQL, so a pattern match on sku works as the constraint."
+        },
+        {
+          "text": "is_valid_sku(sku), a Python function in the pipeline",
+          "average": true,
+          "why": "Reusing an existing Python helper is tempting, but expectation constraints can't contain custom Python functions. The rule has to be written as a SQL Boolean expression."
+        },
+        {
+          "text": "sku IN (SELECT sku FROM ref.valid_skus)",
+          "why": "Constraints can't contain subqueries that reference other tables. A check against another table needs its own dataset, such as a join, rather than an inline subquery."
+        },
+        {
+          "text": "A call to the product service's REST API per sku",
+          "why": "External service calls aren't allowed in expectation constraints. They would also make every update depend on an outside system's availability and latency."
+        }
       ],
       "in_practice": "Rules written in plain SQL run inside the engine with no per-row calls leaving the cluster, and the same expression can be reused in a CHECK constraint or an ad hoc audit query.",
       "source": "https://docs.databricks.com/aws/en/ldp/expectations",
@@ -76,10 +132,24 @@
       "type": "single",
       "stem": "After a pipeline check confirms that customer_sk is unique in gold.dim_customer, a data engineer declares PRIMARY KEY (customer_sk) RELY on the table. What does the RELY option add?",
       "options": [
-        { "text": "It lets the optimizer use the key to rewrite queries, such as skipping a DISTINCT", "correct": true, "why": "RELY tells Databricks it may exploit a valid primary key or unique constraint to rewrite queries, for example removing a DISTINCT on the key or an unneeded outer join. These optimizations need Photon-enabled compute." },
-        { "text": "It makes Databricks reject any insert that repeats an existing customer_sk", "average": true, "why": "RELY doesn't turn the key into an enforced constraint. Databricks still doesn't enforce primary keys, and keeping the key valid remains the user's responsibility." },
-        { "text": "It makes Databricks scan existing rows for duplicates before saving the key", "why": "Databricks doesn't validate key constraints against the data. You confirm uniqueness yourself, as the pipeline check did, before relying on the key." },
-        { "text": "It makes deletes on the dimension cascade to fact rows that reference it", "why": "Foreign keys support only ON DELETE NO ACTION, and RELY on a primary key doesn't change how deletes behave. Nothing cascades to referencing tables." }
+        {
+          "text": "It lets the optimizer use the key to rewrite queries, such as skipping a DISTINCT",
+          "correct": true,
+          "why": "RELY tells Databricks it may exploit a valid primary key or unique constraint to rewrite queries, for example removing a DISTINCT on the key or an unneeded outer join. These optimizations need Photon-enabled compute."
+        },
+        {
+          "text": "It makes Databricks reject any insert that repeats an existing customer_sk",
+          "average": true,
+          "why": "RELY doesn't turn the key into an enforced constraint. Databricks still doesn't enforce primary keys, and keeping the key valid remains the user's responsibility."
+        },
+        {
+          "text": "It makes Databricks scan existing rows for duplicates before saving the key",
+          "why": "Databricks doesn't validate key constraints against the data. You confirm uniqueness yourself, as the pipeline check did, before relying on the key."
+        },
+        {
+          "text": "It makes deletes on the dimension cascade to fact rows that reference it",
+          "why": "Foreign keys support only ON DELETE NO ACTION, and RELY on a primary key doesn't change how deletes behave. Nothing cascades to referencing tables."
+        }
       ],
       "in_practice": "RELY is a promise, not a guard: if a later load slips in a duplicate key, rewritten queries can return wrong totals, so pair it with a uniqueness check that fails the pipeline.",
       "source": "https://docs.databricks.com/aws/en/sql/user/queries/query-optimization-constraints",
@@ -93,11 +163,29 @@
       "type": "multiple",
       "stem": "A platform team enables anomaly detection (Public Preview), part of data quality monitoring, on the gold schema in Unity Catalog. Which two table checks does anomaly detection perform? (Choose two.)",
       "options": [
-        { "text": "Freshness: whether a table's next commit is unusually late given its commit history", "correct": true, "why": "Anomaly detection models each table's commit history to predict the time of the next commit. If a commit is unusually late, the table is marked as stale." },
-        { "text": "Completeness: whether the rows written in the last 24 hours fall below an expected range", "correct": true, "why": "Anomaly detection predicts a range for the number of rows written in the last 24 hours from historical row counts. A count below the lower bound marks the table as incomplete." },
-        { "text": "Uniqueness: whether declared primary key columns contain duplicate values", "average": true, "why": "Duplicate keys are a real risk because key constraints aren't enforced, but anomaly detection doesn't check them. Uniqueness needs its own validation, such as a pipeline check that counts rows per key." },
-        { "text": "Validity: whether new rows satisfy the CHECK constraints on each table", "why": "CHECK constraints are already enforced at write time, since a violating transaction fails. Anomaly detection looks at freshness and completeness patterns instead." },
-        { "text": "Lineage: whether every upstream source of a gold table passed its own checks", "why": "Anomaly detection evaluates each table against its own history. It doesn't certify a table based on the health of its upstream sources." }
+        {
+          "text": "Freshness: whether a table's next commit is unusually late given its commit history",
+          "correct": true,
+          "why": "Anomaly detection models each table's commit history to predict the time of the next commit. If a commit is unusually late, the table is marked as stale."
+        },
+        {
+          "text": "Completeness: whether the rows written in the last 24 hours fall below an expected range",
+          "correct": true,
+          "why": "Anomaly detection predicts a range for the number of rows written in the last 24 hours from historical row counts. A count below the lower bound marks the table as incomplete."
+        },
+        {
+          "text": "Uniqueness: whether declared primary key columns contain duplicate values",
+          "average": true,
+          "why": "Duplicate keys are a real risk because key constraints aren't enforced, but anomaly detection doesn't check them. Uniqueness needs its own validation, such as a pipeline check that counts rows per key."
+        },
+        {
+          "text": "Validity: whether new rows satisfy the CHECK constraints on each table",
+          "why": "CHECK constraints are already enforced at write time, since a violating transaction fails. Anomaly detection looks at freshness and completeness patterns instead."
+        },
+        {
+          "text": "Lineage: whether every upstream source of a gold table passed its own checks",
+          "why": "Anomaly detection evaluates each table against its own history. It doesn't certify a table based on the health of its upstream sources."
+        }
       ],
       "in_practice": "Schema-wide freshness and completeness checks catch quiet failures, such as a gold table that stopped refreshing on Friday, that row-level rules never see because no bad rows arrive at all.",
       "source": "https://docs.databricks.com/aws/en/data-quality-monitoring/anomaly-detection",
@@ -111,10 +199,24 @@
       "type": "single",
       "stem": "A data engineering team streams clickstream events from Kafka straight into silver.events, parsing and casting fields in the same query to save a hop. This month, corrupt messages and an unannounced upstream schema change have each stopped the stream. What does Databricks recommend?",
       "options": [
-        { "text": "Land raw events in a bronze table, then build silver.events with a streaming read from bronze", "correct": true, "why": "Databricks doesn't recommend writing to silver directly from ingestion, because schema changes and corrupt records then cause failures. Raw data lands in bronze, and silver is built from bronze, mostly with streaming reads for append-only sources." },
-        { "text": "Keep the direct write, but catch parsing errors in the query and skip bad messages", "average": true, "why": "Swallowing errors keeps the stream running, but it discards the bad messages instead of preserving them, and silver stays coupled to every change in the source format." },
-        { "text": "Rebuild silver.events each night with a batch read of the whole Kafka topic", "why": "Databricks reserves batch reads for small datasets such as small dimension tables. Reprocessing a full event stream nightly is costly and still writes to silver straight from the source." },
-        { "text": "Enable schema evolution on silver.events so that new fields are added automatically", "why": "Schema evolution can absorb new columns, but it doesn't handle corrupt records, and silver would still be fed directly from ingestion with no raw copy to reprocess." }
+        {
+          "text": "Land raw events in a bronze table, then build silver.events with a streaming read from bronze",
+          "correct": true,
+          "why": "Databricks doesn't recommend writing to silver directly from ingestion, because schema changes and corrupt records then cause failures. Raw data lands in bronze, and silver is built from bronze, mostly with streaming reads for append-only sources."
+        },
+        {
+          "text": "Keep the direct write, but catch parsing errors in the query and skip bad messages",
+          "average": true,
+          "why": "Swallowing errors keeps the stream running, but it discards the bad messages instead of preserving them, and silver stays coupled to every change in the source format."
+        },
+        {
+          "text": "Rebuild silver.events each night with a batch read of the whole Kafka topic",
+          "why": "Databricks reserves batch reads for small datasets such as small dimension tables. Reprocessing a full event stream nightly is costly and still writes to silver straight from the source."
+        },
+        {
+          "text": "Enable schema evolution on silver.events so that new fields are added automatically",
+          "why": "Schema evolution can absorb new columns, but it doesn't handle corrupt records, and silver would still be fed directly from ingestion with no raw copy to reprocess."
+        }
       ],
       "in_practice": "With raw events kept in bronze, a parsing bug becomes a replay from bronze rather than a data-loss incident, and an upstream schema change breaks only the silver query, which can be fixed and restarted.",
       "source": "https://docs.databricks.com/aws/en/lakehouse/medallion",
@@ -128,10 +230,24 @@
       "type": "single",
       "stem": "A data governance team owns about 40 data quality rules that apply to datasets in a dozen Python pipelines. The team wants to add, change and audit rules without editing each pipeline's source code. Which approach does Databricks recommend?",
       "options": [
-        { "text": "Keep rules and tags in a Delta table that pipelines load into expect_all decorators by tag", "correct": true, "why": "Databricks recommends storing expectation definitions separately from pipeline logic. A helper reads the rules for a tag into a dictionary for expect_all, expect_all_or_drop or expect_all_or_fail, so rules change without code edits." },
-        { "text": "Copy the CONSTRAINT clauses into each table definition and update them in code review", "average": true, "why": "Inline rules work for one pipeline, but 40 rules copied across a dozen pipelines drift apart, and every rule change becomes a code change in each pipeline." },
-        { "text": "Add the rules as CHECK constraints on each bronze table so that bad rows never land", "why": "CHECK constraints fail the whole write instead of dropping or flagging rows, and bronze should keep raw data with minimal validation so it can be reprocessed." },
-        { "text": "Have SQL pipelines read the rules table and build their CONSTRAINT clauses at runtime", "why": "The documented pattern loads rules from a table or module in Python; dynamically loading expectations is not supported in SQL." }
+        {
+          "text": "Keep rules and tags in a Delta table that pipelines load into expect_all decorators by tag",
+          "correct": true,
+          "why": "Databricks recommends storing expectation definitions separately from pipeline logic. A helper reads the rules for a tag into a dictionary for expect_all, expect_all_or_drop or expect_all_or_fail, so rules change without code edits."
+        },
+        {
+          "text": "Copy the CONSTRAINT clauses into each table definition and update them in code review",
+          "average": true,
+          "why": "Inline rules work for one pipeline, but 40 rules copied across a dozen pipelines drift apart, and every rule change becomes a code change in each pipeline."
+        },
+        {
+          "text": "Add the rules as CHECK constraints on each bronze table so that bad rows never land",
+          "why": "CHECK constraints fail the whole write instead of dropping or flagging rows, and bronze should keep raw data with minimal validation so it can be reprocessed."
+        },
+        {
+          "text": "Have SQL pipelines read the rules table and build their CONSTRAINT clauses at runtime",
+          "why": "The documented pattern loads rules from a table or module in Python; dynamically loading expectations is not supported in SQL."
+        }
       ],
       "in_practice": "A central rules table gives auditors one place to see every rule and its tag, and a rule added once can be picked up by every pipeline that loads its tag, with no pull request per pipeline.",
       "source": "https://docs.databricks.com/aws/en/ldp/expectation-patterns",
@@ -145,10 +261,24 @@
       "type": "single",
       "stem": "A data engineer builds the streaming table silver.customers in a pipeline from a bronze table that Auto Loader fills with a rescued data column. Records whose JSON didn't parse cleanly into the schema must stay out of silver, and the update must keep running. Which constraint should the engineer add?",
       "options": [
-        { "text": "CONSTRAINT no_rescued_data EXPECT (_rescued_data IS NULL) ON VIOLATION DROP ROW", "correct": true, "why": "A record that Auto Loader read cleanly has a null _rescued_data. Dropping rows where it is set keeps them out of silver while the update continues, and the count of dropped records is logged with the dataset metrics." },
-        { "text": "CONSTRAINT no_rescued_data EXPECT (_rescued_data IS NULL)", "average": true, "why": "With no ON VIOLATION clause the expectation uses the default warn action: it counts the bad records but still writes them to silver.customers." },
-        { "text": "CONSTRAINT no_rescued_data EXPECT (_rescued_data IS NOT NULL) ON VIOLATION DROP ROW", "why": "This reverses the condition: it keeps only the records that had rescued data and drops every record that parsed cleanly." },
-        { "text": "CONSTRAINT no_rescued_data EXPECT (_rescued_data IS NULL) ON VIOLATION FAIL UPDATE", "why": "FAIL UPDATE stops the update when an invalid record arrives, which breaks the requirement that the update keep running." }
+        {
+          "text": "CONSTRAINT no_rescued_data EXPECT (_rescued_data IS NULL) ON VIOLATION DROP ROW",
+          "correct": true,
+          "why": "A record that Auto Loader read cleanly has a null _rescued_data. Dropping rows where it is set keeps them out of silver while the update continues, and the count of dropped records is logged with the dataset metrics."
+        },
+        {
+          "text": "CONSTRAINT no_rescued_data EXPECT (_rescued_data IS NULL)",
+          "average": true,
+          "why": "With no ON VIOLATION clause the expectation uses the default warn action: it counts the bad records but still writes them to silver.customers."
+        },
+        {
+          "text": "CONSTRAINT no_rescued_data EXPECT (_rescued_data IS NOT NULL) ON VIOLATION DROP ROW",
+          "why": "This reverses the condition: it keeps only the records that had rescued data and drops every record that parsed cleanly."
+        },
+        {
+          "text": "CONSTRAINT no_rescued_data EXPECT (_rescued_data IS NULL) ON VIOLATION FAIL UPDATE",
+          "why": "FAIL UPDATE stops the update when an invalid record arrives, which breaks the requirement that the update keep running."
+        }
       ],
       "in_practice": "Pairing the drop with an alert on the dropped-record count, for example above 1% of a batch, keeps silver clean without hiding a vendor format change that suddenly sends most records to the rescue column.",
       "source": "https://docs.databricks.com/aws/en/ldp/tutorial-pipelines",
@@ -162,10 +292,24 @@
       "type": "single",
       "stem": "A data engineer's pipeline builds gold.dim_product, whose declared primary key on product_id isn't enforced. The team wants the pipeline update to fail whenever any product_id appears more than once. Which approach does Databricks document for this check?",
       "options": [
-        { "text": "A materialized view counting rows per product_id, expecting each count to be 1 with fail", "correct": true, "why": "Uniqueness is a property across rows, so Databricks documents a validation materialized view that groups the table by the key and applies a fail expectation that num_entries equals 1." },
-        { "text": "An expectation on gold.dim_product itself: CONSTRAINT unique_id EXPECT (count(*) = 1)", "average": true, "why": "An expectation checks each record passing through the query on its own, so it can't count how many rows share a key. The count has to be computed in a separate dataset first." },
-        { "text": "The RELY option on the primary key, so that rows with a duplicate key are rejected", "why": "RELY lets the optimizer trust the key, but it enforces nothing. Duplicates still load, and queries rewritten on that trust can return wrong results." },
-        { "text": "A CHECK constraint on gold.dim_product comparing count(*) per product_id to 1", "why": "CHECK constraints can't use aggregate functions, and they evaluate one row at a time, so they can't detect duplicates across rows." }
+        {
+          "text": "A materialized view counting rows per product_id, expecting each count to be 1 with fail",
+          "correct": true,
+          "why": "Uniqueness is a property across rows, so Databricks documents a validation materialized view that groups the table by the key and applies a fail expectation that num_entries equals 1."
+        },
+        {
+          "text": "An expectation on gold.dim_product itself: CONSTRAINT unique_id EXPECT (count(*) = 1)",
+          "average": true,
+          "why": "An expectation checks each record passing through the query on its own, so it can't count how many rows share a key. The count has to be computed in a separate dataset first."
+        },
+        {
+          "text": "The RELY option on the primary key, so that rows with a duplicate key are rejected",
+          "why": "RELY lets the optimizer trust the key, but it enforces nothing. Duplicates still load, and queries rewritten on that trust can return wrong results."
+        },
+        {
+          "text": "A CHECK constraint on gold.dim_product comparing count(*) per product_id to 1",
+          "why": "CHECK constraints can't use aggregate functions, and they evaluate one row at a time, so they can't detect duplicates across rows."
+        }
       ],
       "in_practice": "A uniqueness check on a dimension stops a duplicated key from doubling revenue in every fact-to-dimension join, which is far cheaper than explaining a 2x jump on an executive dashboard.",
       "source": "https://docs.databricks.com/aws/en/ldp/expectation-patterns",
@@ -179,31 +323,28 @@
       "type": "single",
       "stem": "A data engineer's pipeline loads taxi trips. Trips missing a pickup or dropoff zip code must go to a repair process while valid trips continue to silver, and the team wants expectation metrics for each zip rule, so dropping or failing invalid trips isn't acceptable. Which pipeline pattern fits?",
       "options": [
-        { "text": "Flag rows with an is_quarantined column under warn expectations, then split them with two views", "correct": true, "why": "The documented quarantine pattern computes an is_quarantined column from the rules in a temporary table with warn expectations, then reads valid and invalid rows through views that filter on the flag, so metrics are kept and both paths continue." },
-        { "text": "Use ON VIOLATION DROP ROW, then read the dropped trips back from the pipeline event log", "average": true, "why": "Dropping is the natural first reach, but the event log records only how many records were dropped, not the records themselves, so the repair process would have nothing to work on." },
-        { "text": "Write valid and invalid trips to two tables with foreachBatch inside a single flow", "why": "Databricks recommends processing filtered data as separate writes, because using foreachBatch to write to multiple tables can lead to inconsistent results." },
-        { "text": "Use ON VIOLATION FAIL UPDATE, then repair the failing trips by hand and rerun", "why": "Failing stops the update when an invalid trip arrives, so valid trips stop flowing to silver until someone intervenes manually." }
+        {
+          "text": "Flag rows with an is_quarantined column under warn expectations, then split them with two views",
+          "correct": true,
+          "why": "The documented quarantine pattern computes an is_quarantined column from the rules in a temporary table with warn expectations, then reads valid and invalid rows through views that filter on the flag, so metrics are kept and both paths continue."
+        },
+        {
+          "text": "Use ON VIOLATION DROP ROW, then read the dropped trips back from the pipeline event log",
+          "average": true,
+          "why": "Dropping is the natural first reach, but the event log records only how many records were dropped, not the records themselves, so the repair process would have nothing to work on."
+        },
+        {
+          "text": "Write valid and invalid trips to two tables with foreachBatch inside a single flow",
+          "why": "Databricks recommends processing filtered data as separate writes, because using foreachBatch to write to multiple tables can lead to inconsistent results."
+        },
+        {
+          "text": "Use ON VIOLATION FAIL UPDATE, then repair the failing trips by hand and rerun",
+          "why": "Failing stops the update when an invalid trip arrives, so valid trips stop flowing to silver until someone intervenes manually."
+        }
       ],
       "in_practice": "A flag-and-split design keeps a 2% invalid rate visible in the metrics while the repair process works from its own view, so silver's freshness doesn't depend on how fast bad trips get fixed.",
       "source": "https://docs.databricks.com/aws/en/ldp/expectation-patterns",
       "evidence": "This pattern combines expectations with temporary tables and views to track data quality metrics during pipeline updates and enable separate processing paths for valid and invalid records in downstream operations."
-    },
-    {
-      "family": "medallion-action-per-rule",
-      "objective": "transformation.medallion",
-      "guide": "3.7",
-      "difficulty": 2,
-      "type": "single",
-      "stem": "A data engineer is preparing a silver orders pipeline for production with three rules. A null order_id means the upstream extract is broken and the load can't be trusted. Rows with no store_id can be safely discarded. An occasional future ship_date is tolerable, and the team reviews that trend weekly. Which expectation actions follow Databricks' production-readiness guidance?",
-      "options": [
-        { "text": "Fail on order_id, drop on store_id with a quarantine copy, and warn on ship_date", "correct": true, "why": "The checklist says to choose per constraint: fail for conditions that should stop the world, drop for records you can safely discard with a quarantine table capturing them, and warn only where someone actively watches the trend." },
-        { "text": "Drop on all three rules, so that every update completes with only clean rows", "average": true, "why": "Dropping everything keeps updates green, but a broken extract would quietly produce a partial table, and dropping future ship dates removes rows the team chose to tolerate." },
-        { "text": "Warn on all three rules, and review the metrics on the Data quality tab", "why": "Warn writes every invalid row to silver, including rows from a broken extract. Warn fits only rules whose trend someone actively watches." },
-        { "text": "Fail on all three rules, so that no invalid row can ever reach silver", "why": "Failing on discardable or tolerable rows stops the whole load for problems the business has accepted, adding manual reruns without protecting anything." }
-      ],
-      "in_practice": "Matching the action to business impact keeps on-call from being paged over a handful of discardable rows, while still halting a load that would publish a half-empty orders table.",
-      "source": "https://docs.databricks.com/aws/en/ldp/best-practices/production-readiness",
-      "evidence": "You've deliberately chosen warn versus drop versus fail per constraint: fail for conditions that should stop the world (such as a broken primary key), drop for records you can safely discard (with a quarantine table capturing what was dropped), and warn only where you actively watch the trend."
     },
     {
       "family": "medallion-check-constraint-null-fails",
@@ -213,10 +354,24 @@
       "type": "single",
       "stem": "A data engineer creates silver.order_lines with CHECK (discount_pct BETWEEN 0 AND 100). Most order lines have no discount and arrive with discount_pct set to null, which the business treats as valid. After deployment, every batch containing such rows fails with a CHECK constraint violation. What explains this, and what should the engineer change?",
       "options": [
-        { "text": "A CHECK passes only when it evaluates to true; use discount_pct IS NULL OR discount_pct BETWEEN 0 AND 100", "correct": true, "why": "For a CHECK constraint to be satisfied in Databricks, its condition must evaluate to true. A comparison with null doesn't evaluate to true, so null rows violate the constraint unless the condition explicitly allows null." },
-        { "text": "CHECK constraints skip nulls, so the failing rows must hold out-of-range discounts; quarantine those rows", "average": true, "why": "In standard SQL a CHECK that evaluates to unknown passes, which makes this tempting. Databricks requires the condition to evaluate to true, so the null rows themselves are failing." },
-        { "text": "Add NOT NULL to discount_pct so that null rows are rejected earlier with a clearer error", "why": "Rejecting nulls contradicts the business rule that a missing discount is valid; it only turns the same rows into a different failure." },
-        { "text": "Drop the CHECK and validate the discount range in a nightly query over the table", "why": "Dropping the constraint lets out-of-range discounts land and only reports them afterward, when the range can still be enforced at write time by allowing null explicitly." }
+        {
+          "text": "A CHECK passes only when it evaluates to true; use discount_pct IS NULL OR discount_pct BETWEEN 0 AND 100",
+          "correct": true,
+          "why": "For a CHECK constraint to be satisfied in Databricks, its condition must evaluate to true. A comparison with null doesn't evaluate to true, so null rows violate the constraint unless the condition explicitly allows null."
+        },
+        {
+          "text": "CHECK constraints skip nulls, so the failing rows must hold out-of-range discounts; quarantine those rows",
+          "average": true,
+          "why": "In standard SQL a CHECK that evaluates to unknown passes, which makes this tempting. Databricks requires the condition to evaluate to true, so the null rows themselves are failing."
+        },
+        {
+          "text": "Add NOT NULL to discount_pct so that null rows are rejected earlier with a clearer error",
+          "why": "Rejecting nulls contradicts the business rule that a missing discount is valid; it only turns the same rows into a different failure."
+        },
+        {
+          "text": "Drop the CHECK and validate the discount range in a nightly query over the table",
+          "why": "Dropping the constraint lets out-of-range discounts land and only reports them afterward, when the range can still be enforced at write time by allowing null explicitly."
+        }
       ],
       "in_practice": "Writing nullable rules as col IS NULL OR <condition> is worth standardizing: one missed null case can block every batch of a 5-million-row daily load until someone hotfixes the constraint.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-alter-table-add-constraint",
@@ -230,10 +385,24 @@
       "type": "single",
       "stem": "A data engineering team writes to silver.shipments from several SQL jobs and notebooks rather than a pipeline. Compliance requires every write to fail if country_code is outside the five supported codes, which are also listed in the table ref.countries. Which ALTER TABLE silver.shipments clause enforces this rule?",
       "options": [
-        { "text": "ADD CONSTRAINT valid_country CHECK (country_code IN ('US','CA','MX','GB','DE'))", "correct": true, "why": "A CHECK condition may use literals, the table's columns and deterministic built-in functions or operators, and Databricks enforces it on every write. Listing the five codes as literals meets the rule." },
-        { "text": "ADD CONSTRAINT fk_country FOREIGN KEY (country_code) REFERENCES ref.countries", "average": true, "why": "A foreign key documents the relationship well, but Databricks doesn't enforce foreign keys, so writes with unsupported codes would still succeed." },
-        { "text": "ADD CONSTRAINT valid_country CHECK (country_code IN (SELECT code FROM ref.countries))", "why": "A CHECK condition must not contain a subquery, so this constraint can't be added." },
-        { "text": "ADD CONSTRAINT valid_country CHECK (is_supported(country_code)) with a SQL UDF", "why": "CHECK conditions can't call user-defined functions; only deterministic built-in functions and operators are allowed." }
+        {
+          "text": "ADD CONSTRAINT valid_country CHECK (country_code IN ('US','CA','MX','GB','DE'))",
+          "correct": true,
+          "why": "A CHECK condition may use literals, the table's columns and deterministic built-in functions or operators, and Databricks enforces it on every write. Listing the five codes as literals meets the rule."
+        },
+        {
+          "text": "ADD CONSTRAINT fk_country FOREIGN KEY (country_code) REFERENCES ref.countries",
+          "average": true,
+          "why": "A foreign key documents the relationship well, but Databricks doesn't enforce foreign keys, so writes with unsupported codes would still succeed."
+        },
+        {
+          "text": "ADD CONSTRAINT valid_country CHECK (country_code IN (SELECT code FROM ref.countries))",
+          "why": "A CHECK condition must not contain a subquery, so this constraint can't be added."
+        },
+        {
+          "text": "ADD CONSTRAINT valid_country CHECK (is_supported(country_code)) with a SQL UDF",
+          "why": "CHECK conditions can't call user-defined functions; only deterministic built-in functions and operators are allowed."
+        }
       ],
       "in_practice": "When the code list changes a few times a year, a literal CHECK is a cheap, always-on guard; the trade-off is a reviewed ALTER TABLE for each new country, against a key that never rejects anything.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-alter-table-add-constraint",
@@ -247,10 +416,24 @@
       "type": "single",
       "stem": "A data engineer set every expectation on a pipeline's silver tables to ON VIOLATION FAIL UPDATE. The data quality lead now wants a weekly chart of each rule's pass rate, but the pipeline shows no pass or fail counts for these expectations. Rows that break several of the rules could safely be dropped. What should the engineer change?",
       "options": [
-        { "text": "Use drop or warn for rules whose pass rate must be charted, since fail records no metrics", "correct": true, "why": "Tracking metrics are available for warn and drop actions. Because fail stops the update when an invalid record is detected, its metrics aren't recorded, so rules that need a pass-rate trend must use warn or drop." },
-        { "text": "Publish the event log to a catalog and schema so the expectation counts become queryable", "average": true, "why": "Publishing changes where the event log lives and who can query it, but it can't add metrics that fail expectations never record." },
-        { "text": "Convert the silver streaming tables to materialized views, which report expectation metrics", "why": "Streaming tables and materialized views both support expectations; the action on violation, not the dataset type, decides whether metrics are recorded." },
-        { "text": "Switch the pipeline to continuous mode so metrics are reported for every micro-batch", "why": "Run mode changes how a failure affects other flows, not whether a fail expectation records metrics, and continuous mode keeps compute running for no quality benefit." }
+        {
+          "text": "Use drop or warn for rules whose pass rate must be charted, since fail records no metrics",
+          "correct": true,
+          "why": "Tracking metrics are available for warn and drop actions. Because fail stops the update when an invalid record is detected, its metrics aren't recorded, so rules that need a pass-rate trend must use warn or drop."
+        },
+        {
+          "text": "Publish the event log to a catalog and schema so the expectation counts become queryable",
+          "average": true,
+          "why": "Publishing changes where the event log lives and who can query it, but it can't add metrics that fail expectations never record."
+        },
+        {
+          "text": "Convert the silver streaming tables to materialized views, which report expectation metrics",
+          "why": "Streaming tables and materialized views both support expectations; the action on violation, not the dataset type, decides whether metrics are recorded."
+        },
+        {
+          "text": "Switch the pipeline to continuous mode so metrics are reported for every micro-batch",
+          "why": "Run mode changes how a failure affects other flows, not whether a fail expectation records metrics, and continuous mode keeps compute running for no quality benefit."
+        }
       ],
       "in_practice": "Keeping fail for the two or three rules that must stop a load, and drop or warn elsewhere, gives the quality lead a pass-rate trend for most rules without weakening the hard stops.",
       "source": "https://docs.databricks.com/aws/en/ldp/expectations",
@@ -264,14 +447,59 @@
       "type": "single",
       "stem": "A data engineer's dashboard sums failed_records from the pipeline event log for the expectation valid_amount on silver.payments and labels the total 'rows removed from silver'. A finance analyst then finds rows with negative amounts in silver.payments. The expectation is defined as CONSTRAINT valid_amount EXPECT (amount >= 0). What explains the mismatch?",
       "options": [
-        { "text": "failed_records counts rows that broke the rule whatever the action, and warn keeps them", "correct": true, "why": "In the event log, failed_records tracks whether an expectation was met but not what happened to the records. With no ON VIOLATION clause the action is warn, so invalid rows are written to the target." },
-        { "text": "The event log runs ahead of the table, and the rows are removed on the next update", "average": true, "why": "No later cleanup removes them. A warn expectation writes invalid records to the target, so the rows stay in silver.payments until the rule's action or the data changes." },
-        { "text": "failed_records counts rows rejected by other expectations on the same table", "why": "Each expectation entry in the event log carries its own name and dataset, so the counts belong to valid_amount. The rule is applied; it just doesn't remove rows." },
-        { "text": "Expectations check only a sample of each batch, so some negative amounts slip by", "why": "Expectations check each record passing through the query, not a sample. These rows were checked, counted as failed and kept." }
+        {
+          "text": "failed_records counts rows that broke the rule whatever the action, and warn keeps them",
+          "correct": true,
+          "why": "In the event log, failed_records tracks whether an expectation was met but not what happened to the records. With no ON VIOLATION clause the action is warn, so invalid rows are written to the target."
+        },
+        {
+          "text": "The event log runs ahead of the table, and the rows are removed on the next update",
+          "average": true,
+          "why": "No later cleanup removes them. A warn expectation writes invalid records to the target, so the rows stay in silver.payments until the rule's action or the data changes."
+        },
+        {
+          "text": "failed_records counts rows rejected by other expectations on the same table",
+          "why": "Each expectation entry in the event log carries its own name and dataset, so the counts belong to valid_amount. The rule is applied; it just doesn't remove rows."
+        },
+        {
+          "text": "Expectations check only a sample of each batch, so some negative amounts slip by",
+          "why": "Expectations check each record passing through the query, not a sample. These rows were checked, counted as failed and kept."
+        }
       ],
       "in_practice": "Labeling dashboards from dropped_records for drop rules and from failed_records for warn rules avoids telling finance that 3,000 bad rows were removed when they sit in the table finance reconciles against.",
       "source": "https://docs.databricks.com/aws/en/ldp/monitor-event-log-schema",
       "evidence": "failed_records: The number of records that fail the expectation. Tracks whether the expectation was met, but does not describe what happens to the records (warn, fail, or drop the records)."
+    },
+    {
+      "family": "medallion-fail-expectation-violation-record",
+      "objective": "transformation.medallion",
+      "guide": "3.7",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's pipeline defines CONSTRAINT valid_temperature EXPECT (temperature BETWEEN -50 AND 60) ON VIOLATION FAIL UPDATE on silver.sensor_readings. Last night's update failed on this expectation, and the engineer must find which reading broke the rule before fixing the pipeline code. Where should the engineer look first?",
+      "options": [
+        {
+          "text": "The update's EXPECTATION_VIOLATION error, which can show the violating record",
+          "correct": true,
+          "why": "Fail expectations change the query plan to track violations, so the EXPECTATION_VIOLATION error names the violated expectation and, for many queries, shows the input data and output record that broke it."
+        },
+        {
+          "text": "The Data quality tab, which lists the failed records for valid_temperature",
+          "average": true,
+          "why": "The Data quality tab shows metrics for warn and drop expectations, but a fail expectation stops the update when it detects an invalid record, so no metrics are recorded, let alone the failing rows."
+        },
+        {
+          "text": "silver.sensor_readings, queried at the version the failed update wrote",
+          "why": "When a fail expectation stops a table update, the transaction is rolled back atomically, so the failed update leaves no table version that holds the invalid reading."
+        },
+        {
+          "text": "silver.sensor_readings, after rerunning with the expectation set to warn",
+          "why": "Switching to warn writes the invalid records into silver just to find them, which costs a rerun and exposes bad data to downstream readers, when the failure message already shows the record."
+        }
+      ],
+      "in_practice": "Reading the violating record straight from the error, such as a sensor reporting -500, often shows whether the fix is a unit conversion upstream or a quarantine rule, without a second costly run over the night's data.",
+      "source": "https://docs.databricks.com/aws/en/ldp/expectations",
+      "evidence": "Expectations configured to fail pipelines modify the Spark query plan of your transformations to track information required to detect and report violations. You can use this information to identify which input record resulted in the violation for many queries."
     }
   ]
 }

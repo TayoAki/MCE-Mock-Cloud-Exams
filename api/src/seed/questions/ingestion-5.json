@@ -626,37 +626,6 @@
       "evidence": "Clean up metadata files: You can run VACUUM to clean up unreferenced metadata files created by COPY INTO in Databricks Runtime 15.2 and above."
     },
     {
-      "family": "copy-into-validate-constraints",
-      "objective": "ingestion.copy-into",
-      "guide": "2.2",
-      "difficulty": 2,
-      "type": "single",
-      "stem": "A data engineer loads vendor files into sales.bronze.orders, which has a CHECK constraint requiring amount > 0 and a non-nullable customer_id column. Before tonight's run, the engineer wants to know whether the new files would violate either rule, without writing anything to the table. Which approach meets this?",
-      "options": [
-        {
-          "text": "Run the same COPY INTO with VALIDATE ALL added",
-          "correct": true,
-          "why": "VALIDATE checks the data to be loaded without writing it, including whether it parses, whether the schema matches and whether all nullability and check constraints are met."
-        },
-        {
-          "text": "Load the files into a staging table and query it, as VALIDATE checks only parsing",
-          "average": true,
-          "why": "VALIDATE goes beyond parsing: it also checks schema compatibility and nullability and check constraints, so a staging copy isn't needed."
-        },
-        {
-          "text": "Run the COPY INTO, then use RESTORE if a constraint turns out to fail",
-          "why": "This writes to the table first, which the engineer wants to avoid; a violated constraint also makes the write fail rather than leaving rows to roll back."
-        },
-        {
-          "text": "Run the COPY INTO with COPY_OPTIONS ('mergeSchema' = 'true')",
-          "why": "mergeSchema lets the target schema evolve with the incoming data; it doesn't preview constraint violations, and it does write data."
-        }
-      ],
-      "in_practice": "A VALIDATE pass before a large nightly load turns a 2 a.m. failure into a daytime check, giving the team hours to ask the vendor for corrected files.",
-      "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
-      "evidence": "The data that is to be loaded into a table is validated but not written to the table. These validations include: Whether the data can be parsed. Whether the schema matches that of the table or if the schema needs to be evolved. Whether all nullability and check constraints are met."
-    },
-    {
       "family": "copy-into-history-skipped-corrupt-metric",
       "objective": "ingestion.copy-into",
       "guide": "2.2",
@@ -872,6 +841,37 @@
       "in_practice": "Letting each region trigger its own load removes a central scheduler, so each region's data lands minutes after its own export instead of waiting for the slowest region.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
       "evidence": "COPY INTO supports concurrent invocations against the same table. As long as COPY INTO is invoked concurrently on distinct sets of input files, each invocation should eventually succeed, otherwise you get a transaction conflict. COPY INTO can be called concurrently when: Multiple data producers don't have an easy way to coordinate and cannot make a single invocation."
+    },
+    {
+      "family": "copy-into-csv-infer-schema-format-option",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "In a dev schema, a data engineer creates an empty placeholder table, dev.bronze.returns, and loads CSV exports into it with COPY INTO ... FORMAT_OPTIONS ('header' = 'true', 'mergeSchema' = 'true') COPY_OPTIONS ('mergeSchema' = 'true'). The load succeeds, but every column, including return_qty and refund_amount, is STRING. Which change makes COPY INTO infer types such as INT and DOUBLE when the production table is loaded?",
+      "options": [
+        {
+          "text": "Add 'inferSchema' = 'true' to FORMAT_OPTIONS",
+          "correct": true,
+          "why": "The inferSchema format option decides whether COPY INTO infers the data types of parsed records or treats every column as a string, so setting it in FORMAT_OPTIONS yields typed columns."
+        },
+        {
+          "text": "Add 'inferSchema' = 'true' to COPY_OPTIONS",
+          "average": true,
+          "why": "inferSchema is a reader option, so it belongs in FORMAT_OPTIONS; COPY_OPTIONS controls the copy operation itself, through options such as force and mergeSchema."
+        },
+        {
+          "text": "Set 'mergeSchema' = 'false' in FORMAT_OPTIONS",
+          "why": "mergeSchema in FORMAT_OPTIONS only decides whether the schemas of multiple source files are merged; turning it off doesn't make COPY INTO infer types."
+        },
+        {
+          "text": "Add COPY_OPTIONS ('force' = 'true') and rerun",
+          "why": "force reloads files that were already loaded, ignoring idempotency; the rerun would parse the files the same way and leave every column a string."
+        }
+      ],
+      "in_practice": "Typed bronze columns let downstream jobs filter and sum refund_amount without casting, and catching the all-STRING result in dev avoids evolving a production table from the wrong starting schema.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/examples",
+      "evidence": "The following FORMAT_OPTIONS are available to infer the input schema automatically with COPY INTO: inferSchema: Whether to infer the data types of the parsed records or to assume all columns are of StringType."
     }
   ]
 }

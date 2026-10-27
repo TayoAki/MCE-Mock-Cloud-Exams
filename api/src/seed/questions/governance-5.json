@@ -686,6 +686,23 @@
       "in_practice": "Converting tables that an outside engine reads usually means pointing the engine at Unity Catalog's REST endpoint with credential vending, after a metastore admin enables external data access, rather than handing it bucket credentials.",
       "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/managed-versus-external",
       "evidence": "Both managed and external tables support read, write, and create access from external engines via open APIs, including the Unity REST API and the Iceberg REST Catalog (IRC). This means that managed tables do not cause vendor lock-in."
+    },
+    {
+      "family": "tables-external-location-root-blocks-more",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer holds CREATE EXTERNAL TABLE on the external location sales_loc, which covers s3://acme-sales, and will create several external tables there over time. Where within that location does Databricks recommend creating each external table?",
+      "options": [
+        { "text": "In its own sub-directory, such as s3://acme-sales/orders", "correct": true, "why": "Databricks recommends never creating external tables or volumes at the root of an external location and creating them in sub-directories instead, so that each table has its own path and the location stays open for more tables and volumes." },
+        { "text": "At the location's root, so the table and location share one path", "average": true, "why": "A table at the root of an external location blocks the location: once an external table or volume sits at the root, no additional external tables or volumes can be created on that location." },
+        { "text": "Under a schema's managed location, such as s3://acme-sales/managed", "why": "Managed storage locations hold managed tables and volumes and can't overlap with external tables or external volumes, so that path is off limits for an external table." },
+        { "text": "In an existing table's directory, so that the two tables share files", "why": "Unity Catalog enforces path-overlap rules: a new table can't be registered on data files where a table already exists, so each external table needs its own directory." }
+      ],
+      "in_practice": "An external location that covers a whole bucket usually serves many tables over its life. Giving each table its own sub-directory, such as /orders and /returns, keeps the location usable for every later table and volume.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/best-practices",
+      "evidence": "Avoid path overlap conflicts: never create external volumes or tables at the root of an external location. If you do create external volumes or tables at the external location root, you can't create any additional external volumes or tables on the external location. Instead, create external volumes or tables on a sub-directory inside the external location."
     }
   ]
 }

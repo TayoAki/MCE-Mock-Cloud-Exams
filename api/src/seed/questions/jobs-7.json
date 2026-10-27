@@ -780,6 +780,99 @@
       "in_practice": "Debouncing on Any handles variable fan-in: the job runs once after each burst whether one table or all four changed, without hard-coding which sources must update together.",
       "source": "https://docs.databricks.com/aws/en/jobs/trigger-table-update",
       "evidence": "Wait after last change in seconds: The time to wait to trigger a run after a table update. Additional table updates during this period reset the timer. This setting can be used when table updates come in batches, and the whole batch needs to be processed after all tables are updated."
+    },
+    {
+      "family": "triggers-trigger-type-table-value",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A job has a table update trigger on main.sales.orders, and operators sometimes start it with Run now. Its notebook task receives {{job.trigger.type}} as a parameter and runs incremental logic only for runs that the table update trigger started. Which value should the notebook compare the parameter with?",
+      "options": [
+        {
+          "text": "table",
+          "correct": true,
+          "why": "{{job.trigger.type}} resolves to one of periodic, one_time, run_job_task, file_arrival, continuous, table or model, and a run started by a table update trigger reports table."
+        },
+        {
+          "text": "table_update",
+          "average": true,
+          "why": "table_update is the namespace of the trigger's other references, such as {{job.trigger.table_update.updated_tables}}, but it isn't one of the values {{job.trigger.type}} returns."
+        },
+        {
+          "text": "one_time",
+          "why": "one_time marks a run started once on demand, as the operators' Run now runs are, so comparing with it would select exactly the runs the incremental logic should skip."
+        },
+        {
+          "text": "run_job_task",
+          "why": "run_job_task marks a run that a Run Job task in another job started, which isn't how this job's trigger starts runs."
+        }
+      ],
+      "in_practice": "Reading the trigger type lets one job serve both paths: trigger-started runs process only the new commits, while manual runs can do a full rebuild, without keeping two copies of the job in sync.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "{{job.trigger.type}} The trigger type of the job run. The possible values are periodic, one_time, run_job_task, file_arrival, continuous, table, and model."
+    },
+    {
+      "family": "triggers-model-update-new-version",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineering team's batch scoring job must run each time a new version of the Unity Catalog model main.ml.churn_model becomes ready. Data scientists register versions at irregular times, from several a day to none for weeks. Which trigger fits this requirement?",
+      "options": [
+        {
+          "text": "A model update trigger (Beta) with the Model version is ready condition",
+          "correct": true,
+          "why": "A model update trigger watches a Unity Catalog model scope and starts a run when a matching event occurs; the Model version is ready condition fires when a new version of the model becomes ready."
+        },
+        {
+          "text": "A scheduled trigger that runs the job every hour",
+          "average": true,
+          "why": "An hourly schedule follows the clock rather than the model: it starts runs during weeks with no new version and still lags each new one. Model update triggers replace cron schedules for tracking model updates."
+        },
+        {
+          "text": "A table update trigger on the model's training data table",
+          "why": "A table update trigger reacts to commits on tables, and new training data doesn't mean a new model version is ready, so runs would start at the wrong times."
+        },
+        {
+          "text": "A continuous trigger with a task that polls for new versions",
+          "why": "A continuous job stays always on, so polling keeps compute busy between rare registrations; a model update trigger detects new versions without persistent compute."
+        }
+      ],
+      "in_practice": "Event-driven scoring starts within minutes of a new version and costs nothing in the weeks without one, where an hourly schedule would launch about 720 mostly idle runs a month.",
+      "source": "https://docs.databricks.com/aws/en/jobs/model-update-triggers",
+      "evidence": "Use model update triggers to automatically run a job when a model change occurs in Unity Catalog. This feature replaces the need for cron schedules or persistent clusters to track model updates. ... Model version is ready: A new model version becomes ready in the scope."
+    },
+    {
+      "family": "triggers-synced-table-triggered-mode-table-update",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer syncs main.gold.customer_profile to Lakebase Postgres through a synced table in Triggered mode, with change data feed enabled on the source. An upstream pipeline updates the source at irregular times, a few times a day, and the app team wants each change in Postgres soon after it lands, without the always-on cost of Continuous mode. How should the engineer automate the syncs?",
+      "options": [
+        {
+          "text": "A Database Table Sync pipeline task in a job with a table update trigger on the source",
+          "correct": true,
+          "why": "Triggered syncs run only when triggered. A table update trigger on the source starts the job when the table changes, and Triggered mode applies only the new changes, giving near-real-time freshness without Continuous mode's always-on cost."
+        },
+        {
+          "text": "A Database Table Sync pipeline task in a job scheduled every 5 minutes",
+          "average": true,
+          "why": "A 5-minute schedule follows the clock rather than the data, so it runs about 288 times a day for a few changes and still lags each one; the docs pair scheduled syncs with Snapshot mode."
+        },
+        {
+          "text": "Snapshot mode for the synced table, with a nightly scheduled job",
+          "why": "Snapshot copies the whole table on each sync and suits sources where more than about 10% of rows change per cycle; a nightly run would also leave the app hours behind each update."
+        },
+        {
+          "text": "A file arrival trigger on the storage location of the source table",
+          "why": "File arrival triggers watch volumes and external locations for new files, and their paths can't contain tables; changes to a table are detected with a table update trigger."
+        }
+      ],
+      "in_practice": "For a source that changes three or four times a day, a table update trigger means three or four incremental syncs that each apply only the changed rows, instead of hundreds of empty scheduled runs or an always-on stream.",
+      "source": "https://docs.databricks.com/aws/en/oltp/projects/sync-tables",
+      "evidence": "Trigger on source table updates: Best for Triggered mode. ... Fires the job when the source Unity Catalog table is updated. With Triggered mode, only new changes are applied incrementally, giving near-real-time freshness without the always-on cost of Continuous mode."
     }
   ]
 }

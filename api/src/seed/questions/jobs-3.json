@@ -621,37 +621,6 @@
       "evidence": "For tasks that take key-value parameters, job parameters are pushed down automatically, and if a job parameter and a task parameter share a key, the job parameter takes precedence."
     },
     {
-      "family": "orchestration-git-source-run-snapshot",
-      "objective": "jobs.orchestration",
-      "guide": "4.2",
-      "difficulty": 2,
-      "type": "single",
-      "stem": "A data engineering team runs its production job's notebook tasks from a Git folder in the workspace. Twice this month the nightly run used old code because nobody pulled the latest release-branch commit into the folder. The team wants each run to get the current release branch automatically, with every task in a run using the same code version. What should the team configure?",
-      "options": [
-        {
-          "text": "A Git provider source on the job, set to the release branch, for its notebook tasks",
-          "correct": true,
-          "why": "With a remote Git source, Databricks takes a snapshot of the branch when each run begins, so new commits are picked up automatically and all tasks in the run use the same code version."
-        },
-        {
-          "text": "A first task in the job that pulls the latest commit into the Git folder",
-          "average": true,
-          "why": "This leaves the team managing the folder's sync; Databricks recommends Git folders for development and a remote Git source, which pulls new code at run time, for production jobs."
-        },
-        {
-          "text": "A different pinned commit hash on each of the job's notebook tasks",
-          "why": "All tasks in a job must reference the same commit, and pinned hashes would stop runs from picking up new release commits."
-        },
-        {
-          "text": "Copies of the notebooks in /Shared that a weekly script refreshes",
-          "why": "Copies refreshed weekly drift from the release branch for days at a time, which repeats the stale-code problem."
-        }
-      ],
-      "in_practice": "Each task run then records its commit SHA, so when a nightly result looks wrong the team can see exactly which code produced it instead of guessing which pull was missed.",
-      "source": "https://docs.databricks.com/aws/en/jobs/git",
-      "evidence": "All tasks in a job must reference the same commit in the remote repository. When a job run begins, Databricks takes a snapshot of the specified branch or commit, so that all tasks in that run use the same version of the code."
-    },
-    {
       "family": "orchestration-dashboard-filter-job-parameter",
       "objective": "jobs.orchestration",
       "guide": "4.2",

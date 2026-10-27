@@ -63,37 +63,6 @@
       "evidence": "Databricks recommends using external tables for the following use cases: You need to register a table backed by existing data that isn't compatible with Unity Catalog managed tables, such as JSON or Avro."
     },
     {
-      "family": "tables-predictive-optimization-managed-only",
-      "objective": "governance.tables",
-      "guide": "7.1",
-      "difficulty": 1,
-      "type": "single",
-      "stem": "A data platform team has a mix of Unity Catalog managed and external Delta tables and wants Databricks to take over routine maintenance through predictive optimization. Which of these tables can predictive optimization maintain?",
-      "options": [
-        {
-          "text": "Only the Unity Catalog managed tables",
-          "correct": true,
-          "why": "Predictive optimization is one of the features unique to Unity Catalog managed tables and isn't available for external or foreign tables, because Unity Catalog controls the data layout only of tables it manages."
-        },
-        {
-          "text": "Both table types, once it is enabled for the account",
-          "average": true,
-          "why": "Enabling it for the account sets the default for managed tables, but it never extends to external tables, which keep needing scheduled OPTIMIZE and VACUUM jobs."
-        },
-        {
-          "text": "Only the external tables in the team's own bucket",
-          "why": "Unity Catalog doesn't manage the layout or lifecycle of external tables, so predictive optimization can't act on them at all."
-        },
-        {
-          "text": "Any table in a schema with a managed location",
-          "why": "A schema's managed location decides where new managed tables store their files; it doesn't make external tables in that schema eligible for predictive optimization."
-        }
-      ],
-      "in_practice": "Converting heavily used external tables to managed tables lets a team retire hand-built maintenance jobs; predictive optimization runs on serverless compute and only when a table would benefit.",
-      "source": "https://docs.databricks.com/aws/en/tables/managed",
-      "evidence": "The following features are unique to Unity Catalog managed tables, and aren't available for external tables and foreign tables: ... Predictive optimization: Automatically optimizes data layout and compute using AI, without manual maintenance operations."
-    },
-    {
       "family": "tables-managed-location-schema-wins",
       "objective": "governance.tables",
       "guide": "7.1",

@@ -724,37 +724,6 @@
       "evidence": "Query federation provides fine-grained access controls and governance at table-level using a foreign catalog. JDBC Unity Catalog connection provides governance only at the connection level. ... If your database is supported, Databricks recommends using query federation instead of a JDBC connection."
     },
     {
-      "family": "choosing-remote-query-existing-dialect",
-      "objective": "ingestion.choosing",
-      "guide": "2.6",
-      "difficulty": 2,
-      "type": "single",
-      "stem": "A data engineer is moving 200 ad hoc reporting queries written in Oracle's SQL dialect, several using Oracle-specific functions, onto Databricks. An Oracle connection already exists for Lakehouse Federation, and the engineer wants to run the queries unchanged without creating foreign catalogs. Which approach fits?",
-      "options": [
-        {
-          "text": "Run each query through remote_query on the existing connection",
-          "correct": true,
-          "why": "remote_query runs a query in the remote database's native dialect, suits existing queries and database-specific functions, needs no foreign catalog, and can reuse a connection created for query federation."
-        },
-        {
-          "text": "Query a foreign catalog in Databricks SQL, rewriting Oracle syntax",
-          "average": true,
-          "why": "Query federation uses Databricks SQL syntax over a foreign catalog, so the Oracle-specific queries would need rewriting and a catalog, which the engineer wants to avoid."
-        },
-        {
-          "text": "Ingest the tables with Lakeflow Connect and rerun the queries",
-          "why": "Ingesting copies the data and still leaves Oracle-dialect SQL to translate into Databricks SQL before it can run."
-        },
-        {
-          "text": "Create a JDBC connection with Oracle's driver and a foreign catalog on it",
-          "why": "Foreign catalogs aren't supported with JDBC connections, and a second connection isn't needed when the existing one works with remote_query."
-        }
-      ],
-      "in_practice": "Running proven queries unchanged gets reports onto Databricks in days instead of a rewrite project; queries that turn into long-term dashboards can move to a foreign catalog or to ingestion later.",
-      "source": "https://docs.databricks.com/aws/en/query-federation/remote-queries",
-      "evidence": "You have existing SQL queries written in the remote database's dialect that you want to run without modification. You need to use database-specific functions or syntax that might not be available in Databricks SQL. You want ad hoc access to remote data without creating foreign catalogs."
-    },
-    {
       "family": "choosing-custom-connector-private-api",
       "objective": "ingestion.choosing",
       "guide": "2.6",
@@ -1001,6 +970,99 @@
       "in_practice": "On 300 busy tables, frequent cursor queries can compete with production traffic; paying for an always-on gateway can cost less than scaling up the primary database to absorb ingestion queries.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/query-based-overview",
       "evidence": "The trade-off is that query performance can be slower and queries run directly on source tables, which can place more load on the source database compared to CDC connectors that query the binlog."
+    },
+    {
+      "family": "choosing-zerobus-direct-write-no-bus",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A company's fleet of IoT gateways must write telemetry records straight into a Unity Catalog Delta table within seconds. The data engineering team doesn't want to run a message bus such as Kafka or land the records as files first. Which ingestion option fits?",
+      "options": [
+        {
+          "text": "Zerobus Ingest, which the gateways push records to directly",
+          "correct": true,
+          "why": "Zerobus Ingest is a push-based streaming API that writes records straight into Unity Catalog Delta tables with no message bus to run, and Databricks calls it the most direct path when the lakehouse is the destination."
+        },
+        {
+          "text": "A Kafka cluster read by the Lakeflow Connect Kafka connector",
+          "average": true,
+          "why": "Managed streaming connectors fit when Kafka already serves other consumers; standing up Kafka only to feed the lakehouse adds the broker layer the team wants to avoid."
+        },
+        {
+          "text": "Auto Loader over files that the gateways write to Amazon S3",
+          "why": "Auto Loader is the choice for data already landed as files in cloud storage; here it would force the gateways to write files first, which the team ruled out."
+        },
+        {
+          "text": "A COPY INTO statement scheduled every minute on a SQL warehouse",
+          "why": "COPY INTO loads files from a storage location in batches, so it still needs the gateways to land files and adds scheduling delay on top."
+        }
+      ],
+      "in_practice": "Dropping the broker removes a cluster to size, patch and pay for; capacity scales serverlessly as more gateways connect, and usage is billed against the Jobs Serverless SKU.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/zerobus-overview",
+      "evidence": "Zerobus Ingest is a push-based streaming API that writes data straight into Unity Catalog Delta tables at high scale, with no message bus to run. It removes the middle layer that many teams place between their producers and the lakehouse. ... When your destination is the lakehouse, Zerobus Ingest is the most direct path."
+    },
+    {
+      "family": "choosing-kafka-batch-bounded-backfill",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "After an outage, a data engineer must reload the events that an Apache Kafka topic holds between two known offsets into a Unity Catalog bronze table. It is a one-time backfill, and the team's continuous Kafka ingestion is already running separately. Which approach fits this load?",
+      "options": [
+        {
+          "text": "A batch spark.read from Kafka that sets startingOffsets and endingOffsets",
+          "correct": true,
+          "why": "Databricks recommends Kafka batch mode, spark.read, for one-time loads and backfills; it requires both startingOffsets and endingOffsets, so the job reads exactly that range and then finishes."
+        },
+        {
+          "text": "A spark.readStream query from Kafka that sets startingOffsets",
+          "average": true,
+          "why": "Streaming mode suits continuous or low-latency ingestion; a stream started at an offset keeps reading past the end of the gap, so it doesn't express a bounded one-time load."
+        },
+        {
+          "text": "A second pipeline built on the managed Kafka connector (Beta)",
+          "why": "The managed Kafka connector runs a pipeline that continuously reads topics into streaming tables, which fits ongoing ingestion rather than a bounded one-time reload."
+        },
+        {
+          "text": "A COPY INTO statement that names the Kafka topic as its source",
+          "why": "COPY INTO loads files from a storage location such as S3 or a volume; it can't read records from a Kafka topic."
+        }
+      ],
+      "in_practice": "A bounded batch read finishes and releases its compute once the gap is filled, and because it keeps no streaming checkpoint, it can't disturb the offsets of the production stream running beside it.",
+      "source": "https://docs.databricks.com/aws/en/connect/streaming/kafka/faq",
+      "evidence": "Streaming mode (spark.readStream): Use when you need continuous data processing or low-latency ingestion. Batch mode (spark.read): Use for one-time data loads, backfills, or debugging. Requires both startingOffsets and endingOffsets."
+    },
+    {
+      "family": "jdbc-rest-connection-driver-volume-read",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team created the JDBC Unity Catalog connection erp_jdbc and stored its driver JAR in the volume ops.drivers.jdbc_jars. A Lakeflow Job's notebook on serverless compute reads ERP tables with .option('databricks.connection', 'erp_jdbc') and runs as the service principal etl_sp, which has USE CONNECTION on erp_jdbc, USE CATALOG on ops and USE SCHEMA on ops.drivers. Which additional privilege does etl_sp need?",
+      "options": [
+        {
+          "text": "READ VOLUME on ops.drivers.jdbc_jars, where the driver JAR is stored",
+          "correct": true,
+          "why": "A JDBC connection installs its driver from a Unity Catalog volume, so the requirements include volume access for whoever queries the connection, and Databricks grants READ VOLUME on the JAR volume for this."
+        },
+        {
+          "text": "No other privilege, since USE CONNECTION covers the driver JAR",
+          "average": true,
+          "why": "USE CONNECTION lets a principal query through the connection, but the driver is loaded from a volume, and querying principals need read access to that volume as well."
+        },
+        {
+          "text": "CREATE CONNECTION on the metastore attached to the workspace",
+          "why": "CREATE CONNECTION is needed to create a connection, which the platform team already did; it isn't what a principal needs to read through an existing one."
+        },
+        {
+          "text": "MANAGE on erp_jdbc, so the job can load the connection's driver",
+          "why": "MANAGE lets a principal administer the connection, such as granting access to it; reading through a JDBC connection relies on USE CONNECTION plus read access to the driver's volume."
+        }
+      ],
+      "in_practice": "Granting READ VOLUME on the driver volume to a group of connection users, rather than to each principal in turn, saves a failed first run every time a new job or service principal starts using the connection.",
+      "source": "https://docs.databricks.com/aws/en/connect/jdbc-connection",
+      "evidence": "Volume access by the user querying the connection. ... The JDBC connection reads and installs the JDBC driver JAR from a Unity Catalog volume. ... Grant read access on the volume to the users who query the connection: GRANT READ VOLUME ON VOLUME my_catalog.my_schema.my_volume_JARs TO `account users`"
     }
   ]
 }

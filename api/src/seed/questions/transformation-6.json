@@ -8,10 +8,24 @@
       "type": "single",
       "stem": "A bronze table, bronze_products, stores each product's attributes in a MAP<STRING, STRING> column named attributes, such as {'color' -> 'red', 'size' -> 'M'}. A data engineer needs silver rows with one row per attribute and the columns product_id, attr_name and attr_value. Which query produces them?",
       "options": [
-        { "text": "SELECT product_id, explode(attributes) AS (attr_name, attr_value) FROM bronze_products", "correct": true, "why": "explode on a MAP returns one row per entry with two columns, the key and the value, which the AS clause names attr_name and attr_value." },
-        { "text": "SELECT product_id, attributes.* FROM bronze_products", "average": true, "why": "Star expansion lists the fields of a STRUCT column as separate columns; it doesn't apply to a MAP and never turns map entries into rows." },
-        { "text": "SELECT product_id, map_keys(attributes) AS attr_name FROM bronze_products", "why": "map_keys returns an array of the keys on the product's single row, so there is still one row per product and the values are lost." },
-        { "text": "SELECT product_id, posexplode(attributes) AS (attr_name, attr_value) FROM bronze_products", "why": "posexplode on a map returns three columns, pos, key and value, so two aliases don't match its output and the position isn't wanted anyway." }
+        {
+          "text": "SELECT product_id, explode(attributes) AS (attr_name, attr_value) FROM bronze_products",
+          "correct": true,
+          "why": "explode on a MAP returns one row per entry with two columns, the key and the value, which the AS clause names attr_name and attr_value."
+        },
+        {
+          "text": "SELECT product_id, attributes.* FROM bronze_products",
+          "average": true,
+          "why": "Star expansion lists the fields of a STRUCT column as separate columns; it doesn't apply to a MAP and never turns map entries into rows."
+        },
+        {
+          "text": "SELECT product_id, map_keys(attributes) AS attr_name FROM bronze_products",
+          "why": "map_keys returns an array of the keys on the product's single row, so there is still one row per product and the values are lost."
+        },
+        {
+          "text": "SELECT product_id, posexplode(attributes) AS (attr_name, attr_value) FROM bronze_products",
+          "why": "posexplode on a map returns three columns, pos, key and value, so two aliases don't match its output and the position isn't wanted anyway."
+        }
       ],
       "in_practice": "Exploding a map turns a sparse attribute bag into a narrow key-value table that can be filtered with WHERE attr_name = 'color', which is easier to query and govern than hundreds of mostly NULL attribute columns.",
       "source": "https://docs.databricks.com/aws/en/semi-structured/complex-types",
@@ -25,10 +39,24 @@
       "type": "single",
       "stem": "Following the guidance for Databricks Runtime 12.2 LTS and above, a data engineer moves explode out of the SELECT list and calls it as a table reference: SELECT o.order_id, t.item FROM bronze_orders AS o, LATERAL explode(o.items) AS t(item). What does the LATERAL keyword do in this query?",
       "options": [
-        { "text": "It lets explode read o.items from the table reference before it in the FROM clause", "correct": true, "why": "A table-valued function in the FROM clause can refer to columns exposed by a preceding table reference only when LATERAL is specified, so explode runs against each order's items array." },
-        { "text": "It keeps orders whose items array is NULL, returning them with a NULL item", "average": true, "why": "Returning a row for a NULL or empty array is the outer behavior of explode_outer; LATERAL only controls whether the function can see columns from earlier in the FROM clause." },
-        { "text": "It runs explode once per partition instead of once per row to cut overhead", "why": "LATERAL says nothing about how execution is batched; it is a name-resolution rule that allows a correlated table reference." },
-        { "text": "It adds the position of each element in items as an extra column", "why": "A position column comes from posexplode, which returns pos alongside each element; LATERAL adds no columns." }
+        {
+          "text": "It lets explode read o.items from the table reference before it in the FROM clause",
+          "correct": true,
+          "why": "A table-valued function in the FROM clause can refer to columns exposed by a preceding table reference only when LATERAL is specified, so explode runs against each order's items array."
+        },
+        {
+          "text": "It keeps orders whose items array is NULL, returning them with a NULL item",
+          "average": true,
+          "why": "Returning a row for a NULL or empty array is the outer behavior of explode_outer; LATERAL only controls whether the function can see columns from earlier in the FROM clause."
+        },
+        {
+          "text": "It runs explode once per partition instead of once per row to cut overhead",
+          "why": "LATERAL says nothing about how execution is batched; it is a name-resolution rule that allows a correlated table reference."
+        },
+        {
+          "text": "It adds the position of each element in items as an extra column",
+          "why": "A position column comes from posexplode, which returns pos alongside each element; LATERAL adds no columns."
+        }
       ],
       "in_practice": "Writing generators as LATERAL table references gives explode, inline and correlated subqueries one consistent style, and it avoids the SELECT-list form that Databricks has deprecated for Runtime 12.2 LTS and above.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-table-reference",
@@ -42,10 +70,24 @@
       "type": "single",
       "stem": "Bronze orders store line items as two parallel arrays, sku_list and qty_list, where the nth quantity belongs to the nth SKU. A data engineer flattens them with df.select('*', explode('sku_list').alias('sku')).select('*', explode('qty_list').alias('qty')), and an order with 3 items now produces 9 rows that pair every SKU with every quantity. Which change produces one row per item with the matching sku and qty?",
       "options": [
-        { "text": "Combine the arrays with arrays_zip, then explode the zipped array once", "correct": true, "why": "arrays_zip builds one array of structs whose nth struct holds the nth element of each input array, so a single explode yields one row per item with its SKU and quantity together." },
-        { "text": "Explode both arrays as before, then remove the extra rows with dropDuplicates()", "average": true, "why": "The 9 rows aren't duplicates: each pairs a different SKU with a different quantity, so dropDuplicates keeps them all and can't tell which pairs are real." },
-        { "text": "Replace both explode calls with explode_outer to keep the arrays aligned", "why": "explode_outer differs only in returning a row for a NULL or empty array; chaining two generators still multiplies the rows." },
-        { "text": "Explode sku_list with posexplode and keep qty_list as an array column", "why": "posexplode gives each SKU its position but leaves the whole qty_list array on every row, so the quantity is still not separated out." }
+        {
+          "text": "Combine the arrays with arrays_zip, then explode the zipped array once",
+          "correct": true,
+          "why": "arrays_zip builds one array of structs whose nth struct holds the nth element of each input array, so a single explode yields one row per item with its SKU and quantity together."
+        },
+        {
+          "text": "Explode both arrays as before, then remove the extra rows with dropDuplicates()",
+          "average": true,
+          "why": "The 9 rows aren't duplicates: each pairs a different SKU with a different quantity, so dropDuplicates keeps them all and can't tell which pairs are real."
+        },
+        {
+          "text": "Replace both explode calls with explode_outer to keep the arrays aligned",
+          "why": "explode_outer differs only in returning a row for a NULL or empty array; chaining two generators still multiplies the rows."
+        },
+        {
+          "text": "Explode sku_list with posexplode and keep qty_list as an array column",
+          "why": "posexplode gives each SKU its position but leaves the whole qty_list array on every row, so the quantity is still not separated out."
+        }
       ],
       "in_practice": "Pairing by position protects revenue figures: a cross product of 20 SKUs and 20 quantities turns one order into 400 rows and inflates totals 20-fold before anyone notices in a gold report.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/arrays_zip",
@@ -59,10 +101,24 @@
       "type": "single",
       "stem": "A data engineer builds a gold table with one row per store and one column per payment method from silver.payments, which has the columns payment_id, store_id, method and amount. The query SELECT * FROM silver.payments PIVOT (sum(amount) FOR method IN ('card' AS card, 'cash' AS cash, 'wallet' AS wallet)) returns one mostly NULL row per payment instead of one row per store. Which change fixes the query?",
       "options": [
-        { "text": "Pivot a subquery that selects only store_id, method and amount", "correct": true, "why": "PIVOT groups by every input column that isn't used in the aggregate or the FOR list, so payment_id made each payment its own group; removing it leaves store_id as the only grouping column." },
-        { "text": "Add DISTINCT to the outer SELECT so repeated store rows collapse", "average": true, "why": "The rows aren't identical: each carries a different payment_id and a different mix of NULL and non-NULL method columns, so DISTINCT removes nothing." },
-        { "text": "List store_id together with method in the FOR clause", "why": "Adding store_id to the FOR list turns store and method combinations into columns; it doesn't produce one row per store." },
-        { "text": "Replace sum(amount) with max(amount) so each method keeps one value", "why": "Changing the aggregate doesn't change the grouping; with payment_id still in the input there is still one group per payment." }
+        {
+          "text": "Pivot a subquery that selects only store_id, method and amount",
+          "correct": true,
+          "why": "PIVOT groups by every input column that isn't used in the aggregate or the FOR list, so payment_id made each payment its own group; removing it leaves store_id as the only grouping column."
+        },
+        {
+          "text": "Add DISTINCT to the outer SELECT so repeated store rows collapse",
+          "average": true,
+          "why": "The rows aren't identical: each carries a different payment_id and a different mix of NULL and non-NULL method columns, so DISTINCT removes nothing."
+        },
+        {
+          "text": "List store_id together with method in the FOR clause",
+          "why": "Adding store_id to the FOR list turns store and method combinations into columns; it doesn't produce one row per store."
+        },
+        {
+          "text": "Replace sum(amount) with max(amount) so each method keeps one value",
+          "why": "Changing the aggregate doesn't change the grouping; with payment_id still in the input there is still one group per payment."
+        }
       ],
       "in_practice": "Trimming the input to the grouping key, the pivot column and the measure also shrinks the shuffle: a gold build over 300 million payments carries three columns into the pivot instead of every payment attribute.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-pivot",
@@ -76,10 +132,24 @@
       "type": "single",
       "stem": "silver.quarterly_sales has one row per year, region and quarter, where quarter is 1 to 4, plus a sales column. A data engineer needs a gold table with one row per year and region and the columns q1, q2, q3 and q4. Which query produces it?",
       "options": [
-        { "text": "SELECT * FROM silver.quarterly_sales PIVOT (sum(sales) FOR quarter IN (1 AS q1, 2 AS q2, 3 AS q3, 4 AS q4))", "correct": true, "why": "PIVOT rotates the listed values of quarter into separate columns, aggregating sales for each, and groups by the remaining columns, year and region." },
-        { "text": "SELECT * FROM silver.quarterly_sales UNPIVOT (sales FOR quarter IN (q1, q2, q3, q4))", "average": true, "why": "UNPIVOT goes the other way, rotating columns into rows, and the source has no q1 to q4 columns to rotate." },
-        { "text": "SELECT year, region, quarter, sum(sales) FROM silver.quarterly_sales GROUP BY ROLLUP (year, region, quarter)", "why": "ROLLUP adds subtotal rows for each grouping level but keeps quarter in rows, so it never produces q1 to q4 columns." },
-        { "text": "SELECT year, region, collect_list(sales) AS q FROM silver.quarterly_sales GROUP BY year, region", "why": "collect_list puts the four values into one array column in no guaranteed order, not into separate q1 to q4 columns." }
+        {
+          "text": "SELECT * FROM silver.quarterly_sales PIVOT (sum(sales) FOR quarter IN (1 AS q1, 2 AS q2, 3 AS q3, 4 AS q4))",
+          "correct": true,
+          "why": "PIVOT rotates the listed values of quarter into separate columns, aggregating sales for each, and groups by the remaining columns, year and region."
+        },
+        {
+          "text": "SELECT * FROM silver.quarterly_sales UNPIVOT (sales FOR quarter IN (q1, q2, q3, q4))",
+          "average": true,
+          "why": "UNPIVOT goes the other way, rotating columns into rows, and the source has no q1 to q4 columns to rotate."
+        },
+        {
+          "text": "SELECT year, region, quarter, sum(sales) FROM silver.quarterly_sales GROUP BY ROLLUP (year, region, quarter)",
+          "why": "ROLLUP adds subtotal rows for each grouping level but keeps quarter in rows, so it never produces q1 to q4 columns."
+        },
+        {
+          "text": "SELECT year, region, collect_list(sales) AS q FROM silver.quarterly_sales GROUP BY year, region",
+          "why": "collect_list puts the four values into one array column in no guaranteed order, not into separate q1 to q4 columns."
+        }
       ],
       "in_practice": "Pivoting once in gold hands BI tools a report-ready wide shape, so dashboards don't each repeat four filtered aggregates and stay consistent when the quarter definition changes.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-pivot",
@@ -93,10 +163,24 @@
       "type": "single",
       "stem": "A data engineer reshapes silver.oncall_wide, with the columns week, team, primary_name, primary_phone, backup_name and backup_phone, into one row per person with the columns week, team, role, name and phone, where role is 'primary' or 'backup'. Each name must stay paired with its own phone number. Which FROM clause does this?",
       "options": [
-        { "text": "FROM silver.oncall_wide UNPIVOT ((name, phone) FOR role IN ((primary_name, primary_phone) AS primary, (backup_name, backup_phone) AS backup))", "correct": true, "why": "A multi-value UNPIVOT rotates each tuple of columns into one row, so each name and phone pair becomes a row with its role, name and phone kept together." },
-        { "text": "FROM silver.oncall_wide UNPIVOT (value FOR role IN (primary_name, primary_phone, backup_name, backup_phone))", "average": true, "why": "A single-value UNPIVOT puts names and phone numbers into one value column, one row per original column, so a person's name and phone end up on separate rows." },
-        { "text": "FROM silver.oncall_wide, LATERAL explode(array(primary_name, backup_name)) AS n(name), LATERAL explode(array(primary_phone, backup_phone)) AS p(phone)", "why": "Two independent explodes pair every name with every phone, producing four rows per team and week, and they don't produce a role column." },
-        { "text": "FROM silver.oncall_wide UNPIVOT (name FOR role IN (primary_name AS primary, backup_name AS backup))", "why": "Only the names are rotated; both phone columns stay on every row, so each row still carries two phone numbers instead of the person's own." }
+        {
+          "text": "FROM silver.oncall_wide UNPIVOT ((name, phone) FOR role IN ((primary_name, primary_phone) AS primary, (backup_name, backup_phone) AS backup))",
+          "correct": true,
+          "why": "A multi-value UNPIVOT rotates each tuple of columns into one row, so each name and phone pair becomes a row with its role, name and phone kept together."
+        },
+        {
+          "text": "FROM silver.oncall_wide UNPIVOT (value FOR role IN (primary_name, primary_phone, backup_name, backup_phone))",
+          "average": true,
+          "why": "A single-value UNPIVOT puts names and phone numbers into one value column, one row per original column, so a person's name and phone end up on separate rows."
+        },
+        {
+          "text": "FROM silver.oncall_wide, LATERAL explode(array(primary_name, backup_name)) AS n(name), LATERAL explode(array(primary_phone, backup_phone)) AS p(phone)",
+          "why": "Two independent explodes pair every name with every phone, producing four rows per team and week, and they don't produce a role column."
+        },
+        {
+          "text": "FROM silver.oncall_wide UNPIVOT (name FOR role IN (primary_name AS primary, backup_name AS backup))",
+          "why": "Only the names are rotated; both phone columns stay on every row, so each row still carries two phone numbers instead of the person's own."
+        }
       ],
       "in_practice": "Rotating column groups as tuples keeps related attributes on one row, so an escalation tool can answer 'who is backup this week and how do I call them' with one filter instead of re-pairing names and phones.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-unpivot",
@@ -110,10 +194,24 @@
       "type": "single",
       "stem": "A data engineer has a PySpark DataFrame with a store_id column and one sales column per month, jan through dec; months is a Python list of those 12 column names. Silver needs a long format with the columns store_id, month and sales, where month holds the original column name. Which call produces it?",
       "options": [
-        { "text": "df.unpivot('store_id', months, 'month', 'sales')", "correct": true, "why": "unpivot keeps store_id as the identifier and rotates the listed columns into rows, writing each column's name to month and its value to sales; melt is an alias for the same method." },
-        { "text": "df.groupBy('store_id').pivot('month').sum('sales')", "average": true, "why": "groupBy().pivot() goes from long to wide, the reverse direction, and this DataFrame has no month column to pivot on." },
-        { "text": "df.select('store_id', explode(array(*months)).alias('sales'))", "why": "Exploding an array of the month columns returns one row per value but loses which month each value came from, so there is no month column." },
-        { "text": "df.transpose('store_id')", "why": "transpose turns the values of the index column into new columns, spreading stores across columns instead of producing one row per store and month." }
+        {
+          "text": "df.unpivot('store_id', months, 'month', 'sales')",
+          "correct": true,
+          "why": "unpivot keeps store_id as the identifier and rotates the listed columns into rows, writing each column's name to month and its value to sales; melt is an alias for the same method."
+        },
+        {
+          "text": "df.groupBy('store_id').pivot('month').sum('sales')",
+          "average": true,
+          "why": "groupBy().pivot() goes from long to wide, the reverse direction, and this DataFrame has no month column to pivot on."
+        },
+        {
+          "text": "df.select('store_id', explode(array(*months)).alias('sales'))",
+          "why": "Exploding an array of the month columns returns one row per value but loses which month each value came from, so there is no month column."
+        },
+        {
+          "text": "df.transpose('store_id')",
+          "why": "transpose turns the values of the index column into new columns, spreading stores across columns instead of producing one row per store and month."
+        }
       ],
       "in_practice": "In the long shape, a gold query filters or aggregates any month with a WHERE clause, and adding a 13th fiscal period later becomes a new row value instead of a schema change for every reader.",
       "source": "https://docs.databricks.com/aws/en/pyspark/reference/classes/dataframe/unpivot",
@@ -127,10 +225,24 @@
       "type": "single",
       "stem": "A data engineer's nightly job rebuilds silver.customers with CREATE OR REPLACE TABLE ... AS SELECT from bronze_customers, which has about 150 columns. Silver must keep every column, including any the source adds later, apart from _rescued_data, and must keep every field of the STRUCT column profile apart from profile.ssn. The bronze table must stay unchanged. Which SELECT meets these requirements?",
       "options": [
-        { "text": "SELECT * EXCEPT (_rescued_data, profile.ssn) FROM bronze_customers", "correct": true, "why": "The EXCEPT clause of a star prunes top-level columns and fields of a struct column alike, so profile keeps its other fields and new bronze columns flow through on each run." },
-        { "text": "SELECT * EXCEPT (_rescued_data, profile) FROM bronze_customers", "average": true, "why": "Excluding profile drops the whole struct, losing every other profile field that silver still needs, not just ssn." },
-        { "text": "SELECT customer_id, name, ... listing all 148 wanted columns by name", "why": "An explicit list works today but leaves out any column the source adds later, which breaks the requirement to keep new columns." },
-        { "text": "ALTER TABLE bronze_customers DROP COLUMNS (_rescued_data, profile.ssn), then SELECT *", "why": "This removes the data from bronze for every consumer, which the requirement forbids, and dropping columns also needs column mapping on the table." }
+        {
+          "text": "SELECT * EXCEPT (_rescued_data, profile.ssn) FROM bronze_customers",
+          "correct": true,
+          "why": "The EXCEPT clause of a star prunes top-level columns and fields of a struct column alike, so profile keeps its other fields and new bronze columns flow through on each run."
+        },
+        {
+          "text": "SELECT * EXCEPT (_rescued_data, profile) FROM bronze_customers",
+          "average": true,
+          "why": "Excluding profile drops the whole struct, losing every other profile field that silver still needs, not just ssn."
+        },
+        {
+          "text": "SELECT customer_id, name, ... listing all 148 wanted columns by name",
+          "why": "An explicit list works today but leaves out any column the source adds later, which breaks the requirement to keep new columns."
+        },
+        {
+          "text": "ALTER TABLE bronze_customers DROP COLUMNS (_rescued_data, profile.ssn), then SELECT *",
+          "why": "This removes the data from bronze for every consumer, which the requirement forbids, and dropping columns also needs column mapping on the table."
+        }
       ],
       "in_practice": "Pruning with EXCEPT keeps a wide silver table in step with its source without a hand-maintained column list, while the sensitive field never leaves bronze, where a separate access policy can protect it.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-star",
@@ -144,10 +256,24 @@
       "type": "single",
       "stem": "silver.orders, a Delta table, has a column line_items of type ARRAY<STRUCT<sku: STRING, qty: INT, price: DECIMAL(10,2)>>. A data engineer must add a tax_amount field to every line item's struct so that later loads can populate it, without rewriting the table's data files. Which statement does this?",
       "options": [
-        { "text": "ALTER TABLE silver.orders ADD COLUMNS (line_items.element.tax_amount DECIMAL(10,2))", "correct": true, "why": "ADD COLUMNS changes only the schema, and the special name element in the column path steps into the array so the field is added to the struct of every element." },
-        { "text": "ALTER TABLE silver.orders ADD COLUMNS (tax_amount DECIMAL(10,2) AFTER line_items)", "average": true, "why": "This adds a new top-level column next to line_items, not a field inside each line item, so the tax isn't stored with the item it belongs to." },
-        { "text": "ALTER TABLE silver.orders ADD COLUMNS (line_items.tax_amount DECIMAL(10,2))", "why": "line_items is an ARRAY, not a STRUCT, so the path must navigate into its element with the special name element before naming the new field." },
-        { "text": "Rewrite the table with transform() on line_items and overwriteSchema set to true", "why": "Rebuilding each struct with transform() and overwriting the schema does add the field, but it rewrites every data file, which the requirement rules out." }
+        {
+          "text": "ALTER TABLE silver.orders ADD COLUMNS (line_items.element.tax_amount DECIMAL(10,2))",
+          "correct": true,
+          "why": "ADD COLUMNS changes only the schema, and the special name element in the column path steps into the array so the field is added to the struct of every element."
+        },
+        {
+          "text": "ALTER TABLE silver.orders ADD COLUMNS (tax_amount DECIMAL(10,2) AFTER line_items)",
+          "average": true,
+          "why": "This adds a new top-level column next to line_items, not a field inside each line item, so the tax isn't stored with the item it belongs to."
+        },
+        {
+          "text": "ALTER TABLE silver.orders ADD COLUMNS (line_items.tax_amount DECIMAL(10,2))",
+          "why": "line_items is an ARRAY, not a STRUCT, so the path must navigate into its element with the special name element before naming the new field."
+        },
+        {
+          "text": "Rewrite the table with transform() on line_items and overwriteSchema set to true",
+          "why": "Rebuilding each struct with transform() and overwriting the schema does add the field, but it rewrites every data file, which the requirement rules out."
+        }
       ],
       "in_practice": "A schema-only change on a multi-terabyte orders table finishes in seconds and existing items simply show NULL for the new field, so downstream jobs keep running while new loads start filling tax_amount.",
       "source": "https://docs.databricks.com/aws/en/tables/update-schema",
@@ -161,10 +287,24 @@
       "type": "single",
       "stem": "A data engineer adds loyalty_tier STRING to silver.customers, an existing Delta table with 20 million rows, and then runs ALTER TABLE silver.customers ALTER COLUMN loyalty_tier SET DEFAULT 'standard'. Both statements succeed. The next day, an analyst queries loyalty_tier. What does the analyst see?",
       "options": [
-        { "text": "NULL in the existing rows, and 'standard' only in rows inserted later without a value", "correct": true, "why": "Columns added to an existing Delta table are NULL for existing rows, and a default defined afterward applies only to new rows inserted without a value for that column." },
-        { "text": "'standard' in every row, because SET DEFAULT backfills the existing rows", "average": true, "why": "Setting a default doesn't touch existing rows; filling them needs an explicit UPDATE or a rewrite of the table." },
-        { "text": "'standard' in the existing rows only after OPTIMIZE rewrites their data files", "why": "OPTIMIZE compacts files without changing column values, so the existing rows stay NULL." },
-        { "text": "NULL in every row, including new inserts, until the table is rebuilt", "why": "New rows inserted without a value pick up the default as soon as it is set; no rebuild is needed." }
+        {
+          "text": "NULL in the existing rows, and 'standard' only in rows inserted later without a value",
+          "correct": true,
+          "why": "Columns added to an existing Delta table are NULL for existing rows, and a default defined afterward applies only to new rows inserted without a value for that column."
+        },
+        {
+          "text": "'standard' in every row, because SET DEFAULT backfills the existing rows",
+          "average": true,
+          "why": "Setting a default doesn't touch existing rows; filling them needs an explicit UPDATE or a rewrite of the table."
+        },
+        {
+          "text": "'standard' in the existing rows only after OPTIMIZE rewrites their data files",
+          "why": "OPTIMIZE compacts files without changing column values, so the existing rows stay NULL."
+        },
+        {
+          "text": "NULL in every row, including new inserts, until the table is rebuilt",
+          "why": "New rows inserted without a value pick up the default as soon as it is set; no rebuild is needed."
+        }
       ],
       "in_practice": "Follow a new column with a one-time UPDATE ... SET loyalty_tier = 'standard' WHERE loyalty_tier IS NULL; otherwise reports mix NULL and 'standard' for the same meaning and segment counts drift.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-alter-table-manage-column",
@@ -178,10 +318,24 @@
       "type": "single",
       "stem": "A partner sends CSV files whose headers include 'Order ID' and 'Unit Price (USD)'. The analytics team wants the silver Delta table to keep these exact column names so they match the partner's data dictionary. Which Delta Lake feature allows column names that contain spaces and parentheses?",
       "options": [
-        { "text": "Column mapping, set with the delta.columnMapping.mode table property", "correct": true, "why": "Column mapping separates logical column names from the physical Parquet names, so names with spaces and characters such as parentheses are allowed." },
-        { "text": "Schema evolution, enabled with the mergeSchema write option", "average": true, "why": "mergeSchema lets a write add new columns to the table schema; it doesn't lift the Parquet restrictions on characters in column names." },
-        { "text": "Deletion vectors, set with the delta.enableDeletionVectors property", "why": "Deletion vectors mark deleted rows without rewriting files; they have nothing to do with which characters a column name may contain." },
-        { "text": "Change data feed, set with the delta.enableChangeDataFeed property", "why": "Change data feed records row-level changes between table versions; it doesn't affect column naming." }
+        {
+          "text": "Column mapping, set with the delta.columnMapping.mode table property",
+          "correct": true,
+          "why": "Column mapping separates logical column names from the physical Parquet names, so names with spaces and characters such as parentheses are allowed."
+        },
+        {
+          "text": "Schema evolution, enabled with the mergeSchema write option",
+          "average": true,
+          "why": "mergeSchema lets a write add new columns to the table schema; it doesn't lift the Parquet restrictions on characters in column names."
+        },
+        {
+          "text": "Deletion vectors, set with the delta.enableDeletionVectors property",
+          "why": "Deletion vectors mark deleted rows without rewriting files; they have nothing to do with which characters a column name may contain."
+        },
+        {
+          "text": "Change data feed, set with the delta.enableChangeDataFeed property",
+          "why": "Change data feed records row-level changes between table versions; it doesn't affect column naming."
+        }
       ],
       "in_practice": "Keeping source names avoids a fragile rename layer of dozens of mappings, but every query must then back-quote names like `Unit Price (USD)`, so many teams still switch to snake_case in gold.",
       "source": "https://docs.databricks.com/aws/en/tables/features/column-mapping",
@@ -195,31 +349,28 @@
       "type": "single",
       "stem": "A data engineer standardizes a bronze PySpark DataFrame with about 60 columns. Only three need new names: cust_nm becomes customer_name, ord_dt becomes order_date and amt becomes amount. All other columns must keep their names and positions. Which call does this in one step?",
       "options": [
-        { "text": "df.withColumnsRenamed({'cust_nm': 'customer_name', 'ord_dt': 'order_date', 'amt': 'amount'})", "correct": true, "why": "withColumnsRenamed takes a dict of existing names to new names and renames them all in one call, leaving every other column and the column order unchanged." },
-        { "text": "df.toDF('customer_name', 'order_date', 'amount')", "average": true, "why": "toDF renames columns by position and needs one new name for every column in the DataFrame, not just the three that change." },
-        { "text": "df.select(col('cust_nm').alias('customer_name'), col('ord_dt').alias('order_date'), col('amt').alias('amount'))", "why": "This renames the three columns but returns only them, dropping the other 57 columns." },
-        { "text": "df.withColumns({'customer_name': col('cust_nm'), 'order_date': col('ord_dt'), 'amount': col('amt')})", "why": "withColumns adds the new columns as copies, so cust_nm, ord_dt and amt remain alongside them." }
+        {
+          "text": "df.withColumnsRenamed({'cust_nm': 'customer_name', 'ord_dt': 'order_date', 'amt': 'amount'})",
+          "correct": true,
+          "why": "withColumnsRenamed takes a dict of existing names to new names and renames them all in one call, leaving every other column and the column order unchanged."
+        },
+        {
+          "text": "df.toDF('customer_name', 'order_date', 'amount')",
+          "average": true,
+          "why": "toDF renames columns by position and needs one new name for every column in the DataFrame, not just the three that change."
+        },
+        {
+          "text": "df.select(col('cust_nm').alias('customer_name'), col('ord_dt').alias('order_date'), col('amt').alias('amount'))",
+          "why": "This renames the three columns but returns only them, dropping the other 57 columns."
+        },
+        {
+          "text": "df.withColumns({'customer_name': col('cust_nm'), 'order_date': col('ord_dt'), 'amount': col('amt')})",
+          "why": "withColumns adds the new columns as copies, so cust_nm, ord_dt and amt remain alongside them."
+        }
       ],
       "in_practice": "A single dict of old-to-new names is easy to keep in a per-source config file and review in a pull request, instead of a chain of rename calls scattered through a notebook.",
       "source": "https://docs.databricks.com/aws/en/pyspark/reference/classes/dataframe/withColumnsRenamed",
       "evidence": "Returns a new DataFrame by renaming multiple columns. ... colsMap: A dict of existing column names and corresponding desired column names. Currently, only a single map is supported."
-    },
-    {
-      "family": "reshaping-dot-notation-array-of-structs",
-      "objective": "transformation.reshaping",
-      "guide": "3.3",
-      "difficulty": 2,
-      "type": "single",
-      "stem": "silver.orders has one row per order and a column items of type ARRAY<STRUCT<sku: STRING, qty: INT>>. An analyst wants each order_id next to an array of just its SKUs, in the original line order, and the result must keep one row per order. Which approach does this most directly?",
-      "options": [
-        { "text": "SELECT order_id, items.sku AS skus FROM silver.orders", "correct": true, "why": "Dot notation on an array of structs returns an array of that field's values, one per element, so each order keeps its single row and the SKUs stay in line order." },
-        { "text": "Explode items, then group by order_id and aggregate collect_list(sku)", "average": true, "why": "This rebuilds the array through an extra shuffle, and Spark doesn't guarantee the element order of collect_list, so SKUs can come back out of line order." },
-        { "text": "SELECT order_id, items[0].sku AS skus FROM silver.orders", "why": "Indexing with [0] returns only the first line item's SKU as a single string, not an array of all SKUs." },
-        { "text": "SELECT order_id, items.* FROM silver.orders", "why": "Star expansion lists the fields of a STRUCT column; items is an ARRAY, so it can't be expanded this way." }
-      ],
-      "in_practice": "Extracting a field from every element without exploding avoids multiplying a ~500 million-row order table by its average line count and shuffling it back together just to rebuild an array.",
-      "source": "https://docs.databricks.com/aws/en/semi-structured/complex-types",
-      "evidence": "You can also use dot notation (.) to access fields in maps that are contained within an array. This returns an array of all values for the specified field. ... Spark does not guarantee the order of items in the array resulting from either operation."
     },
     {
       "family": "reshaping-array-join-null-replacement",
@@ -229,10 +380,24 @@
       "type": "single",
       "stem": "A data engineer builds a gold export that sends a partner each order's codes, an ARRAY<STRING> column, as one comma-delimited string. Some elements are NULL, and the partner requires each one to appear as 'NA' so that every code keeps its position. A first attempt, array_join(codes, ','), produces shorter strings for those orders. Which expression meets the requirement?",
       "options": [
-        { "text": "array_join(codes, ',', 'NA')", "correct": true, "why": "The optional third argument of array_join, nullReplacement, is written in place of each NULL element, so every position stays in the string." },
-        { "text": "concat_ws(',', codes)", "average": true, "why": "concat_ws ignores NULL elements and has no replacement argument, so the positions shift exactly as before." },
-        { "text": "array_join(coalesce(codes, array('NA')), ',')", "why": "coalesce replaces the array only when the whole array is NULL; NULL elements inside a non-NULL array are still dropped." },
-        { "text": "to_json(codes)", "why": "to_json writes a JSON array with brackets, quotes and null literals, not the plain comma-delimited format the partner expects." }
+        {
+          "text": "array_join(codes, ',', 'NA')",
+          "correct": true,
+          "why": "The optional third argument of array_join, nullReplacement, is written in place of each NULL element, so every position stays in the string."
+        },
+        {
+          "text": "concat_ws(',', codes)",
+          "average": true,
+          "why": "concat_ws ignores NULL elements and has no replacement argument, so the positions shift exactly as before."
+        },
+        {
+          "text": "array_join(coalesce(codes, array('NA')), ',')",
+          "why": "coalesce replaces the array only when the whole array is NULL; NULL elements inside a non-NULL array are still dropped."
+        },
+        {
+          "text": "to_json(codes)",
+          "why": "to_json writes a JSON array with brackets, quotes and null literals, not the plain comma-delimited format the partner expects."
+        }
       ],
       "in_practice": "Positional exports break silently when a NULL disappears: a partner reading the fifth code as a warehouse ID loads the wrong value for every shifted order, so an explicit placeholder is cheap insurance.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/array_join",
@@ -246,10 +411,24 @@
       "type": "single",
       "stem": "A data engineer adds a quality filter that should return devices whose readings column, an ARRAY<DOUBLE>, contains at least one NULL element. The query SELECT * FROM silver.devices WHERE array_contains(readings, NULL) returns no rows, although many arrays contain NULLs. Which WHERE clause returns the right devices?",
       "options": [
-        { "text": "WHERE exists(readings, x -> x IS NULL)", "correct": true, "why": "exists applies the lambda to each element and returns true when any element satisfies it, so x IS NULL finds the arrays that hold a NULL." },
-        { "text": "WHERE array_contains(readings, CAST(NULL AS DOUBLE))", "average": true, "why": "Casting doesn't help: array_contains returns NULL whenever the search value is NULL, and the WHERE clause drops rows whose condition is NULL." },
-        { "text": "WHERE readings IS NULL", "why": "This tests whether the whole array is NULL, not whether one of its elements is, so arrays with some NULL readings are missed." },
-        { "text": "WHERE array_contains(readings, NULL) IS NULL", "why": "array_contains returns NULL for every row when the search value is NULL, so this matches all devices, not just those with NULL readings." }
+        {
+          "text": "WHERE exists(readings, x -> x IS NULL)",
+          "correct": true,
+          "why": "exists applies the lambda to each element and returns true when any element satisfies it, so x IS NULL finds the arrays that hold a NULL."
+        },
+        {
+          "text": "WHERE array_contains(readings, CAST(NULL AS DOUBLE))",
+          "average": true,
+          "why": "Casting doesn't help: array_contains returns NULL whenever the search value is NULL, and the WHERE clause drops rows whose condition is NULL."
+        },
+        {
+          "text": "WHERE readings IS NULL",
+          "why": "This tests whether the whole array is NULL, not whether one of its elements is, so arrays with some NULL readings are missed."
+        },
+        {
+          "text": "WHERE array_contains(readings, NULL) IS NULL",
+          "why": "array_contains returns NULL for every row when the search value is NULL, so this matches all devices, not just those with NULL readings."
+        }
       ],
       "in_practice": "Null-safe predicates matter in quality rules: a check that silently matches nothing reports a clean table, and a fleet with ~3% dropped readings then feeds those gaps straight into gold averages.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/array_contains",
@@ -263,10 +442,24 @@
       "type": "single",
       "stem": "Bronze flights store route_codes as a STRING such as 'JFK|LHR|DXB'. A data engineer builds silver with split(route_codes, '|') and then explodes the result, but the rows hold single characters such as 'J', 'F', 'K' and '|' instead of airport codes. Which expression returns the array ['JFK', 'LHR', 'DXB']?",
       "options": [
-        { "text": "split(route_codes, '[|]')", "correct": true, "why": "split treats its second argument as a regular expression; a bare | is an alternation that matches the empty string between characters, while the character class [|] matches a literal pipe." },
-        { "text": "split(route_codes, '|', 3)", "average": true, "why": "The limit caps the number of elements but doesn't change how the pattern is read, so the bare | still splits between characters." },
-        { "text": "split_part(route_codes, '|', 1)", "why": "split_part returns a single part as a STRING, here 'JFK', not an array of all the codes." },
-        { "text": "explode(route_codes)", "why": "explode needs an ARRAY or MAP; a delimited STRING must first be split into an array." }
+        {
+          "text": "split(route_codes, '[|]')",
+          "correct": true,
+          "why": "split treats its second argument as a regular expression; a bare | is an alternation that matches the empty string between characters, while the character class [|] matches a literal pipe."
+        },
+        {
+          "text": "split(route_codes, '|', 3)",
+          "average": true,
+          "why": "The limit caps the number of elements but doesn't change how the pattern is read, so the bare | still splits between characters."
+        },
+        {
+          "text": "split_part(route_codes, '|', 1)",
+          "why": "split_part returns a single part as a STRING, here 'JFK', not an array of all the codes."
+        },
+        {
+          "text": "explode(route_codes)",
+          "why": "explode needs an ARRAY or MAP; a delimited STRING must first be split into an array."
+        }
       ],
       "in_practice": "Characters such as |, . and $ are regex metacharacters, so pipelines that split vendor files should wrap delimiters in a character class or escape them; one unescaped pipe turns a 3-code route into a row per character.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/split",
@@ -280,10 +473,24 @@
       "type": "single",
       "stem": "A data engineer lists regions whose total revenue exceeds 1,000,000 with SELECT region, sum(amount) AS revenue FROM silver.orders GROUP BY region, sum(amount) > 1000000. The query fails with a GROUP_BY_AGGREGATE error. Which rewrite returns the intended regions?",
       "options": [
-        { "text": "GROUP BY region HAVING sum(amount) > 1000000", "correct": true, "why": "HAVING filters the grouped rows after aggregation and can refer to aggregate functions, so it keeps only the regions whose total exceeds the threshold." },
-        { "text": "WHERE sum(amount) > 1000000 GROUP BY region", "average": true, "why": "WHERE filters individual rows before grouping, so it can't contain an aggregate function such as sum." },
-        { "text": "GROUP BY region QUALIFY sum(amount) > 1000000", "why": "QUALIFY filters on the results of window functions; a filter on a group's aggregate belongs in HAVING." },
-        { "text": "GROUP BY ALL, with sum(amount) > 1000000 kept in the SELECT list", "why": "In the SELECT list the comparison becomes a true or false column for every region instead of filtering any region out." }
+        {
+          "text": "GROUP BY region HAVING sum(amount) > 1000000",
+          "correct": true,
+          "why": "HAVING filters the grouped rows after aggregation and can refer to aggregate functions, so it keeps only the regions whose total exceeds the threshold."
+        },
+        {
+          "text": "WHERE sum(amount) > 1000000 GROUP BY region",
+          "average": true,
+          "why": "WHERE filters individual rows before grouping, so it can't contain an aggregate function such as sum."
+        },
+        {
+          "text": "GROUP BY region QUALIFY sum(amount) > 1000000",
+          "why": "QUALIFY filters on the results of window functions; a filter on a group's aggregate belongs in HAVING."
+        },
+        {
+          "text": "GROUP BY ALL, with sum(amount) > 1000000 kept in the SELECT list",
+          "why": "In the SELECT list the comparison becomes a true or false column for every region instead of filtering any region out."
+        }
       ],
       "in_practice": "Putting the threshold in HAVING keeps it in the same query as the aggregate, so a gold job scans and groups the orders once and returns only the regions finance asked about.",
       "source": "https://docs.databricks.com/aws/en/error-messages/group-by-aggregate-error-class",
@@ -297,10 +504,24 @@
       "type": "single",
       "stem": "A data engineer builds gold.customer_profile with one row per customer_id. One column must hold an array of the distinct product categories each customer has bought, with no repeated values. Which aggregate expression, used with GROUP BY customer_id, produces that column?",
       "options": [
-        { "text": "collect_set(category)", "correct": true, "why": "collect_set returns an array of the unique values in the group and excludes NULLs; the order of the elements is not deterministic." },
-        { "text": "collect_list(category)", "average": true, "why": "collect_list gathers every value, so a category bought ten times appears ten times in the array." },
-        { "text": "count(DISTINCT category)", "why": "This returns how many distinct categories there are as a number, not an array of the categories." },
-        { "text": "approx_top_k(category)", "why": "approx_top_k returns only the most frequent categories with their counts, five by default, rather than every distinct category." }
+        {
+          "text": "collect_set(category)",
+          "correct": true,
+          "why": "collect_set returns an array of the unique values in the group and excludes NULLs; the order of the elements is not deterministic."
+        },
+        {
+          "text": "collect_list(category)",
+          "average": true,
+          "why": "collect_list gathers every value, so a category bought ten times appears ten times in the array."
+        },
+        {
+          "text": "count(DISTINCT category)",
+          "why": "This returns how many distinct categories there are as a number, not an array of the categories."
+        },
+        {
+          "text": "approx_top_k(category)",
+          "why": "approx_top_k returns only the most frequent categories with their counts, five by default, rather than every distinct category."
+        }
       ],
       "in_practice": "Because collect_set's order varies between runs, sort the array before it feeds a comparison or a hash; otherwise a daily change check can flag every customer as changed.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/collect_set",
@@ -314,10 +535,24 @@
       "type": "single",
       "stem": "A data engineer builds silver.customers from silver.customer_updates, which holds several rows per customer_id, each with email and updated_at. The query SELECT customer_id, first(email) AS email FROM (SELECT * FROM silver.customer_updates ORDER BY updated_at DESC) GROUP BY customer_id returns a different email for some customers on each run. Which expression reliably returns each customer's most recent email?",
       "options": [
-        { "text": "max_by(email, updated_at)", "correct": true, "why": "max_by returns the email from the row with the largest updated_at in each group, so the result depends on the data rather than on the order rows reach the aggregate." },
-        { "text": "first(email, true)", "average": true, "why": "The second argument only skips NULL emails; first is still non-deterministic, and the subquery's ORDER BY doesn't control which row the aggregate sees first." },
-        { "text": "max(email)", "why": "max compares the email strings themselves and returns the alphabetically largest address, not the most recent one." },
-        { "text": "any_value(email)", "why": "any_value returns some email from the group and is non-deterministic by design, so it has the same problem as first." }
+        {
+          "text": "max_by(email, updated_at)",
+          "correct": true,
+          "why": "max_by returns the email from the row with the largest updated_at in each group, so the result depends on the data rather than on the order rows reach the aggregate."
+        },
+        {
+          "text": "first(email, true)",
+          "average": true,
+          "why": "The second argument only skips NULL emails; first is still non-deterministic, and the subquery's ORDER BY doesn't control which row the aggregate sees first."
+        },
+        {
+          "text": "max(email)",
+          "why": "max compares the email strings themselves and returns the alphabetically largest address, not the most recent one."
+        },
+        {
+          "text": "any_value(email)",
+          "why": "any_value returns some email from the group and is non-deterministic by design, so it has the same problem as first."
+        }
       ],
       "in_practice": "max_by is still non-deterministic when two updates share the same updated_at, so order by a value that is unique per customer, for example updated_at combined with an ingestion sequence number, when the source can emit simultaneous updates.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/max_by",
@@ -331,10 +566,24 @@
       "type": "single",
       "stem": "A data engineer needs the 10 most frequent search terms, with their counts, from a search log of several billion rows. Approximate counts are acceptable if the query is cheaper than an exact GROUP BY with ORDER BY. Which aggregate expression returns this?",
       "options": [
-        { "text": "approx_top_k(search_term, 10)", "correct": true, "why": "approx_top_k returns an array of structs holding each of the k most frequent values and its approximate count, sorted by count in descending order." },
-        { "text": "approx_count_distinct(search_term)", "average": true, "why": "This estimates how many distinct terms exist; it doesn't say which terms are most frequent or how often each one appears." },
-        { "text": "approx_percentile(search_term, 0.9)", "why": "approx_percentile takes a numeric expression and returns a percentile value, not the most frequent items." },
-        { "text": "collect_set(search_term)", "why": "collect_set returns every distinct term without counts or ranking, which on billions of rows can be a huge array." }
+        {
+          "text": "approx_top_k(search_term, 10)",
+          "correct": true,
+          "why": "approx_top_k returns an array of structs holding each of the k most frequent values and its approximate count, sorted by count in descending order."
+        },
+        {
+          "text": "approx_count_distinct(search_term)",
+          "average": true,
+          "why": "This estimates how many distinct terms exist; it doesn't say which terms are most frequent or how often each one appears."
+        },
+        {
+          "text": "approx_percentile(search_term, 0.9)",
+          "why": "approx_percentile takes a numeric expression and returns a percentile value, not the most frequent items."
+        },
+        {
+          "text": "collect_set(search_term)",
+          "why": "collect_set returns every distinct term without counts or ranking, which on billions of rows can be a huge array."
+        }
       ],
       "in_practice": "Each count's error is bounded by 2.0 * numRows / maxItemsTracked, so raising maxItemsTracked above its default of 10,000 tightens counts for a long-tail search log at the cost of more memory.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/approx_top_k",
@@ -348,10 +597,24 @@
       "type": "single",
       "stem": "A data engineer maintains gold.daily_users with approx_count_distinct(user_id) for each day. Product managers now want distinct users per week and per month, and rescanning the raw events table for every period is too slow. A colleague proposes summing the daily figures. Which approach gives correct approximate distinct counts without rescanning raw events?",
       "options": [
-        { "text": "Store hll_sketch_agg(user_id) per day, then merge days with hll_union_agg and read hll_sketch_estimate", "correct": true, "why": "An HLL sketch is a binary buffer that can be stored; hll_union_agg merges the daily sketches so a user active on several days is counted once, and hll_sketch_estimate returns the count." },
-        { "text": "Sum the daily approx_count_distinct values for the days in each week or month", "average": true, "why": "Summing counts a user once for every day they were active, so someone who visits daily is counted seven times in a week." },
-        { "text": "Take the largest daily approx_count_distinct value within each week or month", "why": "The busiest day is only a lower bound, because users who were active only on other days are missed." },
-        { "text": "Average the daily values and multiply by the number of days in the period", "why": "This equals the sum of the daily counts, so it repeats the double counting of returning users." }
+        {
+          "text": "Store hll_sketch_agg(user_id) per day, then merge days with hll_union_agg and read hll_sketch_estimate",
+          "correct": true,
+          "why": "An HLL sketch is a binary buffer that can be stored; hll_union_agg merges the daily sketches so a user active on several days is counted once, and hll_sketch_estimate returns the count."
+        },
+        {
+          "text": "Sum the daily approx_count_distinct values for the days in each week or month",
+          "average": true,
+          "why": "Summing counts a user once for every day they were active, so someone who visits daily is counted seven times in a week."
+        },
+        {
+          "text": "Take the largest daily approx_count_distinct value within each week or month",
+          "why": "The busiest day is only a lower bound, because users who were active only on other days are missed."
+        },
+        {
+          "text": "Average the daily values and multiply by the number of days in the period",
+          "why": "This equals the sum of the daily counts, so it repeats the double counting of returning users."
+        }
       ],
       "in_practice": "Storing one small sketch per day turns a monthly distinct-user query from a scan of billions of events into a merge of about 30 rows, and the same sketches serve weekly, monthly and quarter-to-date views.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/hll_sketch_agg",
@@ -365,10 +628,24 @@
       "type": "single",
       "stem": "An analyst wants a quick approximate average order value from silver.orders, which has about 5 billion rows. A first attempt computes avg(amount) over a LIMIT 1000000 subquery and returns a value skewed toward one region. The analyst needs a random sample so the estimate is unbiased. Which FROM clause should the query use instead?",
       "options": [
-        { "text": "FROM silver.orders TABLESAMPLE (1 PERCENT)", "correct": true, "why": "Sampling by percentage draws a random fraction of rows from across the table, which is what an unbiased approximate aggregate needs." },
-        { "text": "FROM silver.orders TABLESAMPLE (1000000 ROWS)", "average": true, "why": "The ROWS form isn't a simple random sample; it is implemented with LIMIT, so it has the same bias as the first attempt." },
-        { "text": "FROM (SELECT * FROM silver.orders ORDER BY order_id LIMIT 1000000)", "why": "Ordering by order_id returns the lowest IDs, a fixed slice of the oldest orders rather than a random sample." },
-        { "text": "FROM (SELECT * FROM silver.orders LIMIT 1000000 OFFSET 1000000)", "why": "Skipping the first million rows still returns whichever rows are read next, so the sample is just as non-random." }
+        {
+          "text": "FROM silver.orders TABLESAMPLE (1 PERCENT)",
+          "correct": true,
+          "why": "Sampling by percentage draws a random fraction of rows from across the table, which is what an unbiased approximate aggregate needs."
+        },
+        {
+          "text": "FROM silver.orders TABLESAMPLE (1000000 ROWS)",
+          "average": true,
+          "why": "The ROWS form isn't a simple random sample; it is implemented with LIMIT, so it has the same bias as the first attempt."
+        },
+        {
+          "text": "FROM (SELECT * FROM silver.orders ORDER BY order_id LIMIT 1000000)",
+          "why": "Ordering by order_id returns the lowest IDs, a fixed slice of the oldest orders rather than a random sample."
+        },
+        {
+          "text": "FROM (SELECT * FROM silver.orders LIMIT 1000000 OFFSET 1000000)",
+          "why": "Skipping the first million rows still returns whichever rows are read next, so the sample is just as non-random."
+        }
       ],
       "in_practice": "Add REPEATABLE (seed) when a sampled estimate feeds a test or a dashboard tile so reruns return the same rows; a 1% sample of 5 billion rows is still ~50 million rows, plenty for a stable mean.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-sampling",
@@ -382,10 +659,24 @@
       "type": "single",
       "stem": "A data engineer adds a gold table with the 95th-percentile request latency per API endpoint, computed every hour from a silver table with billions of rows. Exact percentiles are too expensive, and an approximation is acceptable. Which expression returns the value?",
       "options": [
-        { "text": "approx_percentile(latency_ms, 0.95)", "correct": true, "why": "approx_percentile returns an approximate percentile of a numeric column within each group, and the percentile is given as a fraction between 0 and 1." },
-        { "text": "avg(latency_ms)", "average": true, "why": "The mean describes typical latency, not the value below which 95% of requests fall, and a few very slow requests can shift it." },
-        { "text": "approx_percentile(latency_ms, 95)", "why": "The percentile argument must be a fraction between 0 and 1, so 95 isn't valid; 0.95 asks for the 95th percentile." },
-        { "text": "approx_top_k(latency_ms, 95)", "why": "approx_top_k returns the most frequent latency values with their counts, not a percentile." }
+        {
+          "text": "approx_percentile(latency_ms, 0.95)",
+          "correct": true,
+          "why": "approx_percentile returns an approximate percentile of a numeric column within each group, and the percentile is given as a fraction between 0 and 1."
+        },
+        {
+          "text": "avg(latency_ms)",
+          "average": true,
+          "why": "The mean describes typical latency, not the value below which 95% of requests fall, and a few very slow requests can shift it."
+        },
+        {
+          "text": "approx_percentile(latency_ms, 95)",
+          "why": "The percentile argument must be a fraction between 0 and 1, so 95 isn't valid; 0.95 asks for the 95th percentile."
+        },
+        {
+          "text": "approx_top_k(latency_ms, 95)",
+          "why": "approx_top_k returns the most frequent latency values with their counts, not a percentile."
+        }
       ],
       "in_practice": "The optional accuracy argument defaults to 10000, giving a relative error of 1.0/accuracy; raise it only if an SLO report needs tighter bounds, because higher accuracy costs memory per group.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/approx_percentile",
@@ -399,10 +690,24 @@
       "type": "single",
       "stem": "A data engineer computes a running total per store with SUM(amount) OVER (PARTITION BY store_id ORDER BY sale_date RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW). A store with three sales on the same day shows the same running total on all three rows, equal to the total at the end of that day. The finance team wants the total to grow row by row. Which change does this?",
       "options": [
-        { "text": "Change the frame to ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW", "correct": true, "why": "A ROWS frame counts each row individually, while a RANGE frame treats rows with equal ORDER BY values as one group and includes all of them in each row's total." },
-        { "text": "Add sale_date to the PARTITION BY clause", "average": true, "why": "Partitioning by date restarts the total every day, and with RANGE the three same-day rows would still share one value." },
-        { "text": "Change the frame to RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING", "why": "This computes the remaining total from each row to the end of the partition, the opposite of a running total." },
-        { "text": "Replace the window with GROUP BY store_id, sale_date", "why": "Grouping collapses the three sales into one row per day, so there is no per-sale running total left." }
+        {
+          "text": "Change the frame to ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW",
+          "correct": true,
+          "why": "A ROWS frame counts each row individually, while a RANGE frame treats rows with equal ORDER BY values as one group and includes all of them in each row's total."
+        },
+        {
+          "text": "Add sale_date to the PARTITION BY clause",
+          "average": true,
+          "why": "Partitioning by date restarts the total every day, and with RANGE the three same-day rows would still share one value."
+        },
+        {
+          "text": "Change the frame to RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING",
+          "why": "This computes the remaining total from each row to the end of the partition, the opposite of a running total."
+        },
+        {
+          "text": "Replace the window with GROUP BY store_id, sale_date",
+          "why": "Grouping collapses the three sales into one row per day, so there is no per-sale running total left."
+        }
       ],
       "in_practice": "With ROWS, the order of same-day sales is arbitrary unless the ORDER BY includes a unique column such as sale_id, so add one to keep reruns reproducible for reconciliations.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-window-functions-frame",
@@ -416,10 +721,24 @@
       "type": "single",
       "stem": "A data engineer counts events in silver.clicks with GROUP BY window(event_ts, '10 MINUTES', '5 MINUTES'). During validation, the sum of the counts across all windows is about twice the number of rows in the table, although no event is duplicated. What explains this?",
       "options": [
-        { "text": "The 5-minute slide is shorter than the 10-minute width, so windows overlap and each event falls in two", "correct": true, "why": "When the slide is less than the width, consecutive windows overlap and a row is counted in every window that covers it; with slide equal to width the windows partition the rows." },
-        { "text": "Events exactly on a boundary are counted twice, because window ends are inclusive", "average": true, "why": "Window starts are inclusive and ends are exclusive, so a boundary event isn't counted twice for that reason; a few boundary rows couldn't double the total anyway." },
-        { "text": "Late events are counted again when they arrive after their window closes", "why": "This is a batch GROUP BY over a table, with no late data or streaming state; each row is grouped once per window that covers it." },
-        { "text": "GROUP BY window adds a subtotal row for every window, like ROLLUP", "why": "window() only defines time buckets; subtotal rows come from ROLLUP, CUBE or GROUPING SETS, none of which the query uses." }
+        {
+          "text": "The 5-minute slide is shorter than the 10-minute width, so windows overlap and each event falls in two",
+          "correct": true,
+          "why": "When the slide is less than the width, consecutive windows overlap and a row is counted in every window that covers it; with slide equal to width the windows partition the rows."
+        },
+        {
+          "text": "Events exactly on a boundary are counted twice, because window ends are inclusive",
+          "average": true,
+          "why": "Window starts are inclusive and ends are exclusive, so a boundary event isn't counted twice for that reason; a few boundary rows couldn't double the total anyway."
+        },
+        {
+          "text": "Late events are counted again when they arrive after their window closes",
+          "why": "This is a batch GROUP BY over a table, with no late data or streaming state; each row is grouped once per window that covers it."
+        },
+        {
+          "text": "GROUP BY window adds a subtotal row for every window, like ROLLUP",
+          "why": "window() only defines time buckets; subtotal rows come from ROLLUP, CUBE or GROUPING SETS, none of which the query uses."
+        }
       ],
       "in_practice": "Sliding windows suit smoothed trend lines, but counts that must add up to a daily total need tumbling windows, with the slide equal to the width, or finance reconciliations are off by the overlap factor.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/window",
@@ -433,10 +752,24 @@
       "type": "single",
       "stem": "A data engineer's pipeline deduplicates an at-least-once click stream with .withWatermark('click_ts', '10 minutes').dropDuplicatesWithinWatermark(['user_id', 'ad_id']). The advertising team reports that gold click counts are consistently lower than the ad server's billing totals. Each click carries a session_id and a click_seq_num that together identify it uniquely. Which change fixes the undercount?",
       "options": [
-        { "text": "Deduplicate on ['session_id', 'click_seq_num'], the columns that identify each click", "correct": true, "why": "The deduplication key must follow the source's uniqueness contract; session_id with click_seq_num identifies one click, so resends are removed while repeat clicks are kept." },
-        { "text": "Lengthen the watermark delay to two hours so late resends are still caught", "average": true, "why": "A longer watermark keeps state longer but still treats two clicks by the same user on the same ad as duplicates, so even more real clicks are dropped." },
-        { "text": "Replace dropDuplicatesWithinWatermark with dropDuplicates and no watermark", "why": "Dropping the watermark keeps unbounded state and still uses user and ad as the identity, so legitimate repeat clicks are still discarded." },
-        { "text": "Deduplicate on ['ad_id', 'click_ts'] instead of the user and the ad", "why": "Two users can click the same ad at the same instant, so this key can merge distinct clicks; it isn't the documented identity of a click." }
+        {
+          "text": "Deduplicate on ['session_id', 'click_seq_num'], the columns that identify each click",
+          "correct": true,
+          "why": "The deduplication key must follow the source's uniqueness contract; session_id with click_seq_num identifies one click, so resends are removed while repeat clicks are kept."
+        },
+        {
+          "text": "Lengthen the watermark delay to two hours so late resends are still caught",
+          "average": true,
+          "why": "A longer watermark keeps state longer but still treats two clicks by the same user on the same ad as duplicates, so even more real clicks are dropped."
+        },
+        {
+          "text": "Replace dropDuplicatesWithinWatermark with dropDuplicates and no watermark",
+          "why": "Dropping the watermark keeps unbounded state and still uses user and ad as the identity, so legitimate repeat clicks are still discarded."
+        },
+        {
+          "text": "Deduplicate on ['ad_id', 'click_ts'] instead of the user and the ad",
+          "why": "Two users can click the same ad at the same instant, so this key can merge distinct clicks; it isn't the documented identity of a click."
+        }
       ],
       "in_practice": "A dedup key that is too coarse fails silently: totals look plausible while the business bills an advertiser for fewer clicks than were delivered, so confirm the source's uniqueness contract before choosing subset columns.",
       "source": "https://docs.databricks.com/aws/en/ldp/best-practices/processing-guarantees",
@@ -450,10 +783,24 @@
       "type": "single",
       "stem": "A data engineer's streaming table in a Lakeflow Spark Declarative Pipeline reads events from Kafka into silver.events. The producer retries on timeouts and sometimes sends the same event twice. The team expected exactly-once processing to prevent duplicates, but silver contains repeated event_id values even though the pipeline never restarted. Why?",
       "options": [
-        { "text": "Exactly-once covers how the pipeline processes records; a record the source sends twice is written twice", "correct": true, "why": "Managed tables process each record once, but repeated records from an at-least-once source are treated as unique records, and removing them is the pipeline author's job." },
-        { "text": "The pipeline lost its checkpoint and reprocessed Kafka offsets it had already read", "average": true, "why": "Checkpoints let a restarted update resume without reprocessing, and this pipeline never restarted, so replayed offsets don't explain the duplicates." },
-        { "text": "Pipelines read Kafka at-least-once, and exactly-once applies only to Auto Loader file sources", "why": "Exactly-once processing in streaming tables holds for Kafka, Kinesis and Event Hubs reads as well as for Auto Loader." },
-        { "text": "Streaming tables deduplicate only within one micro-batch, and the retries span batches", "why": "Streaming tables don't deduplicate records on their own at all; duplicates must be removed explicitly in the pipeline's logic." }
+        {
+          "text": "Exactly-once covers how the pipeline processes records; a record the source sends twice is written twice",
+          "correct": true,
+          "why": "Managed tables process each record once, but repeated records from an at-least-once source are treated as unique records, and removing them is the pipeline author's job."
+        },
+        {
+          "text": "The pipeline lost its checkpoint and reprocessed Kafka offsets it had already read",
+          "average": true,
+          "why": "Checkpoints let a restarted update resume without reprocessing, and this pipeline never restarted, so replayed offsets don't explain the duplicates."
+        },
+        {
+          "text": "Pipelines read Kafka at-least-once, and exactly-once applies only to Auto Loader file sources",
+          "why": "Exactly-once processing in streaming tables holds for Kafka, Kinesis and Event Hubs reads as well as for Auto Loader."
+        },
+        {
+          "text": "Streaming tables deduplicate only within one micro-batch, and the retries span batches",
+          "why": "Streaming tables don't deduplicate records on their own at all; duplicates must be removed explicitly in the pipeline's logic."
+        }
       ],
       "in_practice": "Add an explicit dedup step on event_id, such as a watermark with dropDuplicatesWithinWatermark or an AUTO CDC flow keyed on it, at the first silver table so every downstream count inherits clean data.",
       "source": "https://docs.databricks.com/aws/en/ldp/best-practices/processing-guarantees",
@@ -467,10 +814,24 @@
       "type": "single",
       "stem": "A data engineer appends application logs with merge into silver.logs t using new_logs s on t.log_id = s.log_id when not matched then insert *. The collector sometimes emits the same log record twice within one batch, and silver.logs is ending up with repeated log_id values. Which change keeps log_id unique?",
       "options": [
-        { "text": "Deduplicate new_logs on log_id before running the MERGE", "correct": true, "why": "MERGE compares incoming rows only with rows already in the target, so duplicates inside the source batch are all inserted unless the batch is deduplicated first." },
-        { "text": "Add a WHEN MATCHED THEN UPDATE SET * clause so repeats overwrite each other", "average": true, "why": "Duplicates within the batch don't match any existing target row, so both still take the insert path; the new clause never sees them." },
-        { "text": "Restrict the ON condition to recent dates using a date partition column", "why": "Limiting the match to recent dates speeds up the merge against the target but does nothing about duplicates within the incoming batch." },
-        { "text": "Run OPTIMIZE on silver.logs after each MERGE", "why": "OPTIMIZE compacts small files; it doesn't remove or combine rows, so the repeated log_id values remain." }
+        {
+          "text": "Deduplicate new_logs on log_id before running the MERGE",
+          "correct": true,
+          "why": "MERGE compares incoming rows only with rows already in the target, so duplicates inside the source batch are all inserted unless the batch is deduplicated first."
+        },
+        {
+          "text": "Add a WHEN MATCHED THEN UPDATE SET * clause so repeats overwrite each other",
+          "average": true,
+          "why": "Duplicates within the batch don't match any existing target row, so both still take the insert path; the new clause never sees them."
+        },
+        {
+          "text": "Restrict the ON condition to recent dates using a date partition column",
+          "why": "Limiting the match to recent dates speeds up the merge against the target but does nothing about duplicates within the incoming batch."
+        },
+        {
+          "text": "Run OPTIMIZE on silver.logs after each MERGE",
+          "why": "OPTIMIZE compacts small files; it doesn't remove or combine rows, so the repeated log_id values remain."
+        }
       ],
       "in_practice": "Deduplicating each batch with dropDuplicates(['log_id']) or a row_number filter costs one small shuffle per run, far less than a nightly cleanup pass over a multi-terabyte log table.",
       "source": "https://docs.databricks.com/aws/en/delta/merge",
@@ -484,10 +845,24 @@
       "type": "single",
       "stem": "A data engineer reports how many distinct customer-product combinations appear in silver.order_lines, where the same customer often buys the same product many times. customer_id and product_id are never NULL. Which SQL expression returns this number?",
       "options": [
-        { "text": "count(DISTINCT customer_id, product_id)", "correct": true, "why": "With DISTINCT and several expressions, count returns the number of unique combinations of their values, so each customer-product pair is counted once." },
-        { "text": "count(customer_id, product_id)", "average": true, "why": "Without DISTINCT, count returns the number of rows where both values are non-NULL, so repeat purchases are counted every time." },
-        { "text": "count(DISTINCT concat(customer_id, product_id))", "why": "Concatenating without a separator lets different pairs collide, such as customer 1 with product 23 and customer 12 with product 3." },
-        { "text": "count(DISTINCT customer_id) * count(DISTINCT product_id)", "why": "Multiplying the two distinct counts gives every possible pair, including combinations that never occurred." }
+        {
+          "text": "count(DISTINCT customer_id, product_id)",
+          "correct": true,
+          "why": "With DISTINCT and several expressions, count returns the number of unique combinations of their values, so each customer-product pair is counted once."
+        },
+        {
+          "text": "count(customer_id, product_id)",
+          "average": true,
+          "why": "Without DISTINCT, count returns the number of rows where both values are non-NULL, so repeat purchases are counted every time."
+        },
+        {
+          "text": "count(DISTINCT concat(customer_id, product_id))",
+          "why": "Concatenating without a separator lets different pairs collide, such as customer 1 with product 23 and customer 12 with product 3."
+        },
+        {
+          "text": "count(DISTINCT customer_id) * count(DISTINCT product_id)",
+          "why": "Multiplying the two distinct counts gives every possible pair, including combinations that never occurred."
+        }
       ],
       "in_practice": "When a few percent of error is acceptable on a very large table, approx_count_distinct over struct(customer_id, product_id) avoids holding the full set of distinct pairs in memory.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/count",
@@ -501,10 +876,24 @@
       "type": "single",
       "stem": "silver.shipments has one row per shipment with order_id and a BOOLEAN column delivered. A data engineer builds gold.order_status with one row per order_id and a column fully_delivered that is true only when every shipment of the order is delivered. Which aggregate expression produces fully_delivered?",
       "options": [
-        { "text": "bool_and(delivered)", "correct": true, "why": "bool_and, a synonym for every, returns true only if all values in the group are true." },
-        { "text": "bool_or(delivered)", "average": true, "why": "bool_or returns true when at least one shipment is delivered, so partly delivered orders would be marked complete." },
-        { "text": "max(delivered)", "why": "For booleans, max is true as soon as any shipment is delivered, which is an any-delivered test rather than an all-delivered test." },
-        { "text": "count(delivered) > 0", "why": "count counts non-NULL values whether they are true or false, so any order with a recorded shipment status would pass." }
+        {
+          "text": "bool_and(delivered)",
+          "correct": true,
+          "why": "bool_and, a synonym for every, returns true only if all values in the group are true."
+        },
+        {
+          "text": "bool_or(delivered)",
+          "average": true,
+          "why": "bool_or returns true when at least one shipment is delivered, so partly delivered orders would be marked complete."
+        },
+        {
+          "text": "max(delivered)",
+          "why": "For booleans, max is true as soon as any shipment is delivered, which is an any-delivered test rather than an all-delivered test."
+        },
+        {
+          "text": "count(delivered) > 0",
+          "why": "count counts non-NULL values whether they are true or false, so any order with a recorded shipment status would pass."
+        }
       ],
       "in_practice": "bool_and ignores NULLs, so a shipment with an unknown status doesn't block an order; use bool_and(coalesce(delivered, false)) if an unknown status should count as not delivered.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/bool_and",
@@ -518,10 +907,24 @@
       "type": "single",
       "stem": "A data engineer writes SELECT country_code, country_name, sum(amount) FROM silver.orders GROUP BY country_code. Every country_code always has the same country_name, but the query fails because country_name is neither grouped nor aggregated. The engineer wants to keep grouping on country_code alone. Which expression should replace country_name in the SELECT list?",
       "options": [
-        { "text": "any_value(country_name)", "correct": true, "why": "any_value returns some value of the column from each group; it is non-deterministic in general, but when every row in a group has the same name it returns that name." },
-        { "text": "collect_set(country_name)", "average": true, "why": "collect_set returns an array, so the report would show a one-element array such as ['France'] instead of a plain name." },
-        { "text": "count(DISTINCT country_name)", "why": "This returns how many names each group has, 1 here, rather than the name itself." },
-        { "text": "concat_ws(',', country_name)", "why": "concat_ws is a scalar function, not an aggregate, so country_name is still neither grouped nor aggregated and the query fails the same way." }
+        {
+          "text": "any_value(country_name)",
+          "correct": true,
+          "why": "any_value returns some value of the column from each group; it is non-deterministic in general, but when every row in a group has the same name it returns that name."
+        },
+        {
+          "text": "collect_set(country_name)",
+          "average": true,
+          "why": "collect_set returns an array, so the report would show a one-element array such as ['France'] instead of a plain name."
+        },
+        {
+          "text": "count(DISTINCT country_name)",
+          "why": "This returns how many names each group has, 1 here, rather than the name itself."
+        },
+        {
+          "text": "concat_ws(',', country_name)",
+          "why": "concat_ws is a scalar function, not an aggregate, so country_name is still neither grouped nor aggregated and the query fails the same way."
+        }
       ],
       "in_practice": "any_value keeps descriptive columns out of the GROUP BY, which keeps the grouping key small; use it only for attributes that truly depend on the key, because otherwise it quietly picks an arbitrary value.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/any_value",
@@ -535,14 +938,59 @@
       "type": "single",
       "stem": "A data engineer must flag orders whose amount is more than three times their region's average order amount. The output must keep one row per order, with the region's average shown on each row next to the order's own amount. Which expression supplies the regional average in a query over silver.orders?",
       "options": [
-        { "text": "avg(amount) OVER (PARTITION BY region)", "correct": true, "why": "As a window function, avg is computed over all rows of the same region and returned on every row, so no orders are collapsed." },
-        { "text": "avg(amount) with GROUP BY region", "average": true, "why": "GROUP BY collapses each region to a single row, losing the individual orders that must be compared with the average." },
-        { "text": "avg(amount) OVER (ORDER BY region)", "why": "Without PARTITION BY the window spans all rows, so the result mixes regions instead of giving each region its own average." },
-        { "text": "avg(amount) FILTER (WHERE region IS NOT NULL)", "why": "FILTER only chooses which rows feed the aggregate; it neither splits the average by region nor keeps a row per order." }
+        {
+          "text": "avg(amount) OVER (PARTITION BY region)",
+          "correct": true,
+          "why": "As a window function, avg is computed over all rows of the same region and returned on every row, so no orders are collapsed."
+        },
+        {
+          "text": "avg(amount) with GROUP BY region",
+          "average": true,
+          "why": "GROUP BY collapses each region to a single row, losing the individual orders that must be compared with the average."
+        },
+        {
+          "text": "avg(amount) OVER (ORDER BY region)",
+          "why": "Without PARTITION BY the window spans all rows, so the result mixes regions instead of giving each region its own average."
+        },
+        {
+          "text": "avg(amount) FILTER (WHERE region IS NOT NULL)",
+          "why": "FILTER only chooses which rows feed the aggregate; it neither splits the average by region nor keeps a row per order."
+        }
       ],
       "in_practice": "A window average replaces a GROUP BY plus a join back to the orders table, which keeps an anomaly-flagging job over ~1 billion orders to one partitioned pass.",
       "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-window-functions",
       "evidence": "Functions that operate on a group of rows, referred to as a window, and calculate a return value for each row based on the group of rows. ... One or more expression used to specify a group of rows defining the scope on which the function operates. If no PARTITION clause is specified the partition is comprised of all rows."
+    },
+    {
+      "family": "reshaping-drop-column-check-constraint",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer retires the discount_pct column from silver.order_lines, a Delta table with column mapping enabled. The table has the CHECK constraint valid_discount (discount_pct BETWEEN 0 AND 100). ALTER TABLE silver.order_lines DROP COLUMN discount_pct fails with an error saying the column is referenced by valid_discount. What should the engineer do?",
+      "options": [
+        {
+          "text": "Drop the valid_discount constraint, then drop the column",
+          "correct": true,
+          "why": "Before a column or field can be dropped, the check constraints and generated columns that depend on it must be dropped, so ALTER TABLE ... DROP CONSTRAINT valid_discount comes first."
+        },
+        {
+          "text": "Rerun the statement as DROP COLUMN IF EXISTS discount_pct",
+          "average": true,
+          "why": "IF EXISTS only makes Databricks ignore an attempt to drop a column that doesn't exist; discount_pct exists, and the constraint that depends on it still blocks the drop."
+        },
+        {
+          "text": "Set discount_pct to NULL in every row, then drop the column",
+          "why": "The constraint depends on the column's definition, not its values; nulling every row rewrites data and still leaves valid_discount referencing discount_pct."
+        },
+        {
+          "text": "Run REORG TABLE ... APPLY (PURGE) first, then drop the column",
+          "why": "REORG TABLE ... APPLY (PURGE) rewrites files to remove soft-deleted data, such as columns already dropped; it doesn't remove a constraint that references a column still in the table."
+        }
+      ],
+      "in_practice": "Schema clean-ups go smoother when the migration script looks up dependent constraints first, for example with SHOW TBLPROPERTIES, and drops them in the same change, so a release doesn't stall halfway on a failed DROP COLUMN.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-alter-table-manage-column",
+      "evidence": "Drop one or more columns or fields in a relation. When you drop a column or field, you must drop dependent check constraints and generated columns."
     }
   ]
 }

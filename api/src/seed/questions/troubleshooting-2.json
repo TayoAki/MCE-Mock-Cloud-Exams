@@ -125,37 +125,6 @@
       "evidence": "result_state: The outcome of the job run. For runs longer than one hour that are split across multiple rows, this column is populated only in the row that represents the end of the run."
     },
     {
-      "family": "monitoring-pipeline-event-log-expectations",
-      "objective": "troubleshooting.monitoring",
-      "guide": "6.2",
-      "difficulty": 1,
-      "type": "single",
-      "stem": "A data engineer wants to chart, for every update of a Lakeflow Spark Declarative Pipelines pipeline, how many records passed and failed each expectation. Where are these per-expectation counts recorded?",
-      "options": [
-        {
-          "text": "In flow_progress events in the pipeline's event log",
-          "correct": true,
-          "why": "The pipeline event log stores data quality metrics in the details:flow_progress.data_quality.expectations object of flow_progress events, with passed_records and failed_records for each expectation. Query it with event_log() or a published event log table."
-        },
-        {
-          "text": "In the system.lakeflow.pipeline_update_timeline table",
-          "average": true,
-          "why": "This system table tracks each pipeline update, with its trigger, result state and timing. It doesn't break results down by expectation."
-        },
-        {
-          "text": "In the operation metrics from DESCRIBE HISTORY on each target table",
-          "why": "Table history records each commit's operation and write metrics. Expectation pass and fail counts are kept in the pipeline event log, not in the table history."
-        },
-        {
-          "text": "In the Top 5 error types table on the Runs tab",
-          "why": "That table ranks the most frequent error types across job and pipeline runs. It doesn't report record counts for expectations."
-        }
-      ],
-      "in_practice": "Charting failed_records per expectation over weeks turns data quality into a trend: a rule drifting from 0.1% to 5% failures flags an upstream change before the dropped rows show up as a gap in a finance report.",
-      "source": "https://docs.databricks.com/aws/en/ldp/monitor-event-logs",
-      "evidence": "If you define expectations on data sets in your pipeline, the metrics for the number of records that passed and failed an expectation are stored in the details:flow_progress.data_quality.expectations object. Events containing information about data quality have the event type flow_progress."
-    },
-    {
       "family": "monitoring-matrix-yellow-waiting-retry",
       "objective": "troubleshooting.monitoring",
       "guide": "6.2",
@@ -619,37 +588,6 @@
       "in_practice": "Routing JARs through the allowlist gives the platform team one reviewed list of code allowed on shared compute, which is what keeps user isolation on standard access mode intact.",
       "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/allowlist",
       "evidence": "In Databricks Runtime 13.3 LTS and above, the allowlist in Unity Catalog controls which libraries and init scripts can run on standard access mode compute. By default, the allowlist is empty. To modify the allowlist, you must have the MANAGE ALLOWLIST privilege."
-    },
-    {
-      "family": "compute-issues-topandas-driver-oom",
-      "objective": "troubleshooting.compute-issues",
-      "guide": "6.5",
-      "difficulty": 3,
-      "type": "single",
-      "stem": "A data engineer's notebook on a classic cluster with 16 large workers and a small driver runs pdf = spark.table(\"sales.events\").toPandas() on about 40 GB of data to build a weekly summary in pandas. The notebook fails with a message that the Spark driver stopped unexpectedly, while the Spark UI shows healthy executors. A teammate suggests adding workers. What should the engineer do?",
-      "options": [
-        {
-          "text": "Aggregate in Spark first and call toPandas() only on the small result",
-          "correct": true,
-          "why": "toPandas() collects every record of the DataFrame to the driver, so 40 GB overwhelms a small driver however many workers there are. Databricks advises converting only a small subset of the data."
-        },
-        {
-          "text": "Add more workers so the conversion spreads across executors",
-          "average": true,
-          "why": "Executors compute the DataFrame, but toPandas() gathers all of its rows into one pandas DataFrame on the driver. More workers add no driver memory."
-        },
-        {
-          "text": "Enable spark.sql.execution.arrow.pyspark.enabled for the conversion",
-          "why": "Arrow makes the transfer to pandas more efficient, but even with Arrow, toPandas() still collects all records to the driver."
-        },
-        {
-          "text": "Set spark.sql.shuffle.partitions to auto before the conversion",
-          "why": "Auto-optimized shuffle sizes partitions for joins and aggregations on the executors. It doesn't change how much data toPandas() brings back to the driver."
-        }
-      ],
-      "in_practice": "Pushing the weekly summary into a Spark groupBy shrinks 40 GB to a few thousand rows before conversion, so a modest driver copes, instead of paying for a driver large enough to hold the whole table.",
-      "source": "https://docs.databricks.com/aws/en/pandas/pyspark-pandas-conversion",
-      "evidence": "Even with Arrow, toPandas() results in the collection of all records in the DataFrame to the driver program and should be done on a small subset of the data."
     }
   ]
 }

@@ -342,37 +342,6 @@
       "evidence": "Spark includes built-in support for standard formats such as Delta, Iceberg, Parquet, JSON, CSV, and JDBC, but not for many other systems like REST APIs ... you build connectors to these systems in pure Python, with no JVM-based connector development, and use them like any built-in Spark data source ... spark.dataSource.register(MyDataSourceClass)"
     },
     {
-      "family": "jdbc-rest-write-default-mode-error",
-      "objective": "ingestion.jdbc-rest",
-      "guide": "2.5",
-      "difficulty": 2,
-      "type": "single",
-      "stem": "A data engineer's Lakeflow Job exports a daily summary DataFrame to a PostgreSQL reporting table with df.write.format('jdbc') and the url, dbtable, user and password options, and no save mode. The first run created the table, but the second night's run fails because the table exists. Which change lets each run add that day's rows?",
-      "options": [
-        {
-          "text": "Add .mode('append') to the write",
-          "correct": true,
-          "why": "With no mode set, a write uses the default error-if-exists mode and throws when the target table already exists; append mode inserts the new rows into the existing table instead."
-        },
-        {
-          "text": "Add .option('truncate', 'true') to the write",
-          "average": true,
-          "why": "truncate only changes how overwrite mode replaces a table, truncating it instead of dropping it; with no mode set the write still fails, and with overwrite the earlier days would be lost."
-        },
-        {
-          "text": "Add .mode('overwrite') to the write",
-          "why": "Overwrite replaces the table's contents on each run, so only the latest day would remain instead of a growing history."
-        },
-        {
-          "text": "Add .option('numPartitions', 1) to the write",
-          "why": "numPartitions caps how many parallel connections write to the database; it doesn't change what happens when the target table already exists."
-        }
-      ],
-      "in_practice": "Append makes reruns non-idempotent: if a failed run is repaired after a partial write, that day's rows can land twice, so many teams delete the day's rows first or write to a staging table and merge on the database side.",
-      "source": "https://spark.apache.org/docs/latest/sql-data-sources-load-save-functions.html",
-      "evidence": "SaveMode.ErrorIfExists (default): When saving a DataFrame to a data source, if data already exists, an exception is expected to be thrown."
-    },
-    {
       "family": "jdbc-rest-uc-jdbc-connection-write-back",
       "objective": "ingestion.jdbc-rest",
       "guide": "2.5",
@@ -495,37 +464,6 @@
       "in_practice": "A managed connector turns an hourly SaaS feed into configuration: when ServiceNow changes its API or the admins add fields, Databricks maintains the connector instead of the team rewriting a scraper.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/servicenow",
       "evidence": "The managed ServiceNow connector in Lakeflow Connect allows you to ingest data from ServiceNow into Databricks. ... Incremental ingestion Supported ... Unity Catalog governance Supported ... Automated schema evolution: New and deleted columns Supported"
-    },
-    {
-      "family": "choosing-sql-streaming-table-over-copy-into",
-      "objective": "ingestion.choosing",
-      "guide": "2.6",
-      "difficulty": 1,
-      "type": "single",
-      "stem": "A team of SQL analysts loads files from cloud object storage into Unity Catalog with scheduled COPY INTO statements and wants a more scalable way to ingest incrementally without leaving SQL. Which approach does Databricks recommend?",
-      "options": [
-        {
-          "text": "A streaming table created with CREATE STREAMING TABLE over read_files",
-          "correct": true,
-          "why": "Databricks recommends CREATE STREAMING TABLE as the scalable SQL alternative to COPY INTO; the streaming table uses Auto Loader and handles each input row only once."
-        },
-        {
-          "text": "A materialized view over read_files, refreshed on a schedule",
-          "average": true,
-          "why": "Materialized views suit precomputed query results; for appending newly arrived files, streaming tables are the ingestion choice because each input row is processed only once."
-        },
-        {
-          "text": "A scheduled INSERT INTO ... SELECT FROM read_files",
-          "why": "A batch read_files query reads every matching file each time it runs, so without file tracking it reloads old files and creates duplicates."
-        },
-        {
-          "text": "COPY INTO with COPY_OPTIONS ('force' = 'true')",
-          "why": "force = true makes COPY INTO reload files it has already loaded, which adds duplicates rather than scalability."
-        }
-      ],
-      "in_practice": "Moving from COPY INTO to a streaming table keeps the SQL the analysts know while handing file discovery and checkpoints to Auto Loader, which matters once a folder grows from thousands of files to millions.",
-      "source": "https://docs.databricks.com/aws/en/ingestion/",
-      "evidence": "SQL examples for incremental ingestion from cloud object storage use CREATE STREAMING TABLE syntax. It offers SQL users a scalable ingestion experience, therefore it's the recommended alternative to COPY INTO."
     },
     {
       "family": "choosing-partner-existing-account",

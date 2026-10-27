@@ -63,37 +63,6 @@
       "evidence": "Using the cloud_files_state function, you can find metadata about files that have been discovered by an Auto Loader stream. Query cloud_files_state, providing the checkpoint location associated with an Auto Loader stream."
     },
     {
-      "family": "auto-loader-path-glob-filter-suffix",
-      "objective": "ingestion.auto-loader",
-      "guide": "2.3",
-      "difficulty": 1,
-      "type": "single",
-      "stem": "A data engineer points Auto Loader with the binaryFile format at a Unity Catalog volume folder where a scanner drops both .png images and .json sidecar files. Only the .png files should be ingested. Which option filters the files by their suffix?",
-      "options": [
-        {
-          "text": ".option('pathGlobFilter', '*.png')",
-          "correct": true,
-          "why": "Suffix patterns must be given explicitly with pathGlobFilter, which keeps only files whose names match the pattern."
-        },
-        {
-          "text": ".load('/Volumes/media/raw/scans/*.png')",
-          "average": true,
-          "why": "Putting the pattern in the path looks natural, but the path provides only a prefix filter; Databricks documents pathGlobFilter as the way to filter on a suffix."
-        },
-        {
-          "text": ".option('cloudFiles.format', 'png')",
-          "why": "png isn't a valid cloudFiles.format value; images are read with binaryFile, and the format option doesn't select files by extension."
-        },
-        {
-          "text": ".option('cloudFiles.useStrictGlobber', 'true')",
-          "why": "The strict globber only makes glob matching behave like other Spark file sources; on its own it doesn't select files by suffix."
-        }
-      ],
-      "in_practice": "Filtering at discovery keeps sidecar files out of the binary table, so a folder holding tens of thousands of images and as many JSON files doesn't double the rows a downstream inference job must skip.",
-      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/patterns",
-      "evidence": "You must use the option pathGlobFilter to explicitly provide suffix patterns. The path only provides a prefix filter."
-    },
-    {
       "family": "auto-loader-empty-source-needs-schema",
       "objective": "ingestion.auto-loader",
       "guide": "2.3",
@@ -154,37 +123,6 @@
       "in_practice": "Grouping rescued rows by the file path in the blob shows the drift per delivery, so the team can send the vendor the exact files that broke the contract instead of a day's worth of uploads.",
       "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/schema",
       "evidence": "The rescued data column contains a JSON blob with the rescued columns and the source file path of the record."
-    },
-    {
-      "family": "auto-loader-separate-checkpoint-per-source",
-      "objective": "ingestion.auto-loader",
-      "guide": "2.3",
-      "difficulty": 1,
-      "type": "single",
-      "stem": "A data engineer lands order files from two different S3 source locations, one per region, into a single Unity Catalog table with Auto Loader. How should the streaming checkpoints be configured?",
-      "options": [
-        {
-          "text": "Give each source location's ingestion workload its own checkpoint",
-          "correct": true,
-          "why": "When more than one source location is loaded into the same target table, each Auto Loader ingestion workload requires a separate streaming checkpoint."
-        },
-        {
-          "text": "Share one checkpoint, since both workloads write to the same table",
-          "average": true,
-          "why": "Tying the checkpoint to the target table is the intuitive choice, but the checkpoint tracks one workload's source files and progress, so each source location needs its own."
-        },
-        {
-          "text": "Use one checkpoint with a separate schema location per region",
-          "why": "Splitting only the schema location doesn't help; discovered-file state lives in the checkpoint, so each source location's workload still needs its own."
-        },
-        {
-          "text": "Skip checkpoints, because the Delta log tracks which files were loaded",
-          "why": "The Delta log records table commits, not which source files were discovered; Auto Loader keeps that file state in the stream's checkpoint."
-        }
-      ],
-      "in_practice": "Separate checkpoints let one region's stream be paused, reset or backfilled without touching the other's progress, so an outage in one region never forces reprocessing of the other region's files.",
-      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/schema",
-      "evidence": "If you have more than one source data location being loaded into the target table, each Auto Loader ingestion workload requires a separate streaming checkpoint."
     },
     {
       "family": "auto-loader-schema-hints-keep-evolution",
@@ -872,6 +810,68 @@
       "in_practice": "Teams that know this gap add a runbook step: after a bulk restore in ServiceNow, fully refresh the affected table so the lakehouse matches the source before the next SLA report.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/servicenow-limits",
       "evidence": "Restored records: If you delete a record in the source and later restore it, the connector does not reingest the restored record."
+    },
+    {
+      "family": "auto-loader-clean-source-move-archive",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs Auto Loader on Databricks Runtime 16.4 LTS and wants files in the landing folder moved to an archive path some time after they are ingested, to cut storage costs and shorten future directory listings. Which option does this?",
+      "options": [
+        {
+          "text": "cloudFiles.cleanSource = 'MOVE' with cloudFiles.cleanSource.moveDestination",
+          "correct": true,
+          "why": "With cleanSource set to MOVE, Auto Loader moves processed files to the moveDestination path once the retention duration, 30 days by default, has elapsed; DELETE removes them instead."
+        },
+        {
+          "text": "cloudFiles.maxFileAge = '30 days' to age processed files out of the folder",
+          "average": true,
+          "why": "maxFileAge sets how long a file event is tracked for deduplication in the stream's state; it never moves or deletes source files, and tuning it too aggressively can cause duplicate ingestion."
+        },
+        {
+          "text": "cloudFiles.includeExistingFiles = 'false' so ingested files are skipped",
+          "why": "includeExistingFiles decides whether files already in the path when the stream first starts are ingested; it doesn't touch files after they are processed."
+        },
+        {
+          "text": "cloudFiles.allowOverwrites = 'true' so files can be replaced after loading",
+          "why": "allowOverwrites lets Auto Loader reprocess a file that is appended to or overwritten; it changes what gets ingested, not where processed files are kept."
+        }
+      ],
+      "in_practice": "Archiving keeps a busy landing folder small, so listings stay fast as volume grows; avoid it when several streams read the same folder, because the fastest stream cleans up files before the slower ones ingest them.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/clean-source",
+      "evidence": "Use cloudFiles.cleanSource to move or delete files from the source directory after they are processed. Removing processed files reduces storage costs and shortens the duration of future listing operations. MOVE: The files in the source directory are moved to the path specified by cloudFiles.cleanSource.moveDestination after the retention duration (default 30 days)"
+    },
+    {
+      "family": "auto-loader-inference-samples-recent-files",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer starts a new Auto Loader stream with schema inference on a folder that holds three years of JSON files. Which files does Auto Loader sample to infer the initial schema?",
+      "options": [
+        {
+          "text": "The most recent 50 GB or 1,000 files, by file modification time",
+          "correct": true,
+          "why": "When the DataFrame is first defined, Auto Loader lists the source directory and infers the schema from the most recent 50 GB of data or 1,000 files, chosen by file modification time."
+        },
+        {
+          "text": "Every file in the folder, read once in full before the first batch",
+          "average": true,
+          "why": "Reading three years of files before the first batch would make startup slow and costly, so Auto Loader infers from a bounded sample of recent files instead."
+        },
+        {
+          "text": "The oldest 1,000 files, so the schema matches the first deliveries",
+          "why": "Auto Loader picks its sample by most recent modification time, not by age, so the newest files are the ones that shape the inferred schema."
+        },
+        {
+          "text": "Only the first file it lists, then it adds columns as batches arrive",
+          "why": "Inference uses a sample of up to 50 GB or 1,000 files rather than a single file; schema evolution handles new columns after that initial inference."
+        }
+      ],
+      "in_practice": "A field that appears only in older files can be missed by inference, so for long histories pin the important columns with schema hints instead of trusting the sample to see every shape of the data.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/faq",
+      "evidence": "When the DataFrame is first defined, Auto Loader lists your source directory and chooses the most recent (by file modification time) 50 GB of data or 1000 files, and uses those to infer your data schema."
     }
   ]
 }

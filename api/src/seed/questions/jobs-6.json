@@ -187,37 +187,6 @@
       "evidence": "(Optional) Select the SQL warehouse used to refresh the dashboard. If not specified, the task uses the dashboard's default warehouse. You must use a serverless or pro SQL warehouse for dashboard tasks."
     },
     {
-      "family": "orchestration-pipeline-schedule-button-job",
-      "objective": "jobs.orchestration",
-      "guide": "4.2",
-      "difficulty": 1,
-      "type": "single",
-      "stem": "A data engineer opens a Lakeflow Spark Declarative Pipelines pipeline in Jobs & Pipelines and uses the pipeline's Schedule button to add a nightly time-based schedule. What does this create?",
-      "options": [
-        {
-          "text": "A job with a single pipeline task that runs on that schedule",
-          "correct": true,
-          "why": "Adding a schedule from the pipeline UI creates a Lakeflow Jobs job with a single pipeline task, using the trigger you choose in the dialog."
-        },
-        {
-          "text": "A schedule stored inside the pipeline's own settings",
-          "average": true,
-          "why": "The schedule isn't kept in the pipeline settings; the Schedule button creates a job that runs the pipeline as a task, and the button shows how many such jobs exist."
-        },
-        {
-          "text": "A SCHEDULE clause added to each materialized view",
-          "why": "SCHEDULE clauses belong to materialized views and streaming tables defined in Databricks SQL, not to the datasets of a pipeline."
-        },
-        {
-          "text": "A switch of the pipeline into continuous mode",
-          "why": "The Scheduled trigger type creates a time-based schedule; only the Continuous trigger type creates a job that runs the pipeline continuously."
-        }
-      ],
-      "in_practice": "Because the schedule is an ordinary job, the team can later add an upstream ingestion task or failure notifications to it, rather than recreating the schedule somewhere else.",
-      "source": "https://docs.databricks.com/aws/en/jobs/tasks/pipeline",
-      "evidence": "Adding a schedule to a pipeline creates a job with a single pipeline task. ... If the pipeline is included in one or more scheduled jobs, the Schedule button shows the number of existing schedules, for example, Schedule (5)."
-    },
-    {
       "family": "orchestration-swap-compute-all-tasks",
       "objective": "jobs.orchestration",
       "guide": "4.2",
@@ -877,6 +846,68 @@
       "in_practice": "Grouping 180 tasks onto, say, four job clusters of about 45 tasks each stays under the limit and also contains the impact when one cluster has a problem.",
       "source": "https://docs.databricks.com/aws/en/jobs/large-jobs",
       "evidence": "If you receive an error like Too many execution contexts are open right now. (Limit set to 150), then your job is trying to run too many tasks on a single compute cluster. You must split the tasks across multiple clusters."
+    },
+    {
+      "family": "orchestration-dvr-no-date-arithmetic",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly job starts shortly after midnight UTC, and its notebook task must process the previous UTC day, received as a task parameter named process_date. A teammate proposes setting process_date to {{date_sub(job.start_time.iso_date, 1)}} so the notebook needs no date logic. Which approach meets the requirement?",
+      "options": [
+        {
+          "text": "Pass {{job.start_time.iso_date}} and subtract one day in the notebook's code",
+          "correct": true,
+          "why": "A dynamic value reference is replaced by a string literal, and the contents of the braces aren't evaluated as expressions. Passing the run's start date and subtracting the day in code, for example with date_sub, is the way to derive the previous day."
+        },
+        {
+          "text": "Use {{date_sub(job.start_time.iso_date, 1)}} as the teammate proposes",
+          "average": true,
+          "why": "Wrapping the reference in a SQL function looks natural, but the contents of {{ }} aren't evaluated as expressions, and operations or functions can't run inside the braces."
+        },
+        {
+          "text": "Set process_date to {{job.start_time.iso_date}} - 1",
+          "why": "Only the reference itself is replaced; the text around it is kept as is, so the parameter becomes a string such as 2026-10-27 - 1 rather than the previous day's date."
+        },
+        {
+          "text": "Use {{backfill.iso_date}}, which holds the previous day on scheduled runs",
+          "why": "Backfill references are available only when you create a backfill, and backfill.iso_date is the start of the backfill's time range, so a scheduled run has no previous-day value to read from it."
+        }
+      ],
+      "in_practice": "Passing the raw run date and deriving windows in code keeps the date logic in one testable place, and an operator can rerun a missed night by overriding a single date parameter instead of editing references.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "When a job or task runs, a string literal replaces the dynamic value reference. ... Contents of the double curly braces are not evaluated as expressions. You cannot run operations or functions in double-curly braces."
+    },
+    {
+      "family": "orchestration-git-source-one-repo-per-job",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer configures several tasks in one job to read their code through the Git provider source. How many remote Git repositories can the tasks in that job use?",
+      "options": [
+        {
+          "text": "One repository, shared by every task in the job",
+          "correct": true,
+          "why": "Only one remote Git repository can be used for all tasks in a job. Each Git-sourced task then points at its own file with a path relative to that repository."
+        },
+        {
+          "text": "One repository for each task, set in that task's Source",
+          "average": true,
+          "why": "Each task does pick Git provider as its source and enters its own relative path, but the repository behind those paths is shared: a job can use only one remote repository for all its tasks."
+        },
+        {
+          "text": "One repository for each task type, such as notebooks and SQL files",
+          "why": "Notebook tasks and SQL File tasks read from the same repository when they use the Git provider source; the limit is one repository for the whole job, not one per task type."
+        },
+        {
+          "text": "Any number, as long as one Git credential can read them all",
+          "why": "Access isn't the constraint: even with a credential that reads several repositories, the tasks of one job can use only one remote Git repository."
+        }
+      ],
+      "in_practice": "When a job needs code from two repositories, teams usually package the shared code as a library or split the work into two jobs linked by a Run Job task, so each job keeps a single versioned source.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/notebook",
+      "evidence": "The options displayed by the UI depend on whether or not you have already configured a Git provider elsewhere. Only one remote Git repository can be used for all tasks in a job."
     }
   ]
 }

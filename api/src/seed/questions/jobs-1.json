@@ -99,37 +99,6 @@
       "evidence": "To optionally set the number of iterations that can run in parallel, enter a Concurrency value for the task. The default value is 1."
     },
     {
-      "family": "control-flow-boolean-task-value-in-condition",
-      "objective": "jobs.control-flow",
-      "guide": "4.1",
-      "difficulty": 1,
-      "type": "single",
-      "stem": "An upstream notebook sets a task value named is_full_load to the Python boolean True, and an If/else condition task compares that task value using the == operator. How does the condition task treat the boolean?",
-      "options": [
-        {
-          "text": "As the string \"true\", compared with string comparison",
-          "correct": true,
-          "why": "Non-numeric task values are serialized to strings in If/else expressions, so a boolean becomes \"true\" or \"false\", and == compares the operands as strings."
-        },
-        {
-          "text": "As the number 1, compared with numeric comparison",
-          "average": true,
-          "why": "Booleans are not converted to 1 or 0; they are serialized to the strings \"true\" or \"false\" and treated as strings in the expression."
-        },
-        {
-          "text": "As an unsupported type that makes the condition fail",
-          "why": "Booleans are allowed in operands along with numbers and strings; only other types cause the condition expression to fail."
-        },
-        {
-          "text": "As a JSON object that holds a single value field",
-          "why": "Task values are not wrapped in an object for the comparison; a boolean operand is serialized to the plain string \"true\" or \"false\"."
-        }
-      ],
-      "in_practice": "Knowing that booleans arrive as the strings \"true\" or \"false\" lets you write the comparison value to match exactly, avoiding a branch that silently never fires on full-load days.",
-      "source": "https://docs.databricks.com/aws/en/jobs/tasks/if-else",
-      "evidence": "Only numeric, string, and boolean values are allowed when referencing task values in an operand. Any other types cause the condition expression to fail. Non-numeric value types are serialized to strings... if a task value is set to a boolean value, it is serialized to \"true\" or \"false\"."
-    },
-    {
       "family": "control-flow-for-each-sql-output-rows",
       "objective": "jobs.control-flow",
       "guide": "4.1",

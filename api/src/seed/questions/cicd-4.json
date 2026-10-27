@@ -442,6 +442,23 @@
       "in_practice": "On a backfill that burns hundreds of DBUs, an idempotency token is a one-line change that makes automatic retries safe instead of a source of double spend and duplicate writes.",
       "source": "https://docs.databricks.com/aws/en/dev-tools/cli/reference/jobs-commands",
       "evidence": "databricks jobs run-now: Run a job and return the run_id of the triggered run. --idempotency-token string An optional token to guarantee the idempotency of job run requests."
+    },
+    {
+      "family": "bundles-pydabs-python-resources",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineering team is starting a new bundle project. It wants its Lakeflow Jobs defined in Python code rather than YAML, so that job definitions can be built from metadata, such as a list of source tables, when the bundle deploys. Which Databricks-provided template should the team pass to `databricks bundle init`?",
+      "options": [
+        { "text": "`pydabs`", "correct": true, "why": "The pydabs template sets up Python support for bundles: resources are defined in Python code, can coexist with YAML resources, and can be created dynamically from metadata during bundle deployment." },
+        { "text": "`default-python`", "average": true, "why": "The default-python template uses Python for the project's code, but its bundle configuration is YAML; pydabs is the modified version of it that uses Python for configuration instead." },
+        { "text": "`default-minimal`", "why": "The default-minimal template creates an empty bundle with only the required files and no sample code, so it doesn't set up resources defined in Python." },
+        { "text": "`mlops-stacks`", "why": "The mlops-stacks template is an advanced full-stack template for starting MLOps Stacks projects, not the starting point for defining bundle resources in Python." }
+      ],
+      "in_practice": "Generating resources from metadata lets a team define, say, 40 near-identical ingestion jobs from one table list at deploy time, instead of copying 40 YAML blocks whose small differences are easy to miss in review.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/python",
+      "evidence": "Python support for Declarative Automation Bundles lets you define resources in Python code and dynamically create resources during bundle deployment using metadata. To create a new Python support for Declarative Automation Bundles project, initialize a bundle using the pydabs template: databricks bundle init pydabs"
     }
   ]
 }

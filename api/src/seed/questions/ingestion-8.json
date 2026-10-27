@@ -533,35 +533,35 @@
       "evidence": "Structured ingestion (CSV, JSON, XML, EXCEL, and other formats) supports only APPEND_ONLY storage mode. ... APPEND_ONLY storage mode captures only newly added files. Updates and deletes to existing files are not ingested."
     },
     {
-      "family": "semi-structured-from-json-keep-corrupt-text",
+      "family": "semi-structured-file-managed-external-source",
       "objective": "ingestion.semi-structured",
       "guide": "2.7",
       "difficulty": 3,
       "type": "single",
-      "stem": "A data engineer parses a bronze STRING column named payload with from_json(payload, 'order_id STRING, amount DOUBLE'). For truncated payloads, both fields come back NULL and nothing in the parsed struct shows what was received. The data quality team wants the malformed text kept inside the struct for triage, and the job must not fail. Which change meets this?",
+      "stem": "A legal team keeps signed contracts as PDFs in a SharePoint document library. A data engineer must build a Unity Catalog table with one row per contract and a FILE column (Beta) so that later steps can parse each document. To avoid duplicate storage, an architect asks for FILE EXTERNAL references that point at the SharePoint files without copying them. How should the engineer proceed?",
       "options": [
         {
-          "text": "Add a bad_payload STRING field and pass map('columnNameOfCorruptRecord', 'bad_payload')",
+          "text": "Store the column as FILE MANAGED, copying each contract into managed storage",
           "correct": true,
-          "why": "In the default PERMISSIVE mode, from_json writes a malformed record's text into the field named by columnNameOfCorruptRecord when the schema includes it as a STRING; without that field, the text isn't kept."
+          "why": "Files from sources outside volumes, such as SharePoint, must be ingested and stored as FILE MANAGED; the table then governs the copies, and deleting rows makes their files eligible for cleanup."
         },
         {
-          "text": "Pass map('mode', 'FAILFAST') so malformed payloads are reported",
+          "text": "Store FILE EXTERNAL references to the SharePoint URLs through the connection",
           "average": true,
-          "why": "FAILFAST does surface bad input, but by raising MALFORMED_RECORD_IN_PARSING and failing the query, which breaks the requirement that the job keeps running."
+          "why": "FILE EXTERNAL only references files that already exist in a Unity Catalog volume, and Databricks doesn't support FILE EXTERNAL references for files stored outside volumes, such as in SharePoint."
         },
         {
-          "text": "Replace from_json with try_parse_json so malformed payloads become NULL",
-          "why": "try_parse_json returns NULL for invalid JSON and produces a VARIANT rather than the typed struct, so the malformed text still isn't captured."
+          "text": "Register the SharePoint site as an external location, then use FILE EXTERNAL",
+          "why": "External locations govern cloud object storage paths, not SharePoint sites, and FILE EXTERNAL still requires the files to sit in a Unity Catalog volume."
         },
         {
-          "text": "Pass map('allowUnquotedFieldNames', 'true') so partial payloads parse",
-          "why": "That option only relaxes quoting of field names; a truncated payload is still incomplete JSON and remains a corrupt record."
+          "text": "Keep each contract's SharePoint URL in a STRING column instead of a FILE",
+          "why": "A URL string is only text: it carries no governed file reference, so it doesn't meet the requirement for a FILE column that later steps can read through the table."
         }
       ],
-      "in_practice": "Keeping the malformed text in the struct lets a nightly check count and sample bad payloads per vendor, so a truncation bug is reported with examples the same day instead of after someone reconciles totals.",
-      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/from_json",
-      "evidence": "PERMISSIVE: when it meets a corrupted record, puts the malformed string into a field configured by columnNameOfCorruptRecord, and sets malformed fields to null. To keep corrupt records, you can set a string type field named columnNameOfCorruptRecord in an user-defined schema."
+      "in_practice": "Managed copies cost storage, but they keep the table and its files in sync and put file access under the table's permissions, which is what a compliance review of contract data usually expects.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/file",
+      "evidence": "FILE MANAGED stores copies of files in Unity Catalog-managed storage ... Files from sources outside of volumes, such as SharePoint, Google Drive, or SFTP, must be ingested and stored as FILE MANAGED. FILE EXTERNAL references files that already exist in a Unity Catalog volume. Databricks doesn't support storing FILE EXTERNAL references for files stored outside volumes."
     }
   ]
 }

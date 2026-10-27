@@ -404,37 +404,6 @@
       "evidence": "Your bundle project's collection of source files and metadata is deployed as a single bundle to your target environment. A bundle includes ... Source files, such as notebooks and Python files ... Definitions and settings for Databricks resources, such as Lakeflow Jobs, Lakeflow pipelines ..."
     },
     {
-      "family": "bundles-include-resource-files",
-      "objective": "cicd.bundles",
-      "guide": "5.3",
-      "difficulty": 1,
-      "type": "single",
-      "stem": "A data engineering team wants each job and pipeline definition in its own YAML file under a `resources` folder instead of one long `databricks.yml`. How do those files become part of the bundle configuration?",
-      "options": [
-        {
-          "text": "`databricks.yml` lists them in its `include` mapping, such as `resources/*.yml`",
-          "correct": true,
-          "why": "databricks.yml is the bundle's main configuration file, and every other configuration file must be listed through path globs in its include mapping."
-        },
-        {
-          "text": "The CLI reads every `.yml` file in the project folder automatically",
-          "average": true,
-          "why": "Aside from databricks.yml, configuration files join the bundle only when the include mapping names them; a YAML file isn't merged just because it sits in the project."
-        },
-        {
-          "text": "A `sync` mapping uploads the files so their resources are deployed",
-          "why": "sync controls which files are uploaded to the workspace with the bundle. Uploading a YAML file doesn't merge it into the bundle configuration."
-        },
-        {
-          "text": "Each file is saved as another `databricks.yml` inside the `resources` folder",
-          "why": "A bundle has one and only one databricks.yml at its root. Other configuration files are pulled in through include."
-        }
-      ],
-      "in_practice": "One file per resource keeps pull requests small, so a change to the ingestion job doesn't collide with a teammate's edit to the reporting pipeline.",
-      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/reference",
-      "evidence": "include: Specifies a list of path globs that contain configuration files to include within the bundle. ... Aside from databricks.yml, you must use the include array to specify all configuration files."
-    },
-    {
       "family": "bundles-job-references-bundle-pipeline",
       "objective": "cicd.bundles",
       "guide": "5.3",
