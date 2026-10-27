@@ -1,3 +1,691 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "git-credentials-linked-accounts",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer new to a workspace tries to create a Git folder from the team's private GitHub repository, and the clone fails because Databricks has no Git credential for the engineer. Where does the engineer add one?",
+      "options": [
+        {
+          "text": "In Settings > Linked accounts, with Add Git credential",
+          "correct": true,
+          "why": "Git credentials are configured per user under Settings > Linked accounts with Add Git credential, where the engineer links the provider through OAuth or pastes a personal access token. Private repositories and write operations need this credential."
+        },
+        {
+          "text": "In the parent folder's permissions, by getting Can Manage",
+          "average": true,
+          "why": "Can Manage on the parent folder is needed to create a Git folder there, but workspace permissions don't authenticate to GitHub. Cloning a private repository still needs the user's own Git credential."
+        },
+        {
+          "text": "In a secret scope that the Git folder reads at clone time",
+          "why": "Git folders don't read credentials from secret scopes. Databricks stores each user's Git credentials itself, in the control plane, once they are added under Linked accounts."
+        },
+        {
+          "text": "In the cluster's environment variables, as a GitHub token",
+          "why": "Cluster environment variables affect code running on that compute, not the workspace Git client. A Git folder clone uses the Git credential linked to the user's account."
+        }
+      ],
+      "in_practice": "Linking a credential per user also sets each engineer's Git email as the commit author, so reviewers in GitHub see who changed a pipeline without digging through workspace audit logs.",
+      "source": "https://docs.databricks.com/aws/en/repos/repos-setup",
+      "evidence": "To configure Git credentials in Databricks: Click your username in the top bar of the Databricks workspace and select Settings. Click Linked accounts. Click Add Git credential. To modify a public remote repository or to work with private repositories, configure Git credentials with Write permissions."
+    },
+    {
+      "family": "git-source-format-outputs-not-committed",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer keeps notebooks in a Databricks Git folder in source format (`.py` and `.sql` files). After a Commit & Push, a reviewer asks why the cell results the engineer saw aren't visible in the pull request. What explains this?",
+      "options": [
+        {
+          "text": "Source-format notebooks don't include outputs in commits by default",
+          "correct": true,
+          "why": "When notebooks are saved in source formats such as .py or .sql, a commit from a Git folder carries the code but not the outputs by default. Committing outputs requires the IPYNB format with output commits allowed."
+        },
+        {
+          "text": "Outputs are committed, but GitHub hides them in pull request diffs",
+          "average": true,
+          "why": "The outputs never reach the repository: source-format notebooks are committed as code only by default, so there is nothing for the Git provider to hide."
+        },
+        {
+          "text": "Outputs are stripped because the target branch is protected",
+          "why": "Branch protection controls who can merge into a branch. It doesn't change what a commit pushed from a Git folder contains."
+        },
+        {
+          "text": "Outputs are added to the commit only after the pull request merges",
+          "why": "Merging doesn't add content to an existing commit. The outputs were never part of the commit pushed from the source-format notebook."
+        }
+      ],
+      "in_practice": "Leaving outputs out of commits keeps diffs small and keeps sample rows of production data out of Git history, which matters once a repository is shared beyond the data team.",
+      "source": "https://docs.databricks.com/aws/en/repos/git-operations-with-repos",
+      "evidence": "Notebook outputs aren't included in commits by default when notebooks are saved in source file formats (.py, .scala, .sql, .r). For information on committing notebook outputs using the IPYNB format, see Control IPYNB notebook output artifact commits."
+    },
+    {
+      "family": "git-pull-clears-notebook-state",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer has a notebook in a Databricks Git folder with populated cell outputs and widgets. A teammate pushes edits to that notebook, and the engineer clicks Pull in the Git dialog. What happens to the notebook's state?",
+      "options": [
+        {
+          "text": "It is cleared, because the pull overwrites the notebook's source",
+          "correct": true,
+          "why": "Git operations that alter notebook source code, such as a pull that brings in a teammate's edits, overwrite the existing notebook. That clears its state: cell outputs, comments, version history and widgets."
+        },
+        {
+          "text": "It is kept, because Git folders merge outputs with the new code",
+          "average": true,
+          "why": "Outputs aren't merged with incoming code. When a pull changes notebook source, the notebook is overwritten and its outputs, comments, version history and widgets are lost."
+        },
+        {
+          "text": "It is kept until the engineer next runs Commit & Push",
+          "why": "Commit and push don't change source code and preserve notebook state. The loss happens at the pull itself, not at a later commit."
+        },
+        {
+          "text": "It moves to a copy of the notebook named after the old commit",
+          "why": "Git folders don't keep a side copy of the previous notebook. The existing notebook is overwritten with the pulled source."
+        }
+      ],
+      "in_practice": "Engineers in a long exploratory session save the results they need, for example to a table, before pulling; otherwise an hour of computed outputs on a large cluster has to be run again.",
+      "source": "https://docs.databricks.com/aws/en/repos/limits",
+      "evidence": "Git operations that alter notebook source code result in loss of notebook state, including cell outputs, comments, version history, and widgets. For example, git pull can change notebook source code, requiring Git folders to overwrite the existing notebook. Operations like git commit, push, or creating a new branch don't affect source code and preserve notebook state."
+    },
+    {
+      "family": "git-manual-merge-conflict-resolution",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer uses Merge in a Databricks Git folder to bring `main` into a feature branch and hits a conflict in one notebook cell: the engineer added a date filter, and a teammate renamed a column on the same lines. Both changes must survive. How should the engineer resolve the conflict in the Git folders UI?",
+      "options": [
+        {
+          "text": "Edit the lines to keep both changes, remove the markers, Mark As Resolved, then Continue Merge",
+          "correct": true,
+          "why": "Manual resolution handles conflicts where lines from both sides are needed: the engineer edits the file to the desired code, deletes the Git conflict markers, selects Mark As Resolved, and completes the merge with Continue Merge."
+        },
+        {
+          "text": "Choose Take all incoming changes, which combines both edits line by line",
+          "average": true,
+          "why": "Take all incoming changes accepts one version entirely rather than combining them, so one side's edit, here the engineer's date filter, would be dropped."
+        },
+        {
+          "text": "Click Abort, which keeps both versions of the cell side by side",
+          "why": "Abort undoes the operation and discards the conflicting changes so it can be tried again. It doesn't place both versions in the notebook."
+        },
+        {
+          "text": "Reset the branch to `main`, then reapply the filter and push again",
+          "why": "Reset replaces the branch with main and force-pushes, losing all committed and uncommitted work on the branch. That is a destructive way to fix one conflicting cell."
+        }
+      ],
+      "in_practice": "Picking one side wholesale is a common way a teammate's column rename silently disappears, and a downstream job fails on the missing column the next morning; resolving by hand keeps both fixes in one merge.",
+      "source": "https://docs.databricks.com/aws/en/repos/git-operations-with-repos",
+      "evidence": "To resolve the conflict, select the code lines you want to preserve and delete everything else, including the Git merge conflict markers. When you're done, select Mark As Resolved. Once all conflicts are resolved, click Continue Merge or Continue Rebase to resolve the conflict and complete the operation."
+    },
+    {
+      "family": "git-operations-that-force-push",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 2,
+      "type": "multiple",
+      "stem": "A data engineering team's Git provider blocks force pushes on shared branches, and the engineers run all their Git operations from the Git folders UI. Which two operations in the UI update the remote branch with a force push and can rewrite its history? (Choose two.)",
+      "options": [
+        {
+          "text": "Rebase, which reapplies the branch's commits on top of another branch",
+          "correct": true,
+          "why": "After a rebase, Git folders run git commit and git push --force to update the remote repository. Rebase rewrites commit history, which can cause problems for collaborators on the same branch."
+        },
+        {
+          "text": "Reset, which replaces the branch with the state of another branch",
+          "correct": true,
+          "why": "Reset in the Git folders UI is equivalent to git reset --hard combined with git push --force, so both the local and the remote branch lose their committed and uncommitted changes."
+        },
+        {
+          "text": "Merge, which combines another branch's commit history into this one",
+          "average": true,
+          "why": "Merge uses git merge and, when there is no conflict, pushes with a normal git push. Databricks recommends it for Git beginners because it doesn't require force pushing or rewrite history."
+        },
+        {
+          "text": "Pull, which updates the folder to the latest commit on the remote",
+          "why": "Pull brings remote changes into the Git folder. It doesn't push anything to the remote branch."
+        },
+        {
+          "text": "Create Branch, which starts a new branch from a chosen base branch",
+          "why": "Creating a branch adds a new branch from the selected base. It doesn't rewrite the history of an existing branch."
+        }
+      ],
+      "in_practice": "Teams that share branches usually standardize on merge in the UI; a stray reset on a branch two people push to can wipe a day of their pushed commits from the remote.",
+      "source": "https://docs.databricks.com/aws/en/repos/git-operations-with-repos",
+      "evidence": "After the rebase, Git folders run git commit and git push --force to update the remote repo. Perform a Git reset from the Git folders UI. This operation is equivalent to git reset --hard combined with git push --force."
+    },
+    {
+      "family": "git-job-reads-folder-mid-update",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A platform team keeps a production Git folder that a GitHub Actions workflow updates after each merge to `main`. A scheduled Lakeflow Job runs notebook A from the folder's workspace path, and A calls notebook B with `%run`. Twice this month a run failed with errors that only make sense if A and B came from different commits, both times while the workflow was updating the folder. Which change prevents this?",
+      "options": [
+        {
+          "text": "Configure the job's tasks to use the Git provider as their source",
+          "correct": true,
+          "why": "During a Git operation some notebooks in a folder can be updated before others, so a run that starts then can mix commits. With the remote repository as the source, the job runs all tasks against one snapshot of the code."
+        },
+        {
+          "text": "Run the folder update more often so it never falls behind `main`",
+          "average": true,
+          "why": "Updating more often creates more windows in which a run can start mid-update. The problem is a run reading a folder that is changing, not a folder that is out of date."
+        },
+        {
+          "text": "Give most users Can Run on the folder so only automation edits it",
+          "why": "Run-only access for users is good practice for a production folder, but these failures come from the automation's own update, which permissions don't coordinate with job runs."
+        },
+        {
+          "text": "Recreate the folder with sparse checkout so updates touch fewer files",
+          "why": "Sparse checkout limits which directories are cloned. It doesn't make an update atomic, so a run can still read a partly updated folder."
+        }
+      ],
+      "in_practice": "Reading code from a repository snapshot removes a race that is hard to reproduce: failures that appear only when a merge happens to land during the 2 a.m. run window.",
+      "source": "https://docs.databricks.com/aws/en/repos/limits",
+      "evidence": "During a Git operation, some notebooks might be updated while others aren't yet, causing unpredictable behavior. For example, if notebook A calls notebook Z using %run and a job starts during a Git operation, the job might run the latest notebook A with an older notebook Z. To avoid this, configure job tasks to use your Git provider as the source instead of a workspace path."
+    },
+    {
+      "family": "bundle-config-default-target-no-flag",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's `databricks.yml` declares the `prod` target first and the `dev` target second, and only `dev` sets `default: true`. The engineer runs `databricks bundle deploy` without `-t`. Which target does the deployment use?",
+      "options": [
+        {
+          "text": "`dev`, because it is marked as the default target",
+          "correct": true,
+          "why": "Setting default: true makes a target the one bundle commands use when no target is given, so validate, deploy and run go to dev unless -t names another target."
+        },
+        {
+          "text": "`prod`, because it is the first target declared",
+          "average": true,
+          "why": "Declaration order doesn't choose the target. When no -t is passed, bundle commands use the target that sets default: true."
+        },
+        {
+          "text": "Both targets, one after the other",
+          "why": "A deployment works on one target at a time. Deploying to prod as well would take a separate command with -t prod."
+        },
+        {
+          "text": "Neither, because the command fails until `-t` is passed",
+          "why": "The -t option is needed only when no default target is configured or to pick a different target. Here dev is the default."
+        }
+      ],
+      "in_practice": "Making the developer sandbox the default means a bare deploy from a laptop lands in dev, so reaching prod always takes an explicit `-t prod`, usually only in CI.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/reference",
+      "evidence": "The first target has the name dev and is the default target used when no target is specified for bundle commands. The second target has the name prod and is used only when this target is specified for bundle commands."
+    },
+    {
+      "family": "bundle-config-complex-variable-type",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants one bundle variable to hold a whole job cluster definition (Spark version, node type, worker count and Spark config) so several jobs can reuse it with `new_cluster: ${var.etl_cluster}`. What must the variable's declaration include?",
+      "options": [
+        {
+          "text": "`type: complex`, with the cluster settings as a map under `default`",
+          "correct": true,
+          "why": "A custom variable is a string unless its type is set to complex. With type: complex, the default can be a map such as a full new_cluster specification, which jobs reference with ${var.<name>}."
+        },
+        {
+          "text": "Nothing extra, because a variable's default can be any YAML value",
+          "average": true,
+          "why": "Custom variables are assumed to be strings unless type is set to complex, so a map default isn't valid for a plain variable."
+        },
+        {
+          "text": "`type: map`, with the cluster settings as a map under `default`",
+          "why": "complex is the only valid value for a variable's type setting; map isn't a recognized type."
+        },
+        {
+          "text": "A `lookup` with `cluster:` set to an existing cluster's name",
+          "why": "A lookup resolves the ID of an existing object by name. It returns an ID string, not a cluster definition that jobs can use to create new job clusters."
+        }
+      ],
+      "in_practice": "Keeping the cluster spec in one complex variable turns a runtime upgrade into a one-line change instead of edits to a dozen job definitions that can drift apart.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/variables",
+      "evidence": "A custom variable is assumed to be of type string unless you define it as a complex variable. To define a custom variable with a complex type for your bundle in your bundle configuration, set type to complex. The only valid value for the type setting is complex."
+    },
+    {
+      "family": "bundle-config-dev-mode-unpause-one-job",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer deploys a bundle to a `dev` target set to `mode: development`. To check how a nightly job behaves on its real schedule, the engineer needs that one job's schedule active in dev, while every other job's schedule stays paused. What should the engineer change?",
+      "options": [
+        {
+          "text": "Set `schedule.pause_status: UNPAUSED` on that job in its configuration",
+          "correct": true,
+          "why": "Development mode pauses all schedules and triggers on deployed resources, but one job can be unpaused by setting pause_status to UNPAUSED on the mapping that runs it, such as schedule.pause_status for a scheduled job."
+        },
+        {
+          "text": "Remove `mode: development` from the `dev` target",
+          "average": true,
+          "why": "Dropping development mode would stop pausing every schedule and also remove the per-user name prefixes and other dev behaviors, a far wider change than one job."
+        },
+        {
+          "text": "Add the `trigger_pause_status: UNPAUSED` preset to the `dev` target",
+          "why": "That preset applies to all triggers and schedules in the target, and when mode is development the trigger_pause_status preset is always PAUSED, so it can't single out one job."
+        },
+        {
+          "text": "Deploy with `--force` so the job keeps its schedule status",
+          "why": "--force overrides validations such as the Git branch check. It doesn't change how development mode treats schedules."
+        }
+      ],
+      "in_practice": "Keeping everything else paused protects shared dev compute: one unpaused job costs a single nightly run, while unpausing the whole target could start a dozen schedules for every engineer who deploys.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/deployment-modes",
+      "evidence": "Pauses all schedules and triggers on deployed resources such as jobs or quality monitors. To unpause an individual job, set the pause_status to UNPAUSED for the mapping that defines how it runs. For example, schedule.pause_status for a scheduled job or continuous.pause_status for a continuous job."
+    },
+    {
+      "family": "bundle-config-presets-prefix-and-tags",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team deploys a bundle to a shared `staging` workspace. Schedules there must run normally, and resource names must not carry each deployer's user name. The team still wants every job and pipeline name to start with `stg_` and carry the tag `env: staging`, without editing each resource definition. What should the `staging` target set?",
+      "options": [
+        {
+          "text": "`presets` with `name_prefix: 'stg_'` and `tags: {env: staging}`",
+          "correct": true,
+          "why": "Presets apply settings across every resource in a target without a deployment mode: name_prefix prepends a string to resource names, and tags adds key:value tags to all resources that support them, such as jobs."
+        },
+        {
+          "text": "`mode: development`, which prefixes names and tags resources",
+          "average": true,
+          "why": "Development mode prefixes names with [dev <user>] and pauses all schedules, the two things staging must avoid, and its tag is a fixed dev tag rather than env: staging."
+        },
+        {
+          "text": "A `variables` value `prefix: stg_` for the target",
+          "why": "A variable changes nothing until each resource name references it, which means editing every resource definition."
+        },
+        {
+          "text": "`bundle.name: stg_sales` in the `staging` target",
+          "why": "The bundle name identifies the deployment and its root path. It doesn't rename the jobs and pipelines the bundle deploys."
+        }
+      ],
+      "in_practice": "A consistent prefix and tag let anyone tell staging resources apart at a glance and filter for them, without a naming convention that each engineer has to remember per resource.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/reference",
+      "evidence": "Defines bundle deployment presets. name_prefix The prefix string to prepend to resource names. tags A set of key:value tags that apply to all resources that support tags, which includes jobs and experiments."
+    },
+    {
+      "family": "bundle-config-resource-setting-beats-preset",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A release engineer's `test` target sets no `mode`, but it sets the presets `trigger_pause_status: PAUSED` and `jobs_max_concurrent_runs: 5`. One job in the bundle explicitly sets `schedule.pause_status: UNPAUSED` and `max_concurrent_runs: 1`. After `databricks bundle deploy -t test`, how is that job configured?",
+      "options": [
+        {
+          "text": "Schedule unpaused, with at most 1 concurrent run",
+          "correct": true,
+          "why": "Settings on individual resources override presets, and presets override mode defaults. The job's own UNPAUSED schedule and max_concurrent_runs of 1 therefore win over the target's presets."
+        },
+        {
+          "text": "Schedule paused, with at most 5 concurrent runs",
+          "average": true,
+          "why": "This assumes presets win everywhere, but a preset is a target-wide default; a setting written on the resource itself overrides it."
+        },
+        {
+          "text": "Schedule paused, with at most 1 concurrent run",
+          "why": "Pause status follows the same rule as concurrency: the job's own UNPAUSED setting overrides the trigger_pause_status preset."
+        },
+        {
+          "text": "Schedule unpaused, with at most 5 concurrent runs",
+          "why": "The job's own max_concurrent_runs of 1 overrides the jobs_max_concurrent_runs preset, just as its pause status overrides the pause preset."
+        }
+      ],
+      "in_practice": "Presets suit target-wide defaults such as pausing test schedules, and a team can still let one smoke-test job run hourly in test by setting it on that job, without adding a second target.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/deployment-modes",
+      "evidence": "Presets override the default mode behavior, and settings of individual resources override the presets. If the max_concurrent_runs for a job is 10, but the jobs_max_concurrent_runs preset is set to 20, the job's maximum concurrent runs is 10. If a schedule is set to UNPAUSED, but the trigger_pause_status preset is set to PAUSED, the schedule will be unpaused."
+    },
+    {
+      "family": "bundle-config-prod-root-path-not-shared",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team sets the `prod` target's `workspace.root_path` to `/Shared/.bundle/prod/${bundle.name}` so analysts can browse the deployed notebooks. CI deploys as a service principal, and the target's `run_as` is that service principal. A security review rejects the setup. What is the problem, and what should the team do?",
+      "options": [
+        {
+          "text": "`/Shared` is writable by all users; deploy to a folder only the service principal can write",
+          "correct": true,
+          "why": "The /Shared folder is writable by all workspace users, so anyone could modify deployed production code, job definitions and libraries. Deploy to a folder whose write access, set with folder ACLs, is granted only to the deploying identity."
+        },
+        {
+          "text": "Nothing, because `run_as` already restricts prod to the service principal",
+          "average": true,
+          "why": "run_as sets the identity that jobs and pipelines run as. It doesn't stop other users from editing the deployed code and definitions in a folder everyone can write to."
+        },
+        {
+          "text": "Prod should deploy under the CI engineer's home folder instead",
+          "why": "A person's home folder ties production to one user's account. Databricks recommends deploying with a service principal and limiting write access on the prod root path to it."
+        },
+        {
+          "text": "`/Shared` paths fail production checks, so use `mode: development`",
+          "why": "The deployment itself works; the risk is who can write to the folder. Development mode would also add user prefixes and pause schedules, which is wrong for prod."
+        }
+      ],
+      "in_practice": "The failure is quiet rather than loud: an analyst fixing a typo in a deployed notebook changes what the 2 a.m. production job runs, with no pull request or review behind it.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/reference",
+      "evidence": "Do not use a /Shared path (such as /Shared/.bundle/prod/...) as the production root_path. The /Shared folder is writable by all workspace users, which means anyone could modify your deployed production code, job definitions, and libraries. Instead, deploy to a folder whose write access is controlled with folder ACLs, and grant write access only to the identity that deploys the bundle."
+    },
+    {
+      "family": "bundles-custom-template-init",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform team wants every new data engineering project to start with the same folder layout, `dev` and `prod` targets and CI configuration, with a prompt for the project name. What should the team provide?",
+      "options": [
+        {
+          "text": "A custom bundle template that engineers pass to `databricks bundle init`",
+          "correct": true,
+          "why": "A custom bundle template defines a project's folder structure, configuration files and prompts, the prompts in databricks_template_schema.json. Engineers create a project from it by passing its local path or remote URL to databricks bundle init."
+        },
+        {
+          "text": "A sample `databricks.yml` that engineers copy into each new repository",
+          "average": true,
+          "why": "Copying a file works once but drifts as people edit their copies, and it can't prompt for values or generate the folder structure the way a template does."
+        },
+        {
+          "text": "A shared YAML file that each project lists in its `include` mapping",
+          "why": "include adds configuration files to an existing bundle from paths relative to its configuration. It doesn't create a new project or prompt for its name."
+        },
+        {
+          "text": "A reference job that engineers copy with `databricks bundle generate job`",
+          "why": "bundle generate writes configuration for a job that already exists in the workspace. It doesn't scaffold a project with targets, folders and CI files."
+        }
+      ],
+      "in_practice": "A template turns team standards, such as a service principal run identity and a locked-down prod root path, into the default, so a new project is deployable on day one instead of after a review round of fixes.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/templates",
+      "evidence": "Databricks provides a set of default bundle templates, but you can also create custom bundle templates. Users can then initialize bundles using the bundle init command, specifying a default template or your custom template. To use a custom bundle template, pass the local path or remote URL of the template to the Databricks CLI bundle init command."
+    },
+    {
+      "family": "bundles-artifacts-build-wheel",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's bundle includes a Lakeflow Job with a Python wheel task that runs the team's own package from the same repository. How can the wheel be built as part of every `databricks bundle deploy`?",
+      "options": [
+        {
+          "text": "Define the package in the bundle's `artifacts` mapping with `type: whl`",
+          "correct": true,
+          "why": "The artifacts mapping lists artifacts to build automatically during bundle deployments. For a whl artifact the CLI runs a build, python setup.py bdist_wheel by default, on each deploy, and the job can then use the built wheel."
+        },
+        {
+          "text": "Build the wheel locally and upload it to a volume before each deploy",
+          "average": true,
+          "why": "A manual build step works but is easy to skip or to run against stale code. The artifacts mapping makes the CLI build the wheel during every deployment instead."
+        },
+        {
+          "text": "List the package folder under `sync.include` so the deploy builds it",
+          "why": "sync controls which files are uploaded to the workspace. It copies files but doesn't run a build."
+        },
+        {
+          "text": "Add a `scripts` entry that builds the wheel",
+          "why": "Scripts run when invoked with databricks bundle run. They aren't executed automatically as part of bundle deploy."
+        }
+      ],
+      "in_practice": "Building on deploy ties the wheel to the commit being deployed, so prod never runs a package someone built last week from an unmerged branch.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/reference",
+      "evidence": "Specifies the artifacts to automatically build during bundle deployments that can be used later in bundle runs. For Python wheel builds, the Databricks CLI assumes that it can find a local install of the Python wheel package to run builds, and it runs the command python setup.py bdist_wheel by default during each bundle deployment."
+    },
+    {
+      "family": "bundles-lifecycle-prevent-destroy",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team's bundle defines a Unity Catalog schema whose tables other teams depend on, along with the jobs and pipelines that fill it. CI pipelines in the company often run `databricks bundle destroy --auto-approve`. The team wants the schema's own definition to make sure `bundle destroy` can never delete it. What should the team add?",
+      "options": [
+        {
+          "text": "`lifecycle` with `prevent_destroy: true` on the schema resource",
+          "correct": true,
+          "why": "Resources can carry lifecycle settings that control their behavior when deployed or destroyed. prevent_destroy: true protects the schema from being destroyed while the bundle keeps managing its definition."
+        },
+        {
+          "text": "Nothing, because `bundle destroy` asks before deleting anything",
+          "average": true,
+          "why": "The confirmation prompt is skipped with --auto-approve, which automated pipelines commonly pass, so the prompt protects nothing in CI."
+        },
+        {
+          "text": "Remove the schema from the bundle once it has been created",
+          "why": "Removing a previously deployed resource from the configuration deletes it from the workspace on the next deploy, the outcome the team wants to avoid."
+        },
+        {
+          "text": "`mode: production` on each target, which blocks `bundle destroy`",
+          "why": "Production mode validates things such as the Git branch, pipeline development settings and deployment paths. It isn't a guard against destroy."
+        }
+      ],
+      "in_practice": "Guarding the few long-lived data resources in a bundle is cheap insurance: a cleanup command run against the wrong target can't take out a schema other teams query every day.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/resources",
+      "evidence": "lifecycle Map Contains the lifecycle settings for a resource. It controls the behavior of the resource when it is deployed or destroyed. prevent_destroy Boolean Lifecycle setting to prevent the resource from being destroyed."
+    },
+    {
+      "family": "bundles-renamed-bundle-duplicates-jobs",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team renames its bundle from `sales_etl` to `sales_pipelines` in `databricks.yml` and changes nothing else. CI then runs `databricks bundle deploy -t prod` with the same service principal as before. Afterward the prod workspace has two copies of every job, and the old copies are still scheduled. What explains this?",
+      "options": [
+        {
+          "text": "The bundle name is part of the deployment's identity, so the deploy used new state and created new jobs",
+          "correct": true,
+          "why": "A bundle's identity comes from its root_path, which defaults to ~/.bundle/${bundle.name}/${bundle.target}, and its state tracks deployed resources by ID. A new name means new state, so every job was created again and the old ones were left with the old state."
+        },
+        {
+          "text": "Renaming the bundle renamed the jobs, so deploy no longer matched the old jobs by name",
+          "average": true,
+          "why": "Job names come from each job's own name setting, and deployments never match resources by name. They track the IDs they created in state."
+        },
+        {
+          "text": "Production mode keeps the previous copies of jobs whenever the configuration changes",
+          "why": "No mode keeps old copies on purpose. A deploy deletes resources removed from its configuration if it deployed them before, but only within the same deployment identity."
+        },
+        {
+          "text": "The service principal lacked permission to delete the jobs it had deployed before",
+          "why": "A permission problem would surface as a deploy error. Here the deploy succeeded because it never treated the old jobs as part of this deployment."
+        }
+      ],
+      "in_practice": "Duplicate scheduled jobs double compute spend and can write the same tables twice, so teams treat the bundle name, target names and workspace as fixed once a project reaches prod.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "The root_path property is what determines a bundle's unique identity, which defaults to ~/.bundle/${bundle.name}/${bundle.target}. Resource names are not used to correlate between a bundle deployment and a resource instance. A resource's association with a bundle can only be forgotten if you change the bundle name, the bundle target, or the workspace."
+    },
+    {
+      "family": "cli-github-setup-cli-action",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineering team's GitHub Actions workflow must run `databricks bundle validate` and `databricks bundle deploy` on an Ubuntu runner. Which workflow step installs the Databricks CLI for those commands?",
+      "options": [
+        {
+          "text": "`uses: databricks/setup-cli@<version>`",
+          "correct": true,
+          "why": "databricks/setup-cli is a composite action, developed by Databricks, that sets up the Databricks CLI in a GitHub Actions workflow so later steps can run bundle commands."
+        },
+        {
+          "text": "`run: pip install` of the legacy CLI, version 0.18",
+          "average": true,
+          "why": "Versions 0.18 and below are the legacy Databricks CLI, which gets no new features; bundles require the Databricks CLI version 0.218.0 or above."
+        },
+        {
+          "text": "`uses: actions/checkout@v4` and no other setup",
+          "why": "Checkout puts the repository's files on the runner but doesn't install any Databricks tooling."
+        },
+        {
+          "text": "`run: databricks bundle init` before the deploy",
+          "why": "bundle init creates a new bundle project from a template, and it needs the CLI to be installed already."
+        }
+      ],
+      "in_practice": "Pinning the action to a version, as the Databricks JAR example does with setup-cli@v0.9.0, keeps a new CLI release from changing deploy behavior in the middle of a release week.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/ci-cd/github",
+      "evidence": "Databricks has developed the following GitHub Actions for your CI/CD workflows on GitHub. databricks/setup-cli A composite action that sets up the Databricks CLI in a GitHub Actions workflow."
+    },
+    {
+      "family": "cli-bundle-summary-deep-links",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "After a CI deployment, a data engineer wants a list of the bundle's deployed jobs and pipelines in the `prod` target, each with a link that opens it in the workspace. Which command provides this?",
+      "options": [
+        {
+          "text": "`databricks bundle summary -t prod`",
+          "correct": true,
+          "why": "bundle summary outputs the bundle's identity and resources, including deep links that open each job and pipeline in the Databricks workspace."
+        },
+        {
+          "text": "`databricks bundle validate -t prod`",
+          "average": true,
+          "why": "validate checks that the configuration files are syntactically correct and prints the bundle's identity; for its resources with links, the docs point to bundle summary."
+        },
+        {
+          "text": "`databricks bundle plan -t prod`",
+          "why": "plan previews the create, update and delete actions a deploy would take. It doesn't list deployed resources with workspace links."
+        },
+        {
+          "text": "`databricks jobs list`",
+          "why": "jobs list returns every job the caller can see in the workspace, not just this bundle's, and it doesn't include pipelines."
+        }
+      ],
+      "in_practice": "Posting the summary to the release notes gives reviewers one-click access to what changed in prod, instead of searching the Jobs UI for the right names.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "Output a summary of a bundle's identity and resources, including deep links for resources so that you can easily navigate to the resource in the Databricks workspace."
+    },
+    {
+      "family": "cli-run-only-task-and-downstream",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's bundle job `daily_sales` has three tasks in sequence: `ingest`, `transform` and `publish`. After fixing a bug in `transform` and redeploying to `dev`, the engineer wants to rerun `transform` and everything after it, without rerunning `ingest`. Which command does this?",
+      "options": [
+        {
+          "text": "`databricks bundle run -t dev --only transform+ daily_sales`",
+          "correct": true,
+          "why": "--only takes the task keys to run, and a + suffix on a key also runs that task's downstream tasks, so transform+ runs transform and then publish."
+        },
+        {
+          "text": "`databricks bundle run -t dev --only transform daily_sales`",
+          "average": true,
+          "why": "Without a modifier, --only runs just the listed task, so publish wouldn't run after transform."
+        },
+        {
+          "text": "`databricks bundle run -t dev --only +transform daily_sales`",
+          "why": "A + prefix adds the task's upstream tasks, so this would rerun ingest and still skip publish."
+        },
+        {
+          "text": "`databricks bundle run -t dev --restart daily_sales`",
+          "why": "--restart restarts the run if one is already in progress. It runs the whole job, including ingest."
+        }
+      ],
+      "in_practice": "Skipping an ingest step that already succeeded shortens the fix-and-verify loop in dev and avoids reloading the same source files, which matters when ingest alone takes 40 minutes.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "To also run a task's dependencies, add a + modifier to the task key: Prefix a task key with + to also run its upstream tasks (the tasks it depends on). Suffix a task key with + to also run its downstream tasks (the tasks that depend on it)."
+    },
+    {
+      "family": "cli-env-vars-before-config-profile",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team's CI runner image ships a `~/.databrickscfg` whose `DEFAULT` profile holds a token for an old test user. The release step sets `DATABRICKS_HOST` and `DATABRICKS_TOKEN` from the CI secret store for the release service principal, then runs `databricks repos update` with no `--profile`. Which credentials does the CLI use?",
+      "options": [
+        {
+          "text": "The environment variables, which are checked before `.databrickscfg`",
+          "correct": true,
+          "why": "The CLI looks for authentication settings in a fixed order, with environment variables before .databrickscfg profiles, and stops at the first source that has them. With DATABRICKS_TOKEN set, the service principal's token is used."
+        },
+        {
+          "text": "The `DEFAULT` profile, which applies whenever no profile is named",
+          "average": true,
+          "why": "DEFAULT is the fallback profile, but the CLI checks environment variables before configuration profiles and stops at the first source that has the setting."
+        },
+        {
+          "text": "Neither, because the CLI stops and asks which credential to use",
+          "why": "The CLI resolves credentials in a fixed order without prompting, and here DATABRICKS_TOKEN is found first."
+        },
+        {
+          "text": "The profile's token together with the host from the variables",
+          "why": "Once DATABRICKS_TOKEN is set, the CLI uses it even if tokens exist in .databrickscfg, so the profile's token isn't used."
+        }
+      ],
+      "in_practice": "Injecting credentials as environment variables keeps them out of the runner image, and because they win over profiles, a stale profile baked into the image can't quietly redirect a release.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/authentication",
+      "evidence": "Whenever the Databricks CLI authenticates to a Databricks workspace or account, it looks for required settings in the following order: Bundle settings files, Environment variables, Configuration profiles in the .databrickscfg file. As soon as the CLI finds the required setting, it stops searching other locations. If a DATABRICKS_TOKEN environment variable is set, the CLI uses it."
+    },
+    {
+      "family": "cli-m2m-client-secret-env-var",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer sets up OAuth machine-to-machine authentication so a CI pipeline can deploy a bundle as a service principal. The engineer has put the service principal's `client_id` under the `prod` target's `workspace` mapping. Where should the service principal's OAuth secret go?",
+      "options": [
+        {
+          "text": "In the `DATABRICKS_CLIENT_SECRET` environment variable on the runner",
+          "correct": true,
+          "why": "Bundle configuration can hold the client ID, but a client secret can't be specified in it. Set DATABRICKS_CLIENT_SECRET in the runner's environment, typically from the CI secret store, or put client_secret in a configuration profile."
+        },
+        {
+          "text": "Next to `client_id`, as `client_secret` in the target's `workspace` mapping",
+          "average": true,
+          "why": "A client secret can't be specified in the bundle configuration file. It goes in the DATABRICKS_CLIENT_SECRET environment variable or a configuration profile."
+        },
+        {
+          "text": "In the `DATABRICKS_TOKEN` environment variable on the runner",
+          "why": "DATABRICKS_TOKEN carries a Databricks access token, not an OAuth client secret. The M2M flow reads the secret from DATABRICKS_CLIENT_SECRET or a profile's client_secret."
+        },
+        {
+          "text": "In a Databricks secret scope that the deploy reads at startup",
+          "why": "Secret scopes serve code running in the workspace. The CLI needs the client secret on the runner before it can authenticate to the workspace at all."
+        }
+      ],
+      "in_practice": "Keeping the secret out of databricks.yml keeps it out of Git history and pull request diffs, where a leaked secret would grant the service principal's prod access until someone rotated it.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/reference",
+      "evidence": "For OAuth machine-to-machine (M2M) authentication, the mapping client_id is used. You cannot specify a client secret value in the bundle configuration file. Instead, set the local environment variable DATABRICKS_CLIENT_SECRET. Or you can add the client_secret value to a configuration profile."
+    },
+    {
+      "family": "cli-deploy-force-lock-after-crash",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A CI job running `databricks bundle deploy -t prod` was killed by a runner timeout midway through a deployment. Every deploy since then fails because the deployment lock is held, and the release engineer has confirmed that no other deployment is running. What should the engineer do?",
+      "options": [
+        {
+          "text": "Rerun the deploy once with `--force-lock` to take over the stale lock",
+          "correct": true,
+          "why": "--force-lock forces acquisition of the deployment lock. It is meant for this case, a previous deployment that crashed or was interrupted and left a stale lock, and should be used only once no other deployment is in progress."
+        },
+        {
+          "text": "Rerun the deploy with `--force` to override the blocking validation",
+          "average": true,
+          "why": "--force overrides validations such as the Git branch check. It doesn't acquire a deployment lock left behind by an interrupted run."
+        },
+        {
+          "text": "Run `databricks bundle destroy` on prod, then deploy from scratch",
+          "why": "Destroy permanently deletes the deployed jobs, pipelines and artifacts in prod, which is far more than clearing a lock."
+        },
+        {
+          "text": "Delete the deployment's state files in the workspace, then deploy",
+          "why": "State is how a deployment tracks the IDs of the resources it created. Without it, the deployment can no longer match its existing jobs and pipelines."
+        }
+      ],
+      "in_practice": "The lock exists so two merges landing a minute apart can't interleave their deploys; forcing it while another deploy is live can leave prod half old and half new, so the check comes first.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "--force-lock Force acquisition of deployment lock. This option disables the mechanism that prevents concurrent deployments from interacting with each other. It should only be used if the previous deployment crashed or was interrupted and left a stale lock file."
+    }
+  ]
 }
