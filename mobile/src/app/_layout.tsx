@@ -53,6 +53,7 @@ function Navigator() {
       <Stack.Screen name="complete/[id]" options={{ gestureEnabled: false }} />
       <Stack.Screen name="premium" options={{ presentation: 'modal' }} />
       <Stack.Screen name="account" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="tutor/[sessionItemId]" options={{ presentation: 'modal' }} />
     </Stack>
     <CelebrationPlayer />
     {status === 'signedIn' ? <SignedInEffects /> : null}

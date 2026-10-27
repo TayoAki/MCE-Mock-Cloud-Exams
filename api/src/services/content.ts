@@ -1,4 +1,4 @@
-import { Domain, Exam, ExamVersion, Lesson, Objective, QuestionVersion, Unit } from '../models/index.js';
+import { Domain, Exam, ExamVersion, Lesson, Objective, QuestionFamily, QuestionVersion, Unit } from '../models/index.js';
 import { notFound } from '../lib/errors.js';
 
 export type QuestionVersionLean = Awaited<ReturnType<typeof loadQuestionVersions>>[number];
@@ -80,4 +80,10 @@ export async function latestPublishedByFamily(examVersionId: string, familyIds?:
   const map = new Map<string, (typeof rows)[number]>();
   for (const r of rows) if (!map.has(r.familyId)) map.set(r.familyId, r);
   return map;
+}
+
+/** Level Up difficulty (1–3) per family; families without one count as 1. */
+export async function familyDifficulty(familyIds: string[]) {
+  const rows = await QuestionFamily.find({ _id: { $in: familyIds } }).select({ difficulty: 1 }).lean();
+  return new Map(rows.map((r) => [r._id, r.difficulty ?? 1]));
 }

@@ -10,17 +10,22 @@ import type {
   CircleActivity,
   Engagement,
   Exam,
+  FlagsView,
   FriendStreakRow,
   LeagueView,
+  LevelUpView,
   Me,
+  NextSteps,
   Path,
   PracticeSummary,
   Progress,
+  QotdView,
   QuestsView,
   Recap,
   Reviews,
   Session,
   StorySummary,
+  TutorThread,
 } from './types';
 
 export function useMe() {
@@ -98,6 +103,29 @@ export function useStories(enrollmentId?: string) {
   });
 }
 
+/** Today's shared question and the Question of the Day streak. */
+export function useQotd(enrollmentId?: string) {
+  return useQuery({ queryKey: ['qotd', enrollmentId], queryFn: () => get<QotdView>(`/enrollments/${enrollmentId}/qotd`), enabled: !!enrollmentId });
+}
+
+export function useFlags(enrollmentId?: string) {
+  return useQuery({ queryKey: ['flags', enrollmentId], queryFn: () => get<FlagsView>(`/enrollments/${enrollmentId}/flags`), enabled: !!enrollmentId });
+}
+
+export function useLevelUp(enrollmentId?: string) {
+  return useQuery({ queryKey: ['level-up', enrollmentId], queryFn: () => get<LevelUpView>(`/enrollments/${enrollmentId}/level-up`), enabled: !!enrollmentId });
+}
+
+/** The suggested next step for a finished session. Worked out live, so it never goes stale. */
+export function useNextSteps(sessionId?: string, enabled = true) {
+  return useQuery({ queryKey: ['next', sessionId], queryFn: () => get<NextSteps>(`/sessions/${sessionId}/next`), enabled: !!sessionId && enabled, staleTime: 0 });
+}
+
+export function useTutor(sessionItemId?: string) {
+  // The phase changes the moment the learner answers, so never reuse a cached thread.
+  return useQuery({ queryKey: ['tutor', sessionItemId], queryFn: () => get<TutorThread>(`/tutor/${sessionItemId}`), enabled: !!sessionItemId, staleTime: 0 });
+}
+
 function useSignedIn() {
   return useAuth().status === 'signedIn';
 }
@@ -150,7 +178,27 @@ export function useRefreshLearning() {
   const queryClient = useQueryClient();
   return () =>
     Promise.all(
-      ['me', 'path', 'practice', 'reviews', 'progress', 'sessions', 'circle', 'stories', 'score', 'recap', 'engagement', 'quests', 'achievements', 'league', 'friend-streaks', 'circle-activity'].map(
+      [
+        'me',
+        'path',
+        'practice',
+        'reviews',
+        'progress',
+        'sessions',
+        'circle',
+        'stories',
+        'score',
+        'recap',
+        'engagement',
+        'quests',
+        'achievements',
+        'league',
+        'friend-streaks',
+        'circle-activity',
+        'qotd',
+        'flags',
+        'level-up',
+      ].map(
         (key) => queryClient.invalidateQueries({ queryKey: [key] }),
       ),
     );

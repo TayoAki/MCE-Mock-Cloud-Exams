@@ -6,6 +6,7 @@ import Animated, { FadeIn, FadeInDown, Keyframe } from 'react-native-reanimated'
 import { Cube } from '@/components/Cube';
 import { ChestButton, ChestModal, LevelBar, QuestRow, StatTile, TIER_STYLE, TierBadge } from '@/components/gamify';
 import { Confetti, CountUp, riseIn } from '@/components/motion';
+import { LevelPips, NextStepCard, PeerLine } from '@/components/study';
 import { Banner, Button, Card, ErrorState, Eyebrow, Icon, LoadingState, NavRow, Pill, Screen, Small } from '@/components/ui';
 import { WeekDots } from '@/components/WeekDots';
 import { trackEvent } from '@/lib/analytics';
@@ -13,7 +14,7 @@ import { get } from '@/lib/api';
 import { holdCelebrations } from '@/lib/celebrations';
 import { feedback as play } from '@/lib/feedback';
 import { enableReminders } from '@/lib/notifications';
-import { useMe, useRefreshLearning } from '@/lib/queries';
+import { useCurrentEnrollment, useMe, useQotd, useRefreshLearning } from '@/lib/queries';
 import { colors } from '@/lib/theme';
 import type { Completion, LeagueStanding } from '@/lib/types';
 
@@ -26,6 +27,10 @@ const MODE_LABEL: Record<string, string> = {
   quick: 'Quick 5 complete',
   timed: 'Timed quiz complete',
   custom: 'Custom quiz complete',
+  story: 'Story complete',
+  qotd: 'Question of the Day',
+  flagged: 'Flagged quiz complete',
+  levelup: 'Level Up round complete',
 };
 
 // The celebration's beats, in ms after the results arrive.
@@ -56,6 +61,8 @@ export default function Complete() {
   const refresh = useRefreshLearning();
   const result = useQuery({ queryKey: ['results', id], queryFn: () => get<Completion>(`/sessions/${id}/results`) });
   const me = useMe();
+  const { enrollment } = useCurrentEnrollment();
+  const qotdView = useQotd(result.data?.mode === 'qotd' ? enrollment?.id : undefined);
   const [reminder, setReminder] = useState<'idle' | 'busy' | 'enabled' | 'denied' | 'unavailable'>('idle');
   const [skip, setSkip] = useState(false);
   const [chestOpen, setChestOpen] = useState(false);
@@ -92,6 +99,22 @@ export default function Complete() {
   const firstLesson = c.mode === 'lesson' && c.xp_granted > 0;
   const perfect = c.total >= 5 && c.correct === c.total;
   const g = c.engagement;
+  const lu = c.level_up;
+  const headline = lu
+    ? lu.passed
+      ? lu.level === 4
+        ? `${lu.domain_title} mastered!`
+        : `Level ${lu.level} passed!`
+      : 'So close. Try again?'
+    : c.qotd
+      ? c.qotd.correct
+        ? 'You got today’s question!'
+        : 'Answered. Your streak lives on.'
+      : perfect
+        ? 'Perfect lesson!'
+        : c.study_day_credited
+          ? 'You showed up. That counts.'
+          : 'Extra practice, well spent.';
 
   return (
     <View className="flex-1">
@@ -99,10 +122,10 @@ export default function Complete() {
       {/* Tapping the hero skips the count-up. */}
       <Pressable accessible={false} onPress={() => setSkip(true)} className="items-center gap-3 pt-2">
         <Eyebrow>{MODE_LABEL[c.mode] ?? 'Practice complete'}</Eyebrow>
-        <Cube size={112} mood={perfect || c.study_day_credited ? 'cheer' : 'proud'} motion="jump" />
+        <Cube size={112} mood={perfect || c.study_day_credited || lu?.passed || c.qotd?.correct ? 'cheer' : 'proud'} motion="jump" />
         <Animated.View entering={FadeInDown.delay(BEAT.title).duration(380)}>
           <Text accessibilityRole="header" className="text-ink text-[26px] font-extrabold text-center">
-            {perfect ? 'Perfect lesson!' : c.study_day_credited ? 'You showed up. That counts.' : 'Extra practice, well spent.'}
+            {headline}
           </Text>
         </Animated.View>
         <View accessible accessibilityLabel={`${c.xp_granted} XP earned`}>
@@ -123,7 +146,46 @@ export default function Complete() {
         </View>
       ) : null}
 
-      {me.data ? (
+      {lu ? (
+        <Animated.View entering={riseIn(BEAT.stats + 200)}>
+          <Card tone={lu.passed ? 'mint' : 'surface'} className="gap-2.5">
+            <View className="flex-row items-center gap-2">
+              <Icon name={lu.passed ? 'trending-up' : 'refresh'} size={20} color={lu.passed ? colors.success : colors.primary} />
+              <Text className="flex-1 text-ink text-[16px] font-extrabold" numberOfLines={2}>
+                {lu.domain_title}
+              </Text>
+            </View>
+            <LevelPips passed={lu.mastered ? 4 : lu.passed ? lu.level : lu.level - 1} current={lu.next_level?.level ?? lu.level} />
+            <Text className="text-ink text-[14px] leading-[20px]">
+              {lu.passed
+                ? lu.next_level
+                  ? `Level ${lu.level}: ${lu.label} done with ${lu.correct} of ${lu.total}. Level ${lu.next_level.level}: ${lu.next_level.label} is unlocked.`
+                  : `You’ve reached Mastery in this domain with ${lu.correct} of ${lu.total}.`
+                : `${lu.correct} of ${lu.total} on Level ${lu.level}: ${lu.label}. You need ${lu.needed} to pass.`}
+            </Text>
+          </Card>
+        </Animated.View>
+      ) : null}
+
+      {c.qotd ? (
+        <Animated.View entering={riseIn(BEAT.stats + 200)}>
+          <View className="rounded-[20px] bg-gem-tint p-4 gap-2">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center gap-2">
+                <Icon name="sunny" size={20} color={colors.gemDark} />
+                <Text className="text-ink text-[18px] font-extrabold">{c.qotd.streak}-day question streak</Text>
+              </View>
+              {c.qotd.streak >= c.qotd.longest && c.qotd.streak > 1 ? <Pill tone="streak" icon="flame" label="Best yet" /> : null}
+            </View>
+            <PeerLine peer={qotdView.data?.result?.peer} qotd />
+            <Small>Same question for every learner today. A new one arrives tomorrow.</Small>
+          </View>
+        </Animated.View>
+      ) : null}
+
+      {enrollment ? <NextStepCard sessionId={c.session_id} enrollmentId={enrollment.id} delay={BEAT.stats + 400} /> : null}
+
+      {me.data && !c.qotd ? (
         <Animated.View entering={riseIn(BEAT.streakCard)}>
           <Card className="gap-3">
             <View className="flex-row items-center justify-between">
@@ -222,7 +284,7 @@ export default function Complete() {
 
       <Small className="text-center">XP tracks activity. It is not an exam score.</Small>
     </Screen>
-    {perfect || c.study_day_credited ? <Confetti count={perfect ? 90 : 60} /> : null}
+    {perfect || c.study_day_credited || lu?.newly_passed ? <Confetti count={perfect || lu?.newly_passed ? 90 : 60} /> : null}
     <ChestModal visible={chestOpen} onClose={() => setChestOpen(false)} onOpened={() => setChestTaken(true)} />
     </View>
   );

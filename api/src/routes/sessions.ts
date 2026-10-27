@@ -6,6 +6,7 @@ import { idParam, parseBody, uuidParam } from '../lib/http.js';
 import { answerLimiter, writeLimiter } from '../lib/rate-limit.js';
 import { finalizeSession } from '../services/completion.js';
 import { submitAnswer } from '../services/grading.js';
+import { nextSteps } from '../services/next-step.js';
 import {
   abandonSession,
   getOwnedSession,
@@ -30,6 +31,7 @@ sessionsRouter.post('/sessions', writeLimiter, async (req, res) => {
       story_id: uuidParam.optional(),
       domain_ids: z.array(uuidParam).max(20).optional(),
       question_count: z.int().min(1).max(200).optional(),
+      source_session_id: uuidParam.optional(),
     }),
   );
   res.status(201).json(await startSession(currentUser(req), body));
@@ -80,4 +82,9 @@ sessionsRouter.get('/sessions/:id/results', async (req, res) => {
 
 sessionsRouter.get('/sessions/:id/feedback', async (req, res) => {
   res.json(await sessionFeedback(currentUser(req)._id, idParam(req)));
+});
+
+/** A suggested next step (and an alternative) for a finished session, worked out from what is pending now. */
+sessionsRouter.get('/sessions/:id/next', async (req, res) => {
+  res.json(await nextSteps(currentUser(req)._id, idParam(req)));
 });

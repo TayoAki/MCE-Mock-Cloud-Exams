@@ -18,6 +18,7 @@ import { HttpError, badRequest, conflict, isDuplicateKey, notFound } from '../li
 import { uuid } from '../lib/ids.js';
 import { BOOST, XP, nextReview } from '../lib/rules.js';
 import { effectiveTimezone, localDate, startOfLocalDay } from '../lib/time.js';
+import { peerStats, type PeerStat } from './peer.js';
 
 /** Feedback is withheld for these modes until the session is finalized. */
 export const DELAYED_FEEDBACK_MODES = new Set(['mock']);
@@ -202,23 +203,38 @@ export interface AnswerReceipt {
   attempt_id: string;
   accepted: boolean;
   feedback: Feedback | null;
+  /** How learners did on this question on their first try, shown with the feedback. */
+  peer: PeerStat | null;
   xp_granted?: number;
 }
 
-async function receiptFor(attempt: { _id: string; questionVersionId: string; isCorrect?: boolean | null; mode: string; sessionId: string }) {
+async function receiptFor(attempt: {
+  _id: string;
+  questionVersionId: string;
+  familyId: string;
+  isCorrect?: boolean | null;
+  mode: string;
+  sessionId: string;
+}): Promise<AnswerReceipt> {
   if (attempt.isCorrect == null || DELAYED_FEEDBACK_MODES.has(attempt.mode)) {
     // Mock answers stay sealed until the form is finalized.
     const session = await PracticeSession.findById(attempt.sessionId).select({ status: 1 }).lean();
     if (!session || session.status === 'active' || attempt.isCorrect == null) {
-      return { attempt_id: attempt._id, accepted: true, feedback: null };
+      return { attempt_id: attempt._id, accepted: true, feedback: null, peer: null };
     }
   }
-  const [qv, key] = await Promise.all([
+  const [qv, key, peers] = await Promise.all([
     QuestionVersion.findById(attempt.questionVersionId).select({ sourceUrl: 1, answerType: 1 }).lean(),
     QuestionKey.findById(attempt.questionVersionId).lean(),
+    peerStats([attempt.familyId]),
   ]);
   if (!qv || !key) throw new HttpError(500, 'content_missing', 'Grading data is missing for this question');
-  return { attempt_id: attempt._id, accepted: true, feedback: buildFeedback(attempt.isCorrect!, key, qv.sourceUrl, qv.answerType as AnswerType) };
+  return {
+    attempt_id: attempt._id,
+    accepted: true,
+    feedback: buildFeedback(attempt.isCorrect!, key, qv.sourceUrl, qv.answerType as AnswerType),
+    peer: peers.get(attempt.familyId) ?? null,
+  };
 }
 
 /** Whether a retry carries the same answer as the committed attempt, compared in stored form. */

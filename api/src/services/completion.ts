@@ -22,6 +22,8 @@ import { afterCompletion, type EngagementSummary } from './engagement.js';
 import { creditReminder } from './reminders.js';
 import { recordScoreSnapshot } from './insights.js';
 import { applyGradedAttempt, grantReward } from './grading.js';
+import { applyLevelUp, type LevelUpResult } from './levelup.js';
+import { creditQotd } from './qotd.js';
 import { gradeAnswer } from '../lib/answers.js';
 import { creditDay, syncStreak } from './streaks.js';
 
@@ -46,6 +48,10 @@ export interface Completion {
   completed_at: string;
   /** Quests, level, gems, league and celebrations from this session. */
   engagement: EngagementSummary;
+  /** Level Up sessions: the level tried, whether it passed and what unlocks next. */
+  level_up?: LevelUpResult | null;
+  /** Question of the Day sessions: its date, the result and the QotD streak. */
+  qotd?: { date: string; correct: boolean; streak: number; longest: number } | null;
 }
 
 /**
@@ -159,7 +165,17 @@ export async function finalizeSession(
     }
 
     // Mark the session finished first, so quests and badges count it.
-    const config = (session.selectionConfig ?? {}) as { sample?: boolean; fresh_count?: number };
+    const config = (session.selectionConfig ?? {}) as { sample?: boolean; fresh_count?: number; date?: string; domain_id?: string; level?: number };
+    // Level Up and the Question of the Day keep their own progress, before badges are checked.
+    const levelUp =
+      session.mode === 'levelup'
+        ? await applyLevelUp({ userId: session.userId, enrollmentId: session.enrollmentId, config, status, correct, total: session.items.length, now })
+        : null;
+    let qotd: Completion['qotd'] = null;
+    if (session.mode === 'qotd' && status === 'completed' && config.date) {
+      const credit = await creditQotd(session.userId, config.date, now);
+      qotd = { date: config.date, correct: correct > 0, streak: credit.current, longest: credit.longest };
+    }
     session.status = status;
     session.completedAt = now;
     session.qualifying = qualifying;
@@ -198,6 +214,8 @@ export async function finalizeSession(
       lesson_id: session.lessonId ?? null,
       completed_at: now.toISOString(),
       engagement,
+      level_up: levelUp,
+      qotd,
     };
 
     session.completion = summary;

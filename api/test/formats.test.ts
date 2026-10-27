@@ -3,7 +3,7 @@ import { canonicalAnswer, gradeAnswer, keyMatchPairs, keyOrderSteps, seededRando
 import { GemLedger, Objective, QuestionFamily, QuestionKey, QuestionVersion, Story } from '../src/models/index.js';
 import { latestPublishedByFamily } from '../src/services/content.js';
 import { mockInventory } from '../src/services/selection.js';
-import { admin, as, enroll, guest, id, pilotVersionId } from './helpers.js';
+import { admin, as, correctBody, enroll, guest, id, pilotVersionId } from './helpers.js';
 
 describe('answer rules', () => {
   it('accepts typed answers regardless of case, spacing, punctuation and a small typo', () => {
@@ -46,14 +46,6 @@ describe('answer rules', () => {
     }
   });
 });
-
-/** Correct answers for a session item, read from the private key the way a reviewer would. */
-async function correctBody(item: { session_item_id: string; question_version_id: string; answer_type: string }) {
-  const key = (await QuestionKey.findById(item.question_version_id).lean())!;
-  return item.answer_type === 'type'
-    ? { selected_options: [], typed_answer: key.acceptedAnswers[0], input_mode: 'voice' }
-    : { selected_options: key.correctOptions };
-}
 
 describe('stories', () => {
   it('tells the story with its questions inline, grades every format, and pays out once', async () => {

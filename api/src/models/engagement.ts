@@ -134,6 +134,7 @@ export const CELEBRATION_KINDS = [
   'high_five',
   'nudge',
   'circle_quest',
+  'levelup_passed',
 ] as const;
 
 /** Moments the app plays once, in order. The server decides them; the app only shows them. */

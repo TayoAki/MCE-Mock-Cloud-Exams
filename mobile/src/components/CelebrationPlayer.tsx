@@ -182,6 +182,32 @@ function cardFor(c: Celebration): Card {
         secondary: until ? { label: 'Start fresh' } : undefined,
       };
     }
+    case 'levelup_passed':
+      return p.mastered
+        ? {
+            eyebrow: 'Level Up',
+            title: 'Domain mastered!',
+            body: `You reached Mastery in ${str(p.domain_title)}. Replay it any time to keep it sharp.`,
+            icon: 'podium',
+            iconColor: colors.streakDark,
+            tint: colors.streakTint,
+            confetti: true,
+            gems: num(p.gems),
+            primary: { label: 'Nice!' },
+            secondary: { label: 'All domains', href: '/level-up' },
+          }
+        : {
+            eyebrow: 'Level Up',
+            title: `Level ${num(p.level)} passed`,
+            body: `${str(p.domain_title)}: ${str(p.label)} done. The next level brings harder questions.`,
+            icon: 'trending-up',
+            iconColor: colors.success,
+            tint: colors.mint,
+            confetti: true,
+            gems: num(p.gems),
+            primary: { label: 'Keep going' },
+            secondary: { label: 'All domains', href: '/level-up' },
+          };
     case 'streak_repaired':
       return { eyebrow: 'Streak', title: 'Streak repaired!', body: `You're back to ${num(p.days)} days. Study today to keep it.`, icon: 'flame', iconColor: colors.streak, tint: colors.streakTint, confetti: true, primary: { label: 'Back to it' } };
     default:

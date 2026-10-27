@@ -5,6 +5,7 @@ import { Pressable, ScrollView, Text, View, type ScrollViewInstance } from 'reac
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { riseIn } from '@/components/motion';
+import { PeerLine } from '@/components/study';
 import { ChoiceAnswer, ListenPrompt, MatchAnswer, OrderAnswer, TypeAnswer, answerBody, answerReady, formatHint, type AnswerState } from '@/components/questions';
 import { Banner, Button, ErrorState, Icon, LoadingState, ProgressBar, Screen, Small } from '@/components/ui';
 import { ApiError, post } from '@/lib/api';
@@ -88,6 +89,7 @@ function QuestionCard({ item, sessionId, onAnswered }: { item: SessionItem; sess
                         typed_answer: 'typed_answer' in body ? body.typed_answer : null,
                         submitted_at: new Date().toISOString(),
                         feedback: receipt.feedback,
+                        peer: receipt.peer ?? null,
                       },
                     }
                   : i,
@@ -142,6 +144,11 @@ function QuestionCard({ item, sessionId, onAnswered }: { item: SessionItem; sess
         <View accessibilityLiveRegion="polite" className={`rounded-[16px] p-3.5 gap-1 ${feedback.correct ? 'bg-mint' : 'bg-coral-tint'}`}>
           <Text className={`text-[16px] font-extrabold ${feedback.correct ? 'text-success' : 'text-coral-dark'}`}>{feedback.correct ? 'Good call!' : 'Not quite'}</Text>
           <Text className="text-ink text-[14px] leading-[20px]">{feedback.rationale}</Text>
+          <PeerLine peer={item.submission?.peer} />
+          <Pressable accessibilityRole="button" onPress={() => router.push(`/tutor/${item.session_item_id}`)} className="min-h-[40px] flex-row items-center gap-1.5 self-start">
+            <Icon name="chatbubbles" size={15} color={colors.primary} />
+            <Text className="text-primary text-[14px] font-bold">Talk it through with the tutor</Text>
+          </Pressable>
         </View>
       ) : (
         <>

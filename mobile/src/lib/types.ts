@@ -1,7 +1,20 @@
 /** Response shapes from the CertPath API (api/src/routes). */
 
 export type FeatureKey = 'full_bank' | 'custom_quiz' | 'mocks' | 'ai_explain';
-export type SessionMode = 'lesson' | 'quick' | 'weakest' | 'missed' | 'timed' | 'custom' | 'mock' | 'review' | 'checkpoint' | 'story';
+export type SessionMode =
+  | 'lesson'
+  | 'quick'
+  | 'weakest'
+  | 'missed'
+  | 'timed'
+  | 'custom'
+  | 'mock'
+  | 'review'
+  | 'checkpoint'
+  | 'story'
+  | 'qotd'
+  | 'flagged'
+  | 'levelup';
 
 /** single/multiple: choose; order: tap into sequence; match: pair items; type: type or say a short answer. */
 export type AnswerType = 'single' | 'multiple' | 'order' | 'match' | 'type';
@@ -108,9 +121,16 @@ export interface Feedback {
   sources: string[];
 }
 
+/** How learners did on a question on their first try; the percentage appears from five learners. */
+export interface PeerStat {
+  correct_percent: number | null;
+  answered: number;
+}
+
 export interface SessionItem {
   session_item_id: string;
   question_version_id: string;
+  family_id: string;
   position: number;
   prompt: string;
   answer_type: AnswerType;
@@ -123,7 +143,16 @@ export interface SessionItem {
   objective_title: string;
   domain_title: string;
   repeat: boolean;
-  submission: { attempt_id: string; selected_options: string[]; typed_answer?: string | null; submitted_at: string; feedback: Feedback | null } | null;
+  /** Bookmarked by the learner to come back to. */
+  flagged: boolean;
+  submission: {
+    attempt_id: string;
+    selected_options: string[];
+    typed_answer?: string | null;
+    submitted_at: string;
+    feedback: Feedback | null;
+    peer?: PeerStat | null;
+  } | null;
 }
 
 export type StoryPart = { kind: 'line'; speaker: string | null; text: string } | { kind: 'question'; session_item_id: string };
@@ -190,7 +219,8 @@ export interface Celebration {
     | 'friend_streak'
     | 'high_five'
     | 'nudge'
-    | 'circle_quest';
+    | 'circle_quest'
+    | 'levelup_passed';
   payload: Record<string, string | number | null>;
   created_at: string;
 }
@@ -300,6 +330,22 @@ export interface Completion {
   completed_at: string;
   /** Present for sessions finished after gamification shipped. */
   engagement?: EngagementSummary;
+  level_up?: LevelUpResult | null;
+  qotd?: { date: string; correct: boolean; streak: number; longest: number } | null;
+}
+
+export interface LevelUpResult {
+  domain_id: string;
+  domain_title: string;
+  level: number;
+  label: string;
+  passed: boolean;
+  newly_passed: boolean;
+  correct: number;
+  total: number;
+  needed: number;
+  next_level: { level: number; label: string } | null;
+  mastered: boolean;
 }
 
 export interface Session {
@@ -315,6 +361,10 @@ export interface Session {
   answered_count: number;
   sample: boolean;
   feedback_timing: 'per_answer' | 'after_submit';
+  /** Mocks and timed quizzes open the tutor only after an answer is in. */
+  tutor?: 'any_time' | 'after_answer';
+  level_up?: { domain_id: string; level: number; label: string; pass_needed: number } | null;
+  qotd_date?: string | null;
   items: SessionItem[];
   completion: Completion | null;
   story?: { id: string; title: string; characters: { name: string; role: string }[]; parts: StoryPart[] } | null;
@@ -324,6 +374,7 @@ export interface AnswerReceipt {
   attempt_id: string;
   accepted: boolean;
   feedback: Feedback | null;
+  peer?: PeerStat | null;
   xp_granted?: number;
 }
 
@@ -426,7 +477,10 @@ export interface SessionFeedback {
     typed_answer?: string | null;
     attempt_id: string | null;
     answered: boolean;
+    family_id?: string;
+    flagged?: boolean;
     feedback: Feedback;
+    peer?: PeerStat | null;
   }[];
 }
 
@@ -477,4 +531,93 @@ export interface Recap {
   high_fives: number;
   score: { start: number; end: number } | null;
   share_text: string;
+}
+
+export interface QotdView {
+  date: string;
+  available: boolean;
+  question: { prompt: string; answer_type: AnswerType; objective_title: string; domain_title: string } | null;
+  status: 'new' | 'in_progress' | 'done';
+  session_id: string | null;
+  result: { correct: boolean; peer: PeerStat | null } | null;
+  streak: { current: number; longest: number; answered_today: boolean };
+  gems: number;
+}
+
+export interface FlagItem {
+  family_id: string;
+  question_version_id: string;
+  prompt: string;
+  answer_type: AnswerType;
+  objective_title: string;
+  domain_title: string;
+  flagged_at: string;
+  last_correct: boolean | null;
+  /** False while the question is retired or under repair. */
+  available: boolean;
+}
+
+export interface FlagsView {
+  enrollment_id: string;
+  items: FlagItem[];
+  quiz_available: number;
+}
+
+export interface LevelUpDomain {
+  domain_id: string;
+  title: string;
+  weight_percent: number;
+  level_passed: number;
+  current_level: number;
+  label: string;
+  mastered: boolean;
+  question_count: number;
+  available: boolean;
+  /** Has questions, but the learner's plan or path doesn't reach them yet. */
+  locked: boolean;
+  by_difficulty: number[];
+  best: Record<string, number>;
+  attempts: number;
+}
+
+export interface LevelUpView {
+  enrollment_id: string;
+  levels: { level: number; label: string }[];
+  domains: LevelUpDomain[];
+}
+
+export interface Suggestion {
+  kind: 'take_break' | 'level_up' | 'retry_missed' | 'review_due' | 'qotd' | 'next_lesson' | 'flagged' | 'weakest';
+  title: string;
+  body: string;
+  cta: string;
+  start: { mode: SessionMode; lesson_id?: string; domain_ids?: string[]; source_session_id?: string } | null;
+}
+
+export interface NextSteps {
+  session_id: string;
+  primary: Suggestion;
+  secondary: Suggestion | null;
+  studied_minutes_today: number;
+}
+
+export interface TutorMessage {
+  role: 'learner' | 'tutor';
+  text: string;
+  phase: 'before' | 'after';
+  origin: 'generated' | 'hint' | null;
+  at: string;
+}
+
+export interface TutorThread {
+  session_item_id: string;
+  session_id: string;
+  phase: 'before' | 'after';
+  available: boolean;
+  /** 'hints' when AI isn't configured: reviewed hints and explanations only. */
+  mode: 'ai' | 'hints';
+  intro: string;
+  suggestions: string[];
+  remaining: number;
+  messages: TutorMessage[];
 }

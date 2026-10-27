@@ -20,6 +20,20 @@ export const SAMPLE_MOCK_SIZE = 10;
 export const PLUS_FEATURES = ['full_bank', 'custom_quiz', 'mocks', 'ai_explain'] as const;
 export type FeatureKey = (typeof PLUS_FEATURES)[number];
 
+/** "x% of learners got this right" appears only once this many learners answered on their first try. */
+export const PEER_MIN_SAMPLE = 5;
+export const FLAGGED_QUIZ = { defaultSize: 10, maxSize: 20 } as const;
+
+/** Level Up: levels 1–3 follow question difficulty, level 4 mixes everything with misses first. */
+export const LEVEL_UP = { size: 5, passRate: 0.8, labels: ['Foundations', 'Applied', 'Advanced', 'Mastery'] } as const;
+export const MAX_LEVEL = LEVEL_UP.labels.length;
+export const levelLabel = (level: number) => LEVEL_UP.labels[Math.min(Math.max(level, 1), MAX_LEVEL) - 1]!;
+/** Correct answers needed to pass a level: 4 of 5, or 80% rounded up for a smaller pool. */
+export const levelPassNeeded = (total: number) => Math.ceil(total * LEVEL_UP.passRate - 1e-9);
+
+/** Learner messages per tutor conversation. */
+export const TUTOR_MAX_MESSAGES = 12;
+
 export const PRACTICE_SCORE_NOTE = 'Practice score; not a pass prediction.' as const;
 
 export interface StreakState {
@@ -121,6 +135,8 @@ export const GEMS = {
   lessonComplete: 5,
   perfectLesson: 5,
   storyComplete: 10,
+  qotd: 5,
+  levelUp: 10,
   achievement: 20,
   monthlyChallenge: 100,
   circleQuest: 30,

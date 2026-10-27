@@ -42,6 +42,7 @@ describe('the daily lesson loop', () => {
           'answer_type',
           'domain_title',
           'family_id',
+          'flagged',
           'input_hint',
           'match_targets',
           'objective_title',

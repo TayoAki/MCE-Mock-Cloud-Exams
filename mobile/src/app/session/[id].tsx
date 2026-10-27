@@ -7,6 +7,7 @@ import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSh
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bump, SPRING, pop, popIn, riseIn, useShake } from '@/components/motion';
 import { ListenPrompt, MatchAnswer, OrderAnswer, TypeAnswer, answerBody, answerReady, formatHint } from '@/components/questions';
+import { FlagButton, PeerLine } from '@/components/study';
 import { Banner, Button, ErrorState, Icon, LoadingState, ProgressBar, Screen, Small } from '@/components/ui';
 import { trackEvent } from '@/lib/analytics';
 import { ApiError, post } from '@/lib/api';
@@ -15,7 +16,7 @@ import { newId } from '@/lib/ids';
 import { clearPending, loadPending, savePending, type PendingAnswer } from '@/lib/pending';
 import { useRefreshLearning, useSession } from '@/lib/queries';
 import { colors } from '@/lib/theme';
-import type { AnswerReceipt, Explanation, Feedback, Session, SessionItem } from '@/lib/types';
+import type { AnswerReceipt, Feedback, Session, SessionItem } from '@/lib/types';
 
 type OptionState = 'idle' | 'selected' | 'correct' | 'wrong' | 'dim';
 
@@ -185,8 +186,6 @@ export default function SessionScreen() {
   const [finishing, setFinishing] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
-  const [explanation, setExplanation] = useState<Explanation | null>(null);
-  const [explaining, setExplaining] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [earned, setEarned] = useState<{ itemId: string; xp: number } | null>(null);
   const remaining = useCountdown(s);
@@ -228,11 +227,10 @@ export default function SessionScreen() {
     });
   }, [s?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Moving to another question resets the selection and any extra explanation.
+  // Moving to another question resets the selection.
   const [shownItemId, setShownItemId] = useState(current?.session_item_id);
   if (current?.session_item_id !== shownItemId) {
     setShownItemId(current?.session_item_id);
-    setExplanation(null);
     if (!pending) {
       setSelected([]);
       setTyped('');
@@ -261,6 +259,7 @@ export default function SessionScreen() {
                       typed_answer: body.typed_answer ?? null,
                       submitted_at: new Date().toISOString(),
                       feedback: receipt.feedback,
+                      peer: receipt.peer ?? null,
                     },
                   }
                 : i,
@@ -331,22 +330,13 @@ export default function SessionScreen() {
 
   function next() {
     setShowingId(null);
-    setExplanation(null);
     if (s && s.items.every((i) => i.submission)) finish();
   }
 
-  async function explain() {
-    if (!current?.submission) return;
-    setExplaining(true);
-    trackEvent('explanation_opened', { origin: 'request' });
-    try {
-      setExplanation(await post<Explanation>('/explanations', { attempt_id: current.submission.attempt_id, style: 'analogy' }));
-    } catch (e) {
-      if (e instanceof ApiError && e.code === 'plus_required') router.push({ pathname: '/premium', params: { feature: 'ai_explain' } });
-      else setError(e instanceof ApiError ? e : null);
-    } finally {
-      setExplaining(false);
-    }
+  function askTutor() {
+    if (!current) return;
+    trackEvent('explanation_opened', { origin: feedback ? 'tutor_after' : 'tutor_before' });
+    router.push(`/tutor/${current.session_item_id}`);
   }
 
   function exit() {
@@ -358,7 +348,16 @@ export default function SessionScreen() {
   if (session.error || !s) return <Screen><ErrorState error={session.error} onRetry={() => session.refetch()} /><Button label="Back" variant="ghost" onPress={() => router.back()} /></Screen>;
   if (s.status !== 'active') return <Screen><LoadingState label="Finalizing" /></Screen>;
 
-  const topic = s.lesson ? `${s.lesson.unit_title} · ${s.lesson.title}` : current?.domain_title ?? '';
+  const topic =
+    s.mode === 'qotd'
+      ? 'Question of the Day'
+      : s.level_up
+        ? `${current?.domain_title ?? ''} · Level ${s.level_up.level}: ${s.level_up.label}`
+        : s.lesson
+          ? `${s.lesson.unit_title} · ${s.lesson.title}`
+          : (current?.domain_title ?? '');
+  // The tutor guides before an answer except under exam conditions; after one it discusses freely.
+  const tutorBefore = !sealed && s.tutor !== 'after_answer';
   const multiple = current?.answer_type === 'multiple';
   const allAnswered = answered === s.items.length;
   const lowTime = remaining !== null && remaining < 60_000;
@@ -374,6 +373,7 @@ export default function SessionScreen() {
         <View className="flex-1">
           <ProgressBar value={answered / s.items.length} label={`${answered} of ${s.items.length} answered`} />
         </View>
+        {current ? <FlagButton sessionId={s.id} item={current} /> : null}
         {combo >= 3 ? (
           <Animated.View entering={popIn()}>
             <Bump value={combo}>
@@ -468,6 +468,7 @@ export default function SessionScreen() {
                 {!feedback.correct && (current.answer_type === 'single' || current.answer_type === 'multiple') ? (
                   <Text className="text-ink text-[14px] font-semibold">Correct answer: {feedback.correct_options.join(', ')}</Text>
                 ) : null}
+                <PeerLine peer={current.submission?.peer} qotd={s.mode === 'qotd'} />
                 <Text className="text-ink text-[15px] leading-[22px]">{feedback.rationale}</Text>
                 {feedback.sources.map((src) => (
                   <Pressable
@@ -486,14 +487,16 @@ export default function SessionScreen() {
               </Animated.View>
             ) : null}
 
-            {explanation ? (
-              <View className="rounded-[20px] bg-surface border border-border p-4 gap-2">
-                <Text className="text-primary text-xs font-bold uppercase tracking-wider">
-                  {explanation.origin === 'generated' ? 'Another way to see it' : 'Reviewed explanation'}
-                </Text>
-                <Text className="text-ink text-[15px] leading-[22px]">{explanation.text}</Text>
-                {explanation.notice ? <Small>{explanation.notice}</Small> : null}
-              </View>
+            {!feedback && tutorBefore && !current.submission ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityHint="Opens a chat that guides you without giving the answer away"
+                onPress={askTutor}
+                className="min-h-[44px] flex-row items-center gap-2 self-start rounded-full bg-primary-tint px-3.5 active:opacity-80"
+              >
+                <Icon name="chatbubbles" size={16} color={colors.primaryDark} />
+                <Text className="text-primary-dark text-[14px] font-bold">Stuck? Ask the tutor</Text>
+              </Pressable>
             ) : null}
 
             {!sealed && !feedback ? <Small>Original practice item. {formatHint(current)}</Small> : null}
@@ -522,7 +525,7 @@ export default function SessionScreen() {
           <>
             <View className="flex-row gap-2">
               <View className="flex-1">
-                <Button label="Explain another way" variant="secondary" loading={explaining} onPress={explain} />
+                <Button label="Ask the tutor" icon="chatbubbles" variant="secondary" onPress={askTutor} />
               </View>
               <Pressable accessibilityRole="button" accessibilityLabel="Report an issue with this question" onPress={() => setReporting(true)} className="h-[52px] w-[52px] items-center justify-center rounded-[15px] border-2 border-border">
                 <Icon name="flag-outline" size={20} color={colors.muted} />

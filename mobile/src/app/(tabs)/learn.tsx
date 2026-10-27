@@ -7,9 +7,10 @@ import { AppHeader } from '@/components/AppHeader';
 import { Cube } from '@/components/Cube';
 import { QuestsSummary } from '@/components/gamify';
 import { Pulse, SPRING, pop as popTo } from '@/components/motion';
+import { QotdCard } from '@/components/study';
 import { Banner, Body, Button, Eyebrow, ErrorState, Icon, LoadingState, NavRow, Small, Title } from '@/components/ui';
 import { feedback as play } from '@/lib/feedback';
-import { useCurrentEnrollment, useExams, usePath, usePractice, useQuests, useRecap } from '@/lib/queries';
+import { useCurrentEnrollment, useExams, usePath, usePractice, useQotd, useQuests, useRecap } from '@/lib/queries';
 import { useStartSession } from '@/lib/sessions';
 import { colors } from '@/lib/theme';
 import type { LessonNode } from '@/lib/types';
@@ -79,6 +80,7 @@ export default function Learn() {
   const path = usePath(enrollment?.id);
   const practice = usePractice(enrollment?.id);
   const quests = useQuests();
+  const qotd = useQotd(enrollment?.id);
   // In the first week of a month, last month's recap gets a banner if there was anything to recap.
   const firstWeek = new Date().getDate() <= 7;
   const recap = useRecap('month', undefined, firstWeek);
@@ -96,6 +98,7 @@ export default function Learn() {
         path.refetch();
         practice.refetch();
         quests.refetch();
+        qotd.refetch();
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [enrollment?.id]),
@@ -146,6 +149,7 @@ export default function Learn() {
             {firstWeek && recap.data && !recap.data.empty ? (
               <NavRow icon="sparkles" title={`Your ${recap.data.period.label.split(' ')[0]} recap is ready`} subtitle={`${recap.data.study_days} study days · ${recap.data.answered} questions`} onPress={() => router.push('/recap?period=month')} />
             ) : null}
+            {qotd.data && enrollment ? <QotdCard qotd={qotd.data} enrollmentId={enrollment.id} /> : null}
             {quests.data ? <QuestsSummary quests={quests.data.quests} chestReady={quests.data.chest.available} onPress={() => router.push('/quests')} /> : null}
             {due > 0 ? <NavRow icon="refresh" title={`${due} ${due === 1 ? 'review' : 'reviews'} due today`} subtitle="A little review, a stronger memory" onPress={() => router.push('/review')} /> : null}
 

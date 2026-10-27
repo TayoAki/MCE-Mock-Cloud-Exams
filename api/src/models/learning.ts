@@ -12,6 +12,9 @@ export const SESSION_MODES = [
   'review',
   'checkpoint',
   'story',
+  'qotd',
+  'flagged',
+  'levelup',
 ] as const;
 export type SessionMode = (typeof SESSION_MODES)[number];
 
@@ -125,6 +128,8 @@ attemptSchema.index({ userId: 1, clientSubmissionId: 1 }, { unique: true });
 attemptSchema.index({ userId: 1, examVersionId: 1, gradedAt: -1 });
 attemptSchema.index({ sessionId: 1 });
 attemptSchema.index({ questionVersionId: 1 });
+// "x% of learners got this right" reads first tries per family.
+attemptSchema.index({ familyId: 1, firstSeenFamily: 1 });
 export const Attempt = model('Attempt', attemptSchema);
 
 const exposureSchema = new Schema(

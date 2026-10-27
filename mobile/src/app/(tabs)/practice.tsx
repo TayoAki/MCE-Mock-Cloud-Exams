@@ -3,10 +3,24 @@ import { useCallback } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { Banner, Body, Button, Eyebrow, ErrorState, Icon, LoadingState, NavRow, Pill, Screen, Title, type IconName } from '@/components/ui';
-import { useCurrentEnrollment, usePractice, useStories } from '@/lib/queries';
+import { useCurrentEnrollment, useFlags, usePractice, useStories } from '@/lib/queries';
 import { useStartSession } from '@/lib/sessions';
 import { colors } from '@/lib/theme';
 import type { SessionMode } from '@/lib/types';
+
+const RESUME_LABEL: Partial<Record<SessionMode, string>> = {
+  lesson: 'lesson',
+  story: 'story',
+  qotd: 'Question of the Day',
+  flagged: 'flagged quiz',
+  levelup: 'Level Up round',
+  review: 'review',
+  missed: 'missed questions',
+  weakest: 'weakest topics',
+  quick: 'Quick 5',
+  timed: 'timed quiz',
+  custom: 'custom quiz',
+};
 
 function Tile({ icon, title, subtitle, onPress, plus, busy }: { icon: IconName; title: string; subtitle: string; onPress: () => void; plus?: boolean; busy?: boolean }) {
   return (
@@ -34,6 +48,7 @@ export default function Practice() {
   const { enrollment, isLoading, error } = useCurrentEnrollment();
   const practice = usePractice(enrollment?.id);
   const stories = useStories(enrollment?.id);
+  const flags = useFlags(enrollment?.id);
   const { start, pending, error: startError, clearError } = useStartSession();
 
   useFocusEffect(
@@ -41,6 +56,7 @@ export default function Practice() {
       if (enrollment?.id) {
         practice.refetch();
         stories.refetch();
+        flags.refetch();
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [enrollment?.id]),
@@ -69,12 +85,14 @@ export default function Practice() {
             <NavRow
               key={s.id}
               icon="play"
-              title={`Resume ${s.mode === 'mock' ? (s.sample ? 'sample mock' : 'mock exam') : s.mode === 'lesson' ? 'lesson' : s.mode === 'story' ? 'story' : `${s.mode} practice`}`}
+              title={`Resume ${s.mode === 'mock' ? (s.sample ? 'sample mock' : 'mock exam') : (RESUME_LABEL[s.mode] ?? 'practice')}`}
               subtitle={`${s.answered_count} of ${s.question_count} answered${s.deadline_at ? ' · timer running' : ''}`}
               onPress={() => router.push(s.mode === 'story' ? `/story/${s.id}` : `/session/${s.id}`)}
             />
           ))}
-          {startError ? <Banner tone={startError.code === 'nothing_missed' || startError.code === 'nothing_due' ? 'success' : 'error'}>{startError.message}</Banner> : null}
+          {startError ? (
+            <Banner tone={startError.code === 'nothing_missed' || startError.code === 'nothing_due' || startError.code === 'qotd_done' ? 'success' : 'error'}>{startError.message}</Banner>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Quick 5. Five fresh questions"
@@ -92,6 +110,15 @@ export default function Practice() {
           <View className="flex-row gap-3">
             <Tile icon="arrow-undo" title="Missed questions" subtitle={`${p.missed_count} to revisit`} onPress={() => go('missed')} busy={pending === 'missed'} />
             <Tile icon="trending-up" title="Weakest topics" subtitle="Focus on your gaps" onPress={() => go('weakest')} busy={pending === 'weakest'} />
+          </View>
+          <View className="flex-row gap-3">
+            <Tile icon="podium-outline" title="Level Up" subtitle="Harder, one subject at a time" onPress={() => router.push('/level-up')} />
+            <Tile
+              icon="bookmark-outline"
+              title="Flagged"
+              subtitle={flags.data?.items.length ? `${flags.data.items.length} saved · quiz them` : 'Save questions to revisit'}
+              onPress={() => router.push('/flagged')}
+            />
           </View>
           <View className="flex-row gap-3">
             <Tile icon="timer-outline" title="Timed quiz" subtitle="Build your pace" plus={plus('custom_quiz')} onPress={() => router.push('/custom?mode=timed')} />

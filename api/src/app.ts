@@ -11,6 +11,7 @@ import { engagementRouter } from './routes/engagement.js';
 import { learnerRouter } from './routes/learner.js';
 import { meRouter } from './routes/me.js';
 import { sessionsRouter } from './routes/sessions.js';
+import { studyRouter } from './routes/study.js';
 
 export function createApp() {
   const app = express();
@@ -28,7 +29,7 @@ export function createApp() {
   });
 
   const v1 = express.Router();
-  v1.use(authRouter, learnerRouter, sessionsRouter, meRouter, circlesRouter, engagementRouter, adminRouter);
+  v1.use(authRouter, learnerRouter, sessionsRouter, studyRouter, meRouter, circlesRouter, engagementRouter, adminRouter);
   app.use('/v1', v1);
 
   app.use(notFoundHandler);

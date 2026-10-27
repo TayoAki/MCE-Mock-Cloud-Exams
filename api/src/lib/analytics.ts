@@ -20,6 +20,8 @@ export const EVENT_PROPERTIES = {
   exam_outcome_recorded: ['result'],
   account_upgraded: [],
   explanation_generated: ['origin', 'style'],
+  tutor_message: ['phase', 'origin', 'guard_tripped'],
+  question_flagged: ['flagged'],
   issue_reported: ['reason'],
   // Client
   onboarding_viewed: ['step'],

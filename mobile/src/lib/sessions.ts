@@ -12,6 +12,10 @@ export interface StartOptions {
   story_id?: string;
   domain_ids?: string[];
   question_count?: number;
+  /** Missed mode: only the questions missed in this earlier session. */
+  source_session_id?: string;
+  /** Replace the current screen instead of pushing on top of it. */
+  replace?: boolean;
 }
 
 /**
@@ -27,8 +31,12 @@ export function useStartSession() {
     setPending(options.mode);
     setError(null);
     try {
-      const session = await post<Session>('/sessions', { ...options, client_session_id: newId() });
-      router.push(session.mode === 'story' ? `/story/${session.id}` : `/session/${session.id}`);
+      const { replace: _replace, ...body } = options;
+      const session = await post<Session>('/sessions', { ...body, client_session_id: newId() });
+      const path = session.mode === 'story' ? `/story/${session.id}` : `/session/${session.id}`;
+      // A next step started from the results screen replaces it, so Back returns home.
+      if (options.replace) router.replace(path);
+      else router.push(path);
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(0, 'error', 'Something went wrong');
       if (err.code === 'plus_required') router.push({ pathname: '/premium', params: { feature: String(err.details?.feature ?? '') } });

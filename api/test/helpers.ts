@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
-import { Exam, ExamVersion, Lesson } from '../src/models/index.js';
+import { Exam, ExamVersion, Lesson, QuestionKey } from '../src/models/index.js';
 import { config } from '../src/config.js';
 
 export const app = createApp();
@@ -76,4 +76,36 @@ export async function completeLesson(token: string, enrollmentId: string, lesson
   const session = await startLesson(token, enrollmentId, lesson);
   await answerAll(token, session);
   return (await as(token).post(`/sessions/${session.id}/complete`).expect(200)).body;
+}
+
+/** Correct answers for a session item, read from the private key the way a reviewer would. */
+export async function correctBody(item: { session_item_id: string; question_version_id: string; answer_type: string }) {
+  const key = (await QuestionKey.findById(item.question_version_id).lean())!;
+  return item.answer_type === 'type'
+    ? { selected_options: [], typed_answer: key.acceptedAnswers[0], input_mode: 'voice' }
+    : { selected_options: key.correctOptions };
+}
+
+/** A deliberately wrong answer: the first non-key option, or a typo'd typed answer. */
+export async function wrongBody(item: { question_version_id: string; answer_type: string; options: { key: string }[] }) {
+  const key = (await QuestionKey.findById(item.question_version_id).lean())!;
+  if (item.answer_type === 'type') return { selected_options: [], typed_answer: 'definitely not it' };
+  if (item.answer_type === 'order') return { selected_options: [...key.correctOptions].reverse() };
+  if (item.answer_type === 'match') return { selected_options: key.correctOptions.map((p, i, all) => `${p.split('=')[0]}=${all[(i + 1) % all.length]!.split('=')[1]}`) };
+  return { selected_options: [item.options.find((o) => !key.correctOptions.includes(o.key))!.key] };
+}
+
+/** Answers every item of a session, right or wrong per the pattern, and completes it. */
+export async function playSession(
+  token: string,
+  session: { id: string; items: { session_item_id: string; question_version_id: string; answer_type: string; options: { key: string }[] }[] },
+  right: (i: number) => boolean = () => true,
+) {
+  const receipts = [];
+  for (const [i, item] of session.items.entries()) {
+    const body = right(i) ? await correctBody(item) : await wrongBody(item);
+    receipts.push((await as(token).post(`/sessions/${session.id}/answers`, { session_item_id: item.session_item_id, client_submission_id: id(), ...body }).expect(200)).body);
+  }
+  const completion = (await as(token).post(`/sessions/${session.id}/complete`).expect(200)).body;
+  return { receipts, completion };
 }

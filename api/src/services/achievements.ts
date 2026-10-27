@@ -7,7 +7,9 @@ import {
   Enrollment,
   FriendStreak,
   HighFive,
+  LevelUpProgress,
   PracticeSession,
+  QotdStreak,
   StreakState,
 } from '../models/index.js';
 import { GEMS, STREAK_MILESTONES, levelFor } from '../lib/rules.js';
@@ -27,6 +29,8 @@ type Stat =
   | 'friend_streak'
   | 'high_fives'
   | 'stories'
+  | 'qotd_streak'
+  | 'levels_mastered'
   | 'domains_all';
 
 export interface AchievementDef {
@@ -50,6 +54,9 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { key: 'domains_all', title: 'Well rounded', description: 'Practice every exam domain', icon: 'grid', group: 'learning', stat: 'domains_all', threshold: 1 },
   { key: 'story_1', title: 'Storyteller', description: 'Finish a story', icon: 'book', group: 'learning', stat: 'stories', threshold: 1 },
   { key: 'stories_5', title: 'Page turner', description: 'Finish 5 stories', icon: 'library', group: 'learning', stat: 'stories', threshold: 5 },
+  { key: 'levelup_mastery', title: 'Domain master', description: 'Reach Mastery in a Level Up domain', icon: 'podium', group: 'learning', stat: 'levels_mastered', threshold: 1 },
+  { key: 'qotd_7', title: 'Daily devotee', description: 'Answer the Question of the Day 7 days in a row', icon: 'sunny', group: 'habit', stat: 'qotd_streak', threshold: 7 },
+  { key: 'qotd_30', title: 'Question a day', description: 'Answer the Question of the Day 30 days in a row', icon: 'calendar-number', group: 'habit', stat: 'qotd_streak', threshold: 30 },
   { key: 'reviews_10', title: 'Memory keeper', description: 'Complete 10 review sessions', icon: 'refresh-circle', group: 'practice', stat: 'reviews', threshold: 10 },
   { key: 'mock_1', title: 'Dress rehearsal', description: 'Finish a mock exam', icon: 'document-text', group: 'practice', stat: 'mocks', threshold: 1 },
   { key: 'mock_5', title: 'Exam-day calm', description: 'Finish 5 mock exams', icon: 'ribbon', group: 'practice', stat: 'mocks', threshold: 5 },
@@ -119,6 +126,8 @@ async function stats(userId: string): Promise<Record<Stat, number>> {
   const circles = await CircleMember.countDocuments({ userId, status: 'active' });
   const friend = await FriendStreak.find({ pair: userId }).select({ longestDays: 1 }).lean();
   const highFives = await HighFive.countDocuments({ fromId: userId, kind: 'high_five' });
+  const qotd = await QotdStreak.findById(userId).select({ longestDays: 1 }).lean();
+  const mastered = await LevelUpProgress.countDocuments({ userId, levelPassed: { $gte: 4 } });
   let domainsAll = 0;
   for (const e of await Enrollment.find({ userId }).select({ examVersionId: 1 }).lean()) {
     const total = await Domain.countDocuments({ examVersionId: e.examVersionId });
@@ -138,6 +147,8 @@ async function stats(userId: string): Promise<Record<Stat, number>> {
     friend_streak: Math.max(0, ...friend.map((f) => f.longestDays)),
     high_fives: highFives,
     stories,
+    qotd_streak: qotd?.longestDays ?? 0,
+    levels_mastered: mastered,
     domains_all: domainsAll,
   };
 }

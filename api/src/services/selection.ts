@@ -1,6 +1,8 @@
 import {
   Attempt,
   EXAM_ANSWER_TYPES,
+  FlaggedQuestion,
+  LevelUpProgress,
   Lesson,
   ObjectiveProgress,
   PracticeSession,
@@ -12,10 +14,22 @@ import {
 } from '../models/index.js';
 import { HttpError, badRequest, conflict, notFound, plusRequired } from '../lib/errors.js';
 import { shuffle } from '../lib/ids.js';
-import { MIN_RANKING_SAMPLE, SAMPLE_MOCK_SIZE, allocateBlueprint, type FeatureKey } from '../lib/rules.js';
+import {
+  FLAGGED_QUIZ,
+  LEVEL_UP,
+  MAX_LEVEL,
+  MIN_RANKING_SAMPLE,
+  SAMPLE_MOCK_SIZE,
+  allocateBlueprint,
+  levelLabel,
+  levelPassNeeded,
+  type FeatureKey,
+} from '../lib/rules.js';
 import { localDate, startOfLocalDay } from '../lib/time.js';
-import { latestPublishedByFamily, loadBlueprint, type QuestionVersionLean } from './content.js';
+import { familyDifficulty, latestPublishedByFamily, loadBlueprint, type QuestionVersionLean } from './content.js';
+import { featureSet } from './access.js';
 import { computePath } from './path.js';
+import { dailyQuestion } from './qotd.js';
 
 export interface SelectionInput {
   mode: SessionMode;
@@ -23,6 +37,8 @@ export interface SelectionInput {
   storyId?: string;
   domainIds?: string[];
   questionCount?: number;
+  /** Missed mode: only the questions missed in this earlier session. */
+  sourceSessionId?: string;
 }
 
 /** Mocks mirror the real exam, so they only use its multiple-choice formats. */
@@ -95,6 +111,12 @@ async function practiceScope(ctx: SelectionContext, exposure: Map<string, Exposu
   return [...all.values()].filter((q) => allowed.has(q.familyId));
 }
 
+/** The practice scope for a learner outside a session: the whole bank with Plus, else unlocked and seen families. */
+export async function practicePool(userId: string, enrollment: { _id: string; examVersionId: string }) {
+  const ctx = { userId, timezone: 'Etc/UTC', enrollment, features: await featureSet(userId), now: new Date() };
+  return practiceScope(ctx, await exposureMap(userId, enrollment.examVersionId));
+}
+
 function requireItems(items: ItemSpec[], code: string, message: string) {
   if (items.length === 0) throw conflict(code, message);
   return items;
@@ -142,9 +164,21 @@ async function selectQuick(ctx: SelectionContext, input: SelectionInput, exposur
 }
 
 async function selectMissed(ctx: SelectionContext, input: SelectionInput, exposure: Map<string, Exposure>): Promise<Selection> {
+  // "Retry what you missed" right after a session narrows to that session's misses.
+  const fromSession = input.sourceSessionId
+    ? await Attempt.distinct('familyId', { userId: ctx.userId, sessionId: input.sourceSessionId, isCorrect: false })
+    : null;
   // Families whose latest graded, non-invalidated attempt is incorrect.
   const latest = await Attempt.aggregate<{ _id: string; isCorrect: boolean; at: Date }>([
-    { $match: { userId: ctx.userId, examVersionId: ctx.enrollment.examVersionId, gradedAt: { $ne: null }, invalidatedAt: null } },
+    {
+      $match: {
+        userId: ctx.userId,
+        examVersionId: ctx.enrollment.examVersionId,
+        gradedAt: { $ne: null },
+        invalidatedAt: null,
+        ...(fromSession ? { familyId: { $in: fromSession } } : {}),
+      },
+    },
     { $sort: { gradedAt: -1 } },
     { $group: { _id: '$familyId', isCorrect: { $first: '$isCorrect' }, at: { $first: '$gradedAt' } } },
     { $match: { isCorrect: false } },
@@ -161,7 +195,13 @@ async function selectMissed(ctx: SelectionContext, input: SelectionInput, exposu
     'nothing_missed',
     'No missed questions to revisit. Nice work.',
   );
-  return { mode: 'missed', items, lessonId: null, deadlineAt: null, config: { missed_available: latest.length } };
+  return {
+    mode: 'missed',
+    items,
+    lessonId: null,
+    deadlineAt: null,
+    config: { missed_available: latest.length, ...(input.sourceSessionId ? { source_session_id: input.sourceSessionId } : {}) },
+  };
 }
 
 /**
@@ -351,6 +391,81 @@ async function selectStory(ctx: SelectionContext, input: SelectionInput, exposur
   return { mode: 'story', items, lessonId: null, deadlineAt: null, config: { story_id: story._id } };
 }
 
+/** The day's shared question: one item, the same for every learner on that local date. */
+async function selectQotd(ctx: SelectionContext, _input: SelectionInput, exposure: Map<string, Exposure>): Promise<Selection> {
+  const date = localDate(ctx.now, ctx.timezone);
+  const done = await PracticeSession.exists({ userId: ctx.userId, enrollmentId: ctx.enrollment._id, mode: 'qotd', 'selectionConfig.date': date, status: 'completed' });
+  if (done) throw conflict('qotd_done', 'You already answered today’s question. A new one arrives tomorrow.');
+  const question = await dailyQuestion(ctx.enrollment.examVersionId, date);
+  if (!question) throw conflict('empty_selection', 'No published questions are available yet');
+  return { mode: 'qotd', items: [toItem(question, exposure)], lessonId: null, deadlineAt: null, config: { date, family_id: question.familyId } };
+}
+
+/** A quiz on the learner's flagged questions, in random order. */
+async function selectFlagged(ctx: SelectionContext, input: SelectionInput, exposure: Map<string, Exposure>): Promise<Selection> {
+  const flags = await FlaggedQuestion.find({ userId: ctx.userId, examVersionId: ctx.enrollment.examVersionId }).select({ familyId: 1 }).lean();
+  const size = Math.min(input.questionCount ?? FLAGGED_QUIZ.defaultSize, FLAGGED_QUIZ.maxSize);
+  const revisions = await latestPublishedByFamily(ctx.enrollment.examVersionId, flags.map((f) => f.familyId));
+  const items = requireItems(
+    shuffle([...revisions.values()]).slice(0, size).map((q) => toItem(q, exposure)),
+    'nothing_flagged',
+    'Flag questions as you practice, then quiz yourself on them here.',
+  );
+  return { mode: 'flagged', items, lessonId: null, deadlineAt: null, config: { flagged_available: revisions.size } };
+}
+
+/**
+ * One Level Up round in one domain. Levels 1–3 draw that difficulty first and
+ * fill from the nearest difficulty when the domain runs short; level 4 (mastery)
+ * puts the learner's current misses first, then the hardest questions.
+ */
+async function selectLevelUp(ctx: SelectionContext, input: SelectionInput, exposure: Map<string, Exposure>): Promise<Selection> {
+  if (input.domainIds?.length !== 1) throw badRequest('domain_required', 'Choose one domain to level up in');
+  const domainId = input.domainIds[0]!;
+  const { domains } = await loadBlueprint(ctx.enrollment.examVersionId);
+  if (!domains.some((d) => d._id === domainId)) throw badRequest('invalid_domain', 'That domain is not part of this exam version');
+  const progress = await LevelUpProgress.findOne({ enrollmentId: ctx.enrollment._id, domainId }).lean();
+  const level = Math.min((progress?.levelPassed ?? 0) + 1, MAX_LEVEL);
+
+  const pool = (await practiceScope(ctx, exposure)).filter((q) => q.domainId === domainId);
+  if (pool.length === 0 && !ctx.features.has('full_bank')) {
+    throw conflict('levelup_locked', 'Level Up opens in this area once your path reaches it.');
+  }
+  const difficulty = await familyDifficulty(pool.map((q) => q.familyId));
+  const at = (d: number) => rankFresh(pool.filter((q) => (difficulty.get(q.familyId) ?? 1) === d), exposure);
+  let ordered: QuestionVersionLean[];
+  if (level < MAX_LEVEL) {
+    // Nearest difficulty first; on a tie the easier one, so a short level never jumps ahead.
+    const order = [1, 2, 3].sort((a, b) => Math.abs(a - level) - Math.abs(b - level) || a - b);
+    ordered = order.flatMap(at);
+  } else {
+    const missed = new Set(
+      (
+        await Attempt.aggregate<{ _id: string; isCorrect: boolean }>([
+          { $match: { userId: ctx.userId, examVersionId: ctx.enrollment.examVersionId, domainId, gradedAt: { $ne: null }, invalidatedAt: null } },
+          { $sort: { gradedAt: -1 } },
+          { $group: { _id: '$familyId', isCorrect: { $first: '$isCorrect' } } },
+          { $match: { isCorrect: false } },
+        ])
+      ).map((r) => r._id),
+    );
+    const misses = rankFresh(pool.filter((q) => missed.has(q.familyId)), exposure);
+    ordered = [...misses, ...[3, 2, 1].flatMap((d) => at(d).filter((q) => !missed.has(q.familyId)))];
+  }
+  const items = requireItems(
+    shuffle(ordered.slice(0, LEVEL_UP.size)).map((q) => toItem(q, exposure)),
+    'empty_selection',
+    'No published questions are available in this domain yet',
+  );
+  return {
+    mode: 'levelup',
+    items,
+    lessonId: null,
+    deadlineAt: null,
+    config: { domain_id: domainId, level, label: levelLabel(level), pass_needed: levelPassNeeded(items.length) },
+  };
+}
+
 export async function selectItems(ctx: SelectionContext, input: SelectionInput): Promise<Selection> {
   const exposure = await exposureMap(ctx.userId, ctx.enrollment.examVersionId);
   switch (input.mode) {
@@ -372,6 +487,12 @@ export async function selectItems(ctx: SelectionContext, input: SelectionInput):
       return selectMock(ctx, input, exposure);
     case 'story':
       return selectStory(ctx, input, exposure);
+    case 'qotd':
+      return selectQotd(ctx, input, exposure);
+    case 'flagged':
+      return selectFlagged(ctx, input, exposure);
+    case 'levelup':
+      return selectLevelUp(ctx, input, exposure);
   }
 }
 

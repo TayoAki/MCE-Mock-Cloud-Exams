@@ -15,12 +15,14 @@ import {
 } from '../models/index.js';
 import { track } from '../lib/analytics.js';
 import { HttpError, conflict, isDuplicateKey, notFound } from '../lib/errors.js';
-import { effectiveTimezone } from '../lib/time.js';
+import { effectiveTimezone, localDate } from '../lib/time.js';
 import type { UserRecord } from '../models/index.js';
 import { featureSet } from './access.js';
 import { finalizeSession } from './completion.js';
 import { loadQuestionVersions } from './content.js';
+import { flaggedFamilies } from './flags.js';
 import { DELAYED_FEEDBACK_MODES, buildFeedback, type Feedback } from './grading.js';
+import { peerStats } from './peer.js';
 import { selectItems } from './selection.js';
 
 export interface StartInput {
@@ -31,7 +33,11 @@ export interface StartInput {
   story_id?: string;
   domain_ids?: string[];
   question_count?: number;
+  source_session_id?: string;
 }
+
+/** Mocks and timed quizzes rehearse exam conditions, so the tutor waits until the answer is in. */
+export const TUTOR_AFTER_ANSWER_MODES = new Set(['mock', 'timed']);
 
 type StoryPartView = { kind: 'line'; speaker: string | null; text: string } | { kind: 'question'; session_item_id: string };
 
@@ -84,16 +90,36 @@ export async function startSession(user: UserRecord, input: StartInput) {
   }
 
   const now = new Date();
+  const timezone = effectiveTimezone(user, now);
+  // The Question of the Day resumes if it was opened and not answered yet today.
+  if (input.mode === 'qotd') {
+    const active = await PracticeSession.findOne({
+      userId: user._id,
+      enrollmentId: enrollment._id,
+      mode: 'qotd',
+      'selectionConfig.date': localDate(now, timezone),
+      status: 'active',
+    }).lean();
+    if (active) return sessionView(await getOwnedSession(user._id, active._id));
+  }
+
   const features = await featureSet(user._id, now);
   const selection = await selectItems(
     {
       userId: user._id,
-      timezone: effectiveTimezone(user, now),
+      timezone,
       enrollment: { _id: enrollment._id, examVersionId: enrollment.examVersionId },
       features,
       now,
     },
-    { mode: input.mode, lessonId: input.lesson_id, storyId: input.story_id, domainIds: input.domain_ids, questionCount: input.question_count },
+    {
+      mode: input.mode,
+      lessonId: input.lesson_id,
+      storyId: input.story_id,
+      domainIds: input.domain_ids,
+      questionCount: input.question_count,
+      sourceSessionId: input.source_session_id,
+    },
   );
 
   let created;
@@ -164,6 +190,10 @@ export async function sessionView(session: SessionLean) {
   const domainTitles = new Map(domains.map((d) => [d._id, d.title]));
   const keyIds = revealFeedback ? attempts.filter((a) => a.isCorrect != null).map((a) => a.questionVersionId) : [];
   const keys = new Map((await QuestionKey.find({ _id: { $in: keyIds } }).lean()).map((k) => [k._id, k]));
+  const familyIds = session.items.map((i) => i.familyId);
+  const flagged = await flaggedFamilies(session.userId, familyIds);
+  // Peer accuracy shows with feedback, so it is only looked up for revealed answers.
+  const peers = await peerStats(revealFeedback ? attempts.filter((a) => a.isCorrect != null).map((a) => a.familyId) : []);
 
   const items = session.items.map((item) => {
     const q = byQuestion.get(item.questionVersionId);
@@ -185,6 +215,7 @@ export async function sessionView(session: SessionLean) {
       objective_title: objectiveTitles.get(item.objectiveId) ?? '',
       domain_title: domainTitles.get(item.domainId) ?? '',
       repeat: item.repeat,
+      flagged: flagged.has(item.familyId),
       submission: attempt
         ? {
             attempt_id: attempt._id,
@@ -192,6 +223,7 @@ export async function sessionView(session: SessionLean) {
             typed_answer: attempt.typedAnswer ?? null,
             submitted_at: attempt.submittedAt.toISOString(),
             feedback,
+            peer: feedback ? (peers.get(item.familyId) ?? null) : null,
           }
         : null,
     };
@@ -213,6 +245,13 @@ export async function sessionView(session: SessionLean) {
     answered_count: attempts.length,
     sample: !!config.sample,
     feedback_timing: DELAYED_FEEDBACK_MODES.has(session.mode) ? 'after_submit' : 'per_answer',
+    // Tutoring is guidance-only before an answer, and off until submission in exam-condition modes.
+    tutor: TUTOR_AFTER_ANSWER_MODES.has(session.mode) ? 'after_answer' : 'any_time',
+    level_up:
+      session.mode === 'levelup'
+        ? { domain_id: config.domain_id, level: config.level, label: config.label, pass_needed: config.pass_needed }
+        : null,
+    qotd_date: session.mode === 'qotd' ? (config.date as string) : null,
     items,
     completion: session.completion ?? null,
     story: story
@@ -298,6 +337,7 @@ export async function sessionFeedback(userId: string, sessionId: string) {
   const visible = session.items.filter((i) => finalized || byItem.has(i._id));
   const keys = new Map((await QuestionKey.find({ _id: { $in: visible.map((i) => i.questionVersionId) } }).lean()).map((k) => [k._id, k]));
   const byQuestion = new Map(questions.map((q) => [q._id, q]));
+  const [peers, flagged] = await Promise.all([peerStats(visible.map((i) => i.familyId)), flaggedFamilies(userId, visible.map((i) => i.familyId))]);
   return {
     session_id: session._id,
     status: session.status,
@@ -316,7 +356,10 @@ export async function sessionFeedback(userId: string, sessionId: string) {
         typed_answer: attempt?.typedAnswer ?? null,
         attempt_id: attempt?._id ?? null,
         answered: !!attempt,
+        family_id: item.familyId,
+        flagged: flagged.has(item.familyId),
         feedback: buildFeedback(attempt?.isCorrect === true, key, q.sourceUrl, q.answerType as AnswerType),
+        peer: peers.get(item.familyId) ?? null,
       };
     }),
   };
