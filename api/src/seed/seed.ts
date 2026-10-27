@@ -21,6 +21,7 @@ import { uuid } from '../lib/ids.js';
 import { DOMAINS, REVIEW_NOTE, UNITS, type SeedQuestion } from './bank.js';
 import { applySeedDifficulty } from './difficulty.js';
 import { addFormatContent } from './formats.js';
+import { addQuestionBank } from './questions/index.js';
 
 const PILOT_SLUG = 'databricks-de-associate';
 /** The plan's five original sample items keep their published option order (A, B, B, A, D scores 3/5). */
@@ -192,6 +193,8 @@ export async function seedDatabase(options: SeedOptions = {}) {
   // Newer formats and stories arrive additively, so existing databases pick them up on the next start.
   await addFormatContent(examVersionId, { publish, reviewerId: FIXTURE_REVIEWER_ID, now });
   await applySeedDifficulty(examVersionId, FIXTURE_REVIEWER_ID);
+  // The question factory's bank, mapped to the current exam guide's objectives.
+  await addQuestionBank(examVersionId, { publish, reviewerId: FIXTURE_REVIEWER_ID, now });
 
   const result: { examVersionId: string; adminId?: string; demoUserId?: string } = { examVersionId };
   if (options.accounts) {

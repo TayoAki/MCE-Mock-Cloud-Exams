@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { config } from '../src/config.js';
 import { QuestionFamily, QuestionKey, QuestionVersion, User } from '../src/models/index.js';
 import { seedDatabase } from '../src/seed/seed.js';
+import { bankItems } from '../src/seed/questions/index.js';
 
 describe('seed content', () => {
   it('spreads correct answers across positions and keeps the plan sample intact', async () => {
@@ -28,6 +29,7 @@ describe('seed content', () => {
     expect(first.demoUserId).toBeUndefined();
     expect(await User.exists({ email: config.SEED_ADMIN_EMAIL })).toBeTruthy();
     expect(await User.exists({ email: config.SEED_DEMO_EMAIL })).toBeNull();
-    expect(await QuestionFamily.countDocuments()).toBe(78);
+    // 78 hand-written seed questions plus the question factory's bank.
+    expect(await QuestionFamily.countDocuments()).toBe(78 + bankItems().length);
   });
 });

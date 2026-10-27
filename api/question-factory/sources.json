@@ -1,0 +1,231 @@
+{
+  "guide": "https://www.databricks.com/sites/default/files/2026-10/Databricks-Certified-Data-Engineer-Associate-Exam-Guide-August-2026.pdf",
+  "objectives": {
+    "platform.lakehouse": [
+      "https://docs.databricks.com/aws/en/lakehouse-architecture/",
+      "https://docs.databricks.com/aws/en/introduction/",
+      "https://docs.databricks.com/aws/en/delta/",
+      "https://docs.databricks.com/aws/en/tables/history",
+      "https://docs.databricks.com/aws/en/data-governance/unity-catalog/",
+      "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage"
+    ],
+    "platform.compute": [
+      "https://docs.databricks.com/aws/en/compute/",
+      "https://docs.databricks.com/aws/en/compute/choose-compute",
+      "https://docs.databricks.com/aws/en/compute/serverless/",
+      "https://docs.databricks.com/aws/en/compute/serverless/limitations",
+      "https://docs.databricks.com/aws/en/compute/sql-warehouse/",
+      "https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types",
+      "https://docs.databricks.com/aws/en/compute/standard-overview",
+      "https://docs.databricks.com/aws/en/compute/dedicated-overview",
+      "https://docs.databricks.com/aws/en/compute/pools",
+      "https://docs.databricks.com/aws/en/compute/cluster-config-best-practices"
+    ],
+    "ingestion.patterns": [
+      "https://docs.databricks.com/aws/en/ingestion/",
+      "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/",
+      "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/onboard-data",
+      "https://docs.databricks.com/aws/en/structured-streaming/",
+      "https://docs.databricks.com/aws/en/structured-streaming/triggers",
+      "https://docs.databricks.com/aws/en/volumes/",
+      "https://docs.databricks.com/aws/en/admin/account-settings/audit-log-delivery"
+    ],
+    "ingestion.copy-into": [
+      "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/",
+      "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
+      "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/examples",
+      "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/configure-data-access"
+    ],
+    "ingestion.auto-loader": [
+      "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/",
+      "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/schema",
+      "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/file-detection-modes",
+      "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/patterns",
+      "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/unity-catalog",
+      "https://docs.databricks.com/aws/en/structured-streaming/checkpoints"
+    ],
+    "ingestion.lakeflow-connect": [
+      "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/",
+      "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/salesforce",
+      "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/sql-server",
+      "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/query-based-overview",
+      "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/file-connectors-overview",
+      "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/sharepoint",
+      "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/gateway-event-logs"
+    ],
+    "ingestion.jdbc-rest": [
+      "https://docs.databricks.com/aws/en/connect/",
+      "https://docs.databricks.com/aws/en/query-federation/",
+      "https://docs.databricks.com/aws/en/query-federation/database-federation",
+      "https://docs.databricks.com/aws/en/pyspark/reference/classes/dataframereader/jdbc",
+      "https://docs.databricks.com/aws/en/volumes/download-internet-files",
+      "https://docs.databricks.com/aws/en/files/"
+    ],
+    "ingestion.choosing": [
+      "https://docs.databricks.com/aws/en/ingestion/",
+      "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/",
+      "https://docs.databricks.com/aws/en/partner-connect/",
+      "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/"
+    ],
+    "ingestion.semi-structured": [
+      "https://docs.databricks.com/aws/en/semi-structured/",
+      "https://docs.databricks.com/aws/en/semi-structured/json",
+      "https://docs.databricks.com/aws/en/semi-structured/variant",
+      "https://docs.databricks.com/aws/en/semi-structured/complex-types",
+      "https://docs.databricks.com/aws/en/ingestion/variant",
+      "https://docs.databricks.com/aws/en/sql/language-manual/functions/from_json"
+    ],
+    "transformation.cleaning": [
+      "https://docs.databricks.com/aws/en/transform/",
+      "https://docs.databricks.com/aws/en/getting-started/etl-quick-start",
+      "https://docs.databricks.com/aws/en/pyspark/",
+      "https://docs.databricks.com/aws/en/transform/validate",
+      "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/dataframe.html"
+    ],
+    "transformation.joins": [
+      "https://docs.databricks.com/aws/en/transform/join",
+      "https://docs.databricks.com/aws/en/transform/optimize-joins",
+      "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-join",
+      "https://spark.apache.org/docs/latest/sql-performance-tuning.html"
+    ],
+    "transformation.reshaping": [
+      "https://docs.databricks.com/aws/en/sql/language-manual/functions/explode",
+      "https://docs.databricks.com/aws/en/sql/language-manual/functions/explode_outer",
+      "https://docs.databricks.com/aws/en/semi-structured/complex-types",
+      "https://docs.databricks.com/aws/en/pyspark/",
+      "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/dataframe.html"
+    ],
+    "transformation.aggregation": [
+      "https://docs.databricks.com/aws/en/transform/aggregation",
+      "https://docs.databricks.com/aws/en/sql/language-manual/functions/approx_count_distinct",
+      "https://docs.databricks.com/aws/en/pyspark/reference/functions/approx_count_distinct"
+    ],
+    "transformation.tuning": [
+      "https://docs.databricks.com/aws/en/optimizations/",
+      "https://docs.databricks.com/aws/en/optimizations/aqe",
+      "https://docs.databricks.com/aws/en/transform/optimize-joins",
+      "https://spark.apache.org/docs/latest/sql-performance-tuning.html",
+      "https://spark.apache.org/docs/latest/configuration.html"
+    ],
+    "transformation.gold": [
+      "https://docs.databricks.com/aws/en/views/",
+      "https://docs.databricks.com/aws/en/views/create-views",
+      "https://docs.databricks.com/aws/en/views/materialized",
+      "https://docs.databricks.com/aws/en/ldp/concepts/materialized-views",
+      "https://docs.databricks.com/aws/en/ldp/concepts/streaming-tables",
+      "https://docs.databricks.com/aws/en/transform/data-modeling"
+    ],
+    "transformation.medallion": [
+      "https://docs.databricks.com/aws/en/lakehouse/medallion",
+      "https://docs.databricks.com/aws/en/ldp/expectations",
+      "https://docs.databricks.com/aws/en/transform/validate"
+    ],
+    "jobs.control-flow": [
+      "https://docs.databricks.com/aws/en/jobs/control-flow",
+      "https://docs.databricks.com/aws/en/jobs/tasks/if-else",
+      "https://docs.databricks.com/aws/en/jobs/tasks/for-each",
+      "https://docs.databricks.com/aws/en/jobs/run-if"
+    ],
+    "jobs.recovery": [
+      "https://docs.databricks.com/aws/en/jobs/repair-job-failures",
+      "https://docs.databricks.com/aws/en/jobs/configure-task",
+      "https://docs.databricks.com/aws/en/jobs/notifications"
+    ],
+    "jobs.orchestration": [
+      "https://docs.databricks.com/aws/en/jobs/",
+      "https://docs.databricks.com/aws/en/jobs/configure-task",
+      "https://docs.databricks.com/aws/en/jobs/tasks/notebook",
+      "https://docs.databricks.com/aws/en/jobs/tasks/sql",
+      "https://docs.databricks.com/aws/en/jobs/tasks/dashboard",
+      "https://docs.databricks.com/aws/en/jobs/tasks/pipeline",
+      "https://docs.databricks.com/aws/en/jobs/tasks/run-job",
+      "https://docs.databricks.com/aws/en/jobs/parameters",
+      "https://docs.databricks.com/aws/en/jobs/dynamic-value-references"
+    ],
+    "jobs.triggers": [
+      "https://docs.databricks.com/aws/en/jobs/triggers",
+      "https://docs.databricks.com/aws/en/jobs/scheduled",
+      "https://docs.databricks.com/aws/en/jobs/file-arrival-triggers",
+      "https://docs.databricks.com/aws/en/jobs/continuous"
+    ],
+    "cicd.git": [
+      "https://docs.databricks.com/aws/en/repos/",
+      "https://docs.databricks.com/aws/en/repos/git-operations-with-repos",
+      "https://docs.databricks.com/aws/en/repos/git-folders-concepts",
+      "https://docs.databricks.com/aws/en/repos/ci-cd"
+    ],
+    "cicd.bundle-config": [
+      "https://docs.databricks.com/aws/en/dev-tools/bundles/variables",
+      "https://docs.databricks.com/aws/en/dev-tools/bundles/overrides",
+      "https://docs.databricks.com/aws/en/dev-tools/bundles/settings",
+      "https://docs.databricks.com/aws/en/dev-tools/bundles/deployment-modes"
+    ],
+    "cicd.bundles": [
+      "https://docs.databricks.com/aws/en/dev-tools/bundles/",
+      "https://docs.databricks.com/aws/en/dev-tools/bundles/resources",
+      "https://docs.databricks.com/aws/en/dev-tools/bundles/jobs-tutorial",
+      "https://docs.databricks.com/aws/en/dev-tools/bundles/templates",
+      "https://docs.databricks.com/aws/en/dev-tools/ci-cd/"
+    ],
+    "cicd.cli": [
+      "https://docs.databricks.com/aws/en/dev-tools/cli/",
+      "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "https://docs.databricks.com/aws/en/dev-tools/cli/commands",
+      "https://docs.databricks.com/aws/en/dev-tools/ci-cd/github"
+    ],
+    "troubleshooting.monitoring": [
+      "https://docs.databricks.com/aws/en/jobs/monitor",
+      "https://docs.databricks.com/aws/en/jobs/repair-job-failures",
+      "https://docs.databricks.com/aws/en/admin/system-tables/jobs",
+      "https://docs.databricks.com/aws/en/jobs/notifications"
+    ],
+    "troubleshooting.spark-ui": [
+      "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/",
+      "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/long-spark-stage",
+      "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/long-spark-stage-page",
+      "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/one-spark-task",
+      "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/spark-memory-issues",
+      "https://docs.databricks.com/aws/en/optimizations/aqe"
+    ],
+    "troubleshooting.layout": [
+      "https://docs.databricks.com/aws/en/delta/clustering",
+      "https://docs.databricks.com/aws/en/optimizations/predictive-optimization"
+    ],
+    "troubleshooting.compute-issues": [
+      "https://docs.databricks.com/aws/en/compute/troubleshooting/",
+      "https://docs.databricks.com/aws/en/compute/troubleshooting/cluster-error-codes",
+      "https://docs.databricks.com/aws/en/libraries/",
+      "https://docs.databricks.com/aws/en/libraries/cluster-libraries",
+      "https://docs.databricks.com/aws/en/libraries/notebooks-python-libraries",
+      "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/spark-memory-issues"
+    ],
+    "governance.tables": [
+      "https://docs.databricks.com/aws/en/tables/",
+      "https://docs.databricks.com/aws/en/tables/managed",
+      "https://docs.databricks.com/aws/en/tables/external",
+      "https://docs.databricks.com/aws/en/tables/convert-to-managed"
+    ],
+    "governance.privileges": [
+      "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/",
+      "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/privileges-reference",
+      "https://docs.databricks.com/aws/en/sql/language-manual/security-grant",
+      "https://docs.databricks.com/aws/en/sql/language-manual/security-revoke",
+      "https://docs.databricks.com/aws/en/sql/language-manual/security-deny"
+    ],
+    "governance.filters-masks": [
+      "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+      "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-column-mask",
+      "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-row-filter",
+      "https://docs.databricks.com/aws/en/views/dynamic"
+    ],
+    "governance.abac": [
+      "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/",
+      "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/core-concepts",
+      "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policies",
+      "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/abac-vs-rls-cm",
+      "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/best-practices",
+      "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/tutorial-sql"
+    ]
+  }
+}

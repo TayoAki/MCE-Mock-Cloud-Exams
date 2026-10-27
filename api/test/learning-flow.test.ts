@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { Attempt, DailyStudyDay, ReviewQueue, RewardLedger, StreakState } from '../src/models/index.js';
+import { DOMAINS } from '../src/seed/bank.js';
+import { BLUEPRINT } from '../src/seed/questions/index.js';
 import { SAMPLE_PICKS, answerAll, as, completeLesson, enroll, guest, id, lessonId, pilotVersionId, startLesson } from './helpers.js';
+
+/** The seed's objectives plus the ones the current exam guide added. */
+const ALL_OBJECTIVES = new Set([...DOMAINS.flatMap((d) => d.objectives.map((o) => o.code)), ...BLUEPRINT.objectives.map((o) => o.code)]).size;
 
 describe('catalog and enrollment', () => {
   it('lists the pilot as enrollable and planned banks as not', async () => {
@@ -237,7 +242,7 @@ describe('progress', () => {
     const first = await completeLesson(token, enrollmentId);
     await completeLesson(token, enrollmentId, first.lesson_id);
     const progress = await as(token).get(`/enrollments/${enrollmentId}/progress`).expect(200);
-    expect(progress.body).toMatchObject({ first_seen_correct: 3, first_seen_total: 5, repeat_correct: 3, repeat_total: 5, practiced_objectives: 2, total_objectives: 16 });
+    expect(progress.body).toMatchObject({ first_seen_correct: 3, first_seen_total: 5, repeat_correct: 3, repeat_total: 5, practiced_objectives: 2, total_objectives: ALL_OBJECTIVES });
     expect(progress.body.note).toMatch(/not a pass prediction/i);
     expect(JSON.stringify(progress.body)).not.toMatch(/probab/i);
     // No objective has five first-seen answers yet, so the focus is a coverage gap, not an accuracy ranking.

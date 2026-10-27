@@ -92,7 +92,13 @@ The backoffice covers the plan's content workflow: draft → human review → pu
 
 - **MongoDB instead of PostgreSQL.** You specified MongoDB, so the plan's 38-table reference schema became 35 collections. Join tables are embedded and the plan's uniqueness and idempotency constraints are unique indexes; the mapping is in [`api/README.md`](api/README.md). Grading and completion use multi-document transactions, so MongoDB must run as a replica set.
 - **"Customer and rider app" is the learner app.** CertPath has no riders, so `mobile/` serves learners and `admin/` serves staff.
-- **Content.** The plan shipped five sample questions. To make the path, practice modes and mocks usable, the seed adds 55 original draft questions (60 total) across all seven domains, with answer positions shuffled. **None has had subject-matter review.** The seed marks them reviewed by a fixture account so they can be published, and the backoffice labels them "Dev fixture — not subject-matter approval". With 60 questions the full 45-question mock correctly refuses (the Jobs domain has 5 of the 7 it needs) and offers a labelled 10-question sample instead.
+- **Content.** The plan shipped five sample questions. The seed now holds 300 original draft questions across all seven domains. 78 were written by hand (including the newer formats and stories). The other 222 come from the [question factory](api/question-factory/README.md), which:
+  - maps the August 2026 exam guide's 33 objectives to the app;
+  - scrapes the cited documentation (with Firecrawl when `FIRECRAWL_API_KEY` is set);
+  - writes every item to one authoring spec;
+  - validates each one automatically.
+  
+  The full 45-question mock now fills from every domain. **None of the questions has had independent subject-matter review.** The seed marks them reviewed by a fixture account so they can be published, and the backoffice labels them "Dev fixture — not subject-matter approval". Each factory item keeps its supporting documentation quote in the reviewer notes, so review can go quickly.
 - **Guests are server-side identities.** Grading never happens on the device. Registering upgrades the guest in place, keeping all progress. Merging a guest into a different existing account is not implemented; the sign-in screen says so.
 - **AI help** uses Claude at low effort with server-side refusal fallbacks, per-user and global daily caps, and a timeout. The reviewed rationale is shown whenever generation fails, is refused, or no `ANTHROPIC_API_KEY` is set.
 

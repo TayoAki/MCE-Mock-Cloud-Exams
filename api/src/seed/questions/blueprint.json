@@ -1,0 +1,89 @@
+{
+  "exam": "Databricks Certified Data Engineer Associate",
+  "guide": {
+    "title": "Databricks Certified Data Engineer Associate Exam Guide",
+    "published": "2026-05-04",
+    "updated": "2026-08-06",
+    "url": "https://www.databricks.com/sites/default/files/2026-10/Databricks-Certified-Data-Engineer-Associate-Exam-Guide-August-2026.pdf",
+    "format": "45 scored multiple-choice questions in 90 minutes. Code is SQL when possible, otherwise Python."
+  },
+  "mix": {
+    "difficulty": { "1": 0.4, "2": 0.35, "3": 0.25 },
+    "multiple_max_share": 0.1
+  },
+  "guide_objectives": {
+    "1.1": "Understand the core components of the Databricks Platform, such as its architecture, Delta Lake, and Unity Catalog.",
+    "1.2": "Understand Databricks Platform's compute services, including their characteristics, limitations, and cost models, and select the most suitable option for each workload use case.",
+    "2.1": "Enable and detail data ingestion patterns, including batch, streaming, and incremental loading, and import data from sources such as local files, Lakeflow Connect standard connectors, and Lakeflow Connect managed connectors.",
+    "2.2": "Use the COPY INTO command to incrementally load files from cloud object storage (ADLS/S3/GCS) into Unity Catalog-governed tables.",
+    "2.3": "Use Auto Loader with schema enforcement and schema evolution in batch modes (for example, directory listing or file notification) to land data into Unity Catalog-governed tables.",
+    "2.4": "Configure Lakeflow Connect to reliably ingest data from diverse enterprise sources into Unity Catalog-governed tables.",
+    "2.5": "Use JDBC/ODBC or REST clients in notebooks to land data into cloud storage or directly into Unity Catalog-governed tables, usually orchestrated and scheduled with Lakeflow Jobs.",
+    "2.6": "Prioritize between Auto Loader, Lakeflow Connect (standard and managed connectors), partner connectors, and other ingestion methods based on technical requirements such as data volume, ingestion frequency, data types, and governance needs with Unity Catalog.",
+    "2.7": "Ingest semi-structured and unstructured data (for example, JSON and nested data) via Lakeflow Connect and other managed connectors into Unity Catalog-governed Delta tables.",
+    "3.1": "Implement data cleaning by reading bronze tables with PySpark/SQL, cleaning nulls, standardizing data types, and writing to new silver tables.",
+    "3.2": "Combine DataFrames with operations such as inner join, left join, broadcast join, multiple keys, cross join, union, and union all.",
+    "3.3": "Manipulate columns, rows, and table structures by adding, dropping, splitting, renaming column names, applying filters, and exploding arrays.",
+    "3.4": "Perform data deduplication operations and aggregate operations on DataFrames, such as count, approximate count distinct, and mean, summary.",
+    "3.5": "Understand the basic tuning parameters (spark.sql.shuffle.partitions, spark.default.parallelism, spark.executor/driver.memory, spark.sql.autoBroadcastJoinThreshold) and re-measure the performance.",
+    "3.6": "Understand the difference between, and how to build, Gold layer objects such as materialized views, views, streaming tables, and tables for BI and analytics teams in Unity Catalog.",
+    "3.7": "Apply data quality checks and validation rules to ensure reliable Silver and Gold datasets.",
+    "4.1": "Implement control flows (retries and conditional tasks such as branching and looping) using Lakeflow Jobs for pipeline orchestration.",
+    "4.2": "Configure common tasks (notebook, SQL query, dashboard, and pipeline tasks) and their dependencies using Lakeflow Jobs and its DAG-based task graph.",
+    "4.3": "Implement job schedules using Lakeflow Jobs with an understanding of trigger types (scheduled, file arrival, and table update).",
+    "4.4": "Choose between time-based and data-driven triggers based on data availability and pipeline dependencies.",
+    "5.1": "Manage your code development workflow within the Databricks workspace UI, including creating and switching between branches in Databricks Git folders, committing and pushing changes, and creating pull requests using Databricks Git integration.",
+    "5.2": "Understand environment-specific configuration using Declarative Automation Bundle variables and overrides while promoting the same codebase across dev, test, and prod targets.",
+    "5.3": "Deploy Declarative Automation Bundles to package, configure, and promote Lakeflow Jobs, Lakeflow Declarative Pipelines, and other workspace assets across dev, test, and prod environments.",
+    "5.4": "Understand the Databricks CLI to validate, deploy, and manage Declarative Automation Bundles and other workspace assets in automated CI/CD workflows.",
+    "6.1": "Identify trends in job performance using the Lakeflow Jobs run history view to compare current execution times against historical baselines.",
+    "6.2": "Use the Lakeflow Jobs UI to monitor pipeline health by interpreting job statuses, viewing DAG-based task graphs to spot upstream blockers, and tracking pipeline run times and failure rates.",
+    "6.3": "Identify common performance bottlenecks such as data skew, shuffling, and disk spilling by interpreting stage-level metrics in the Spark UI.",
+    "6.4": "Understand the features of Liquid Clustering and predictive optimization.",
+    "6.5": "Diagnose cluster startup failures, library conflicts, and out-of-memory issues.",
+    "7.1": "Differentiate between managed and external tables in Unity Catalog and perform basic operations (create, modify, delete, and convert between managed and external tables) on them.",
+    "7.2": "Configure access controls using the UI and SQL by applying GRANT, REVOKE, and DENY privileges to principals (users, groups, and service principals) at appropriate levels of the security hierarchy.",
+    "7.3": "Understand column-level masking and row-level security to restrict data visibility based on user groups.",
+    "7.4": "Understand Unity Catalog ABAC policies to centrally control row-level filtering and column masking for sensitive data."
+  },
+  "objectives": [
+    { "code": "platform.lakehouse", "domain": "platform", "title": "Lakehouse, Delta Lake and Unity Catalog", "guide": ["1.1"], "new": 6, "file": "platform" },
+    { "code": "platform.compute", "domain": "platform", "title": "Compute types and serverless", "guide": ["1.2"], "new": 6, "file": "platform" },
+
+    { "code": "ingestion.patterns", "domain": "ingestion", "title": "Batch, streaming and incremental ingestion", "guide": ["2.1"], "new": 7, "file": "ingestion-1", "add": true },
+    { "code": "ingestion.copy-into", "domain": "ingestion", "title": "COPY INTO batch loading", "guide": ["2.2"], "new": 6, "file": "ingestion-1" },
+    { "code": "ingestion.auto-loader", "domain": "ingestion", "title": "Auto Loader incremental ingestion", "guide": ["2.3"], "new": 7, "file": "ingestion-1" },
+    { "code": "ingestion.lakeflow-connect", "domain": "ingestion", "title": "Lakeflow Connect connectors", "guide": ["2.4"], "new": 8, "file": "ingestion-2", "add": true },
+    { "code": "ingestion.jdbc-rest", "domain": "ingestion", "title": "JDBC, ODBC and REST ingestion", "guide": ["2.5"], "new": 6, "file": "ingestion-2", "add": true },
+    { "code": "ingestion.choosing", "domain": "ingestion", "title": "Choosing an ingestion method", "guide": ["2.6"], "new": 7, "file": "ingestion-2", "add": true },
+    { "code": "ingestion.semi-structured", "domain": "ingestion", "title": "Semi-structured and nested data", "guide": ["2.7"], "new": 6, "file": "ingestion-2", "add": true },
+
+    { "code": "transformation.cleaning", "domain": "transformation", "title": "Cleaning bronze data into silver", "guide": ["3.1"], "new": 7, "file": "transformation-1", "add": true },
+    { "code": "transformation.joins", "domain": "transformation", "title": "Joins and unions", "guide": ["3.2"], "new": 7, "file": "transformation-1", "add": true },
+    { "code": "transformation.reshaping", "domain": "transformation", "title": "Reshaping columns, rows and arrays", "guide": ["3.3"], "new": 7, "file": "transformation-1", "add": true },
+    { "code": "transformation.aggregation", "domain": "transformation", "title": "Deduplication and aggregation", "guide": ["3.4"], "new": 7, "file": "transformation-2", "add": true },
+    { "code": "transformation.tuning", "domain": "transformation", "title": "Spark tuning parameters", "guide": ["3.5"], "new": 6, "file": "transformation-2", "add": true },
+    { "code": "transformation.gold", "domain": "transformation", "title": "Gold layer: views, materialized views and streaming tables", "guide": ["3.6"], "new": 6, "file": "transformation-2", "add": true },
+    { "code": "transformation.medallion", "domain": "transformation", "title": "Medallion layers and data quality", "guide": ["3.7"], "new": 5, "file": "transformation-2" },
+
+    { "code": "jobs.control-flow", "domain": "jobs", "title": "Control flow: branches and loops", "guide": ["4.1"], "new": 10, "file": "jobs-1", "add": true },
+    { "code": "jobs.recovery", "domain": "jobs", "title": "Retries, timeouts and repair runs", "guide": ["4.1"], "new": 3, "file": "jobs-1" },
+    { "code": "jobs.orchestration", "domain": "jobs", "title": "Tasks and dependencies", "guide": ["4.2"], "new": 12, "file": "jobs-1" },
+    { "code": "jobs.triggers", "domain": "jobs", "title": "Schedules and data-driven triggers", "guide": ["4.3", "4.4"], "new": 15, "file": "jobs-2", "add": true },
+
+    { "code": "cicd.git", "domain": "cicd", "title": "Git folders", "guide": ["5.1"], "new": 6, "file": "cicd" },
+    { "code": "cicd.bundle-config", "domain": "cicd", "title": "Bundle variables, targets and overrides", "guide": ["5.2"], "new": 6, "file": "cicd", "add": true },
+    { "code": "cicd.bundles", "domain": "cicd", "title": "Deploying Declarative Automation Bundles", "guide": ["5.3"], "new": 5, "file": "cicd" },
+    { "code": "cicd.cli", "domain": "cicd", "title": "The Databricks CLI in automation", "guide": ["5.4"], "new": 5, "file": "cicd", "add": true },
+
+    { "code": "troubleshooting.monitoring", "domain": "troubleshooting", "title": "Monitoring Lakeflow Jobs", "guide": ["6.1", "6.2"], "new": 10, "file": "troubleshooting", "add": true },
+    { "code": "troubleshooting.spark-ui", "domain": "troubleshooting", "title": "Diagnosing slow queries in the Spark UI", "guide": ["6.3"], "new": 5, "file": "troubleshooting" },
+    { "code": "troubleshooting.layout", "domain": "troubleshooting", "title": "Liquid clustering and predictive optimization", "guide": ["6.4"], "new": 4, "file": "troubleshooting" },
+    { "code": "troubleshooting.compute-issues", "domain": "troubleshooting", "title": "Cluster startup, library and memory failures", "guide": ["6.5"], "new": 5, "file": "troubleshooting", "add": true },
+
+    { "code": "governance.tables", "domain": "governance", "title": "Managed and external tables", "guide": ["7.1"], "new": 8, "file": "governance-1", "add": true },
+    { "code": "governance.privileges", "domain": "governance", "title": "Privileges and access", "guide": ["7.2"], "new": 8, "file": "governance-1" },
+    { "code": "governance.filters-masks", "domain": "governance", "title": "Row filters and column masks", "guide": ["7.3"], "new": 8, "file": "governance-2", "add": true },
+    { "code": "governance.abac", "domain": "governance", "title": "ABAC policies", "guide": ["7.4"], "new": 8, "file": "governance-2", "add": true }
+  ]
+}

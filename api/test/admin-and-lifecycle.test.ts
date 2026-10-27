@@ -3,6 +3,7 @@ import { config } from '../src/config.js';
 import { Attempt, NotificationJob, ObjectiveProgress, Objective, PracticeSession, QuestionFamily, QuestionVersion, ReviewQueue, User } from '../src/models/index.js';
 import { processDeletions } from '../src/services/deletion.js';
 import { dispatchReminders, planReminders } from '../src/services/notifications.js';
+import { bankItems } from '../src/seed/questions/index.js';
 import { admin, answerAll, as, completeLesson, enroll, guest, id, pilotVersionId, registered, startLesson } from './helpers.js';
 
 const draft = {
@@ -24,8 +25,8 @@ describe('content backoffice', () => {
     await as().get('/admin/overview').expect(401);
     const staff = await admin();
     const overview = await as(staff.token).get('/admin/overview').expect(200);
-    // 60 multiple-choice items, 10 hands-on items in the newer formats and 8 story questions.
-    expect(overview.body.questions_by_status.published).toBe(78);
+    // 60 multiple-choice items, 10 hands-on items in the newer formats, 8 story questions and the factory's bank.
+    expect(overview.body.questions_by_status.published).toBe(78 + bankItems().length);
   });
 
   it('runs draft → review → publish, keeps revisions immutable and retires superseded ones', async () => {
