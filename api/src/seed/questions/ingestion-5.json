@@ -1,3 +1,877 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "patterns-bronze-streaming-semantics",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer designs the bronze layer of a medallion architecture. It lands large volumes of raw records from source systems and appends them without joins, aggregations or deduplication. Which processing semantic does Databricks generally recommend for this layer?",
+      "options": [
+        {
+          "text": "Streaming, which processes only new data and avoids stateful complexity here",
+          "correct": true,
+          "why": "Databricks recommends streaming for bronze ingestion: the engine tracks what it has processed and handles only new data, and stateless appends don't expose the hard parts of streaming, such as late data in stateful logic."
+        },
+        {
+          "text": "Batch, because each run reflects all of the data available in the source",
+          "average": true,
+          "why": "Batch does give simple, complete results, but it reprocesses data that earlier runs already handled, which is inefficient for large, append-only bronze volumes."
+        },
+        {
+          "text": "Batch with materialized views refreshed incrementally, as for the gold layer",
+          "why": "Materialized views with incremental refresh are the recommendation for silver and gold transformation workloads, which involve joins and aggregations, not for raw bronze ingestion."
+        },
+        {
+          "text": "Real-time mode, because bronze tables need sub-second end-to-end latency",
+          "why": "Real-time mode targets sub-second operational workloads such as fraud detection; bronze ingestion has no such requirement, and micro-batch streaming suits it."
+        }
+      ],
+      "in_practice": "Streaming bronze loads read each new file or message once, so a source that grows by ~200 GB a day costs one day's worth of compute per run instead of a rescan of its full history.",
+      "source": "https://docs.databricks.com/aws/en/data-engineering/batch-vs-streaming",
+      "evidence": "Bronze: Ingestion workloads. Typically involves no or stateless processing for incremental append from data sources. Streaming processing is generally a better choice, given users can benefit from the advantages of streaming but not get exposed to the complexities of stateful streaming processing."
+    },
+    {
+      "family": "patterns-batch-corrects-late-data",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A retail analytics team publishes the average item price for each hour of a flash sale. Some point-of-sale records arrive an hour late, and finance requires already published hourly figures to be corrected automatically when late records land. Results may lag by up to an hour, and the team wants the simplest processing logic. Which approach should a data engineer choose?",
+      "options": [
+        {
+          "text": "Batch processing that recomputes each hour from all its data and overwrites earlier results",
+          "correct": true,
+          "why": "Batch semantics process all available data for the hour on each run, so late records are combined with the rows already there and the earlier average is overwritten with a corrected one, using simple logic."
+        },
+        {
+          "text": "Streaming that appends an average of each run's new rows to the earlier results",
+          "average": true,
+          "why": "Streaming processes only new data, so a late record would be averaged without the rest of its hour; appending that partial average leaves the published figure wrong."
+        },
+        {
+          "text": "Streaming that stores each hour's average and blends late rows into that value",
+          "why": "An average alone can't be updated correctly; the streaming logic would have to keep each hour's sum and count, which is the stateful complexity the team wants to avoid."
+        },
+        {
+          "text": "Real-time mode, which recalculates every hourly average as each record arrives",
+          "why": "Real-time mode serves sub-second operational workloads; it adds cost and doesn't remove the stateful logic needed to correct earlier hours."
+        }
+      ],
+      "in_practice": "Recomputing a day of hourly partitions in batch takes minutes of compute, which is often cheaper than building and maintaining stateful streaming logic that keeps sums and counts for every hour.",
+      "source": "https://docs.databricks.com/aws/en/data-engineering/batch-vs-streaming",
+      "evidence": "In batch processing, the late arrival data from the first hour is processed with data from the second hour and existing data from the first hour. The previous results from the first hour are overwritten and corrected with the late arrival data."
+    },
+    {
+      "family": "patterns-upload-zip-unsupported",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data analyst has a .zip archive that holds four small CSV exports and wants to turn them into a Unity Catalog managed table with the Create or modify a table using file upload page. What must the analyst do first?",
+      "options": [
+        {
+          "text": "Extract the archive and upload the CSV files themselves",
+          "correct": true,
+          "why": "The upload page accepts CSV, TSV, JSON, Avro, Parquet and text files with matching extensions; compressed files such as zip and tar aren't supported, so the CSVs must be extracted first."
+        },
+        {
+          "text": "Nothing, because the page unpacks .zip archives and appends their files",
+          "average": true,
+          "why": "The page does append multiple uploaded files as rows, but it doesn't accept compressed archives, so a .zip isn't unpacked for you."
+        },
+        {
+          "text": "Convert the archive to a .tar file, which the page accepts",
+          "why": "Tar files are archives too, and the page doesn't support them any more than zip files."
+        },
+        {
+          "text": "Rename the archive with a .csv extension so the page parses it",
+          "why": "Renaming doesn't change the contents; the file is still a compressed archive, not CSV text the page can parse."
+        }
+      ],
+      "in_practice": "Extracting locally takes seconds; knowing the limit up front saves a failed upload and a support ticket for what is a one-step fix.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/create-or-modify-table",
+      "evidence": "The file must be a CSV, TSV, JSON, Avro, Parquet, or text file and have the extension \".csv\", \".tsv\" (or \".tab\"), \".json\", \".avro\", \".parquet\", or \".txt\". Compressed files such as zip and tar files are not supported."
+    },
+    {
+      "family": "patterns-upload-overwrite-existing-table",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Each month a data analyst receives a refreshed CSV of sales targets and must replace the contents of main.sales.targets, a managed table first created on the Create or modify a table using file upload page. Which choice on that page does this?",
+      "options": [
+        {
+          "text": "Select Overwrite existing table in the dropdown and pick main.sales.targets",
+          "correct": true,
+          "why": "The upload page creates or overwrites a managed Delta table; its dropdown offers Overwrite existing table alongside Create new table, which replaces the table's contents with the new file."
+        },
+        {
+          "text": "Select Create new table and reuse the name main.sales.targets",
+          "average": true,
+          "why": "Creating a new table with a name that already exists is a name conflict, and the page shows an error rather than replacing the table."
+        },
+        {
+          "text": "Enable Merge the schema across multiple files before creating",
+          "why": "That option merges the inferred schema across files uploaded together; it doesn't make the page replace an existing table."
+        },
+        {
+          "text": "Enable First row contains the header so new rows replace old ones",
+          "why": "The header option only controls whether the first row is read as column names; it has nothing to do with replacing table contents."
+        }
+      ],
+      "in_practice": "Overwriting in place keeps the same table name, so dashboards and queries that point at main.sales.targets pick up the new month's targets without any edits.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/create-or-modify-table",
+      "evidence": "The Create or modify a table using file upload page allows you to upload CSV, TSV, or JSON, Avro, Parquet, or text files to create or overwrite a managed Delta Lake table. You can use the dropdown to select Overwrite existing table or Create new table. Operations that attempt to create new tables with name conflicts display an error message."
+    },
+    {
+      "family": "patterns-delta-sink-concurrent-writers",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs two Structured Streaming queries, one per region and with separate checkpoints, that append orders to the Delta table bronze.orders, while a nightly batch backfill also appends to it. Which guarantee applies to the streaming writes?",
+      "options": [
+        {
+          "text": "Exactly-once processing, enforced through the table's transaction log",
+          "correct": true,
+          "why": "When Structured Streaming writes to a Delta Lake table, the transaction log guarantees exactly-once processing, even when other streams or batch queries run concurrently against the table."
+        },
+        {
+          "text": "No guarantee, because only one stream may write to a Delta table at a time",
+          "average": true,
+          "why": "Several streams and batch jobs can write to the same Delta table; the transaction log keeps each streaming write exactly-once while they run concurrently."
+        },
+        {
+          "text": "Exactly-once only if each query writes through foreachBatch with txnAppId",
+          "why": "txnAppId and txnVersion make writes to multiple tables inside foreachBatch idempotent; a plain streaming write to one Delta table is already exactly-once."
+        },
+        {
+          "text": "At-least-once delivery, so a downstream step must remove duplicate rows",
+          "why": "Concurrent writers don't weaken the Delta sink to at-least-once; the transaction log provides exactly-once processing for each streaming query."
+        }
+      ],
+      "in_practice": "Each region's stream can run, fail and restart on its own schedule against one bronze table, with no external lock manager or dedup job between the writers.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/delta-lake",
+      "evidence": "You can write data into a Delta Lake table using Structured Streaming. The Delta Lake transaction log guarantees exactly-once processing, even when there are other streams or batch queries running concurrently against the table."
+    },
+    {
+      "family": "patterns-sftp-pem-key-auth",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is creating a Unity Catalog connection for the Lakeflow Connect SFTP connector to pull a supplier's daily files from its SFTP server. Which authentication setup does Databricks recommend for this connection?",
+      "options": [
+        {
+          "text": "PEM private key authentication for a non-root, read-only SFTP user",
+          "correct": true,
+          "why": "The SFTP connector supports PEM private keys and passwords; Databricks recommends PEM private key authentication and least-privilege credentials, such as a non-root user limited to read-only access."
+        },
+        {
+          "text": "Username and password authentication for the server's admin account",
+          "average": true,
+          "why": "Password authentication is supported but isn't the recommended method, and an admin account goes against the least-privilege guidance for the source server."
+        },
+        {
+          "text": "OAuth user-to-machine sign-in through the supplier's identity provider",
+          "why": "The SFTP connector's authentication methods are PEM private keys and passwords; OAuth sign-in isn't one of them."
+        },
+        {
+          "text": "Anonymous FTP access, so that no credentials are stored in Unity Catalog",
+          "why": "The connector doesn't support the FTP protocol, and storing credentials in a Unity Catalog connection is how it keeps source access governed."
+        }
+      ],
+      "in_practice": "A read-only, key-based user limits the damage if the credential leaks: it can't delete or overwrite the supplier's files, and the key can be rotated without sharing a password.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/sftp",
+      "evidence": "The connector supports the following authentication methods: PEM private key; Password-based authentication. Databricks recommends using PEM private key authentication. Databricks also recommends using credentials with the least privilege on the source SFTP server (for example, a non-root user limited to read-only access)."
+    },
+    {
+      "family": "patterns-kinesis-no-managed-connector",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 1,
+      "type": "multiple",
+      "stem": "A data engineer must continuously ingest events from an Amazon Kinesis data stream into Unity Catalog tables. Which two approaches does Databricks document for this source? (Choose two.)",
+      "options": [
+        {
+          "text": "Structured Streaming with the Kinesis source",
+          "correct": true,
+          "why": "Kinesis has no Lakeflow Connect managed connector, so Databricks documents streaming it directly with Structured Streaming using the Kinesis source."
+        },
+        {
+          "text": "A Lakeflow pipeline that reads the Kinesis source into a streaming table",
+          "correct": true,
+          "why": "Lakeflow pipelines can also read the Kinesis source, adding managed orchestration, checkpoints and recovery on top of Structured Streaming."
+        },
+        {
+          "text": "A Lakeflow Connect managed Kinesis connector",
+          "average": true,
+          "why": "Lakeflow Connect's managed streaming connectors cover sources such as Apache Kafka and RabbitMQ; Kinesis, Google Pub/Sub and Apache Pulsar have no managed connector."
+        },
+        {
+          "text": "Auto Loader with cloudFiles.format set to kinesis",
+          "why": "Auto Loader ingests files from cloud object storage; it doesn't read records from a Kinesis data stream."
+        },
+        {
+          "text": "COPY INTO with the stream's ARN as the source path",
+          "why": "COPY INTO loads files from a storage location into a Delta table; it can't read from a message stream."
+        }
+      ],
+      "in_practice": "Choosing a Lakeflow pipeline over hand-written Structured Streaming means checkpoints and recovery are managed for you, which cuts on-call work for a stream that runs around the clock.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/streaming-overview",
+      "evidence": "For streaming sources without a managed connector, including Amazon Kinesis, Google Pub/Sub, and Apache Pulsar, you can stream directly with Structured Streaming or Lakeflow pipelines."
+    },
+    {
+      "family": "patterns-delta-source-skip-change-commits",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer streams from bronze.user_events, a Delta table partitioned by date, into silver.user_events with Structured Streaming. For a GDPR request, the privacy team runs a DELETE on bronze.user_events filtered by user_email, and the stream then fails. A separate job already removes those users from silver, so the stream only needs to keep processing new appends. Which read option should the engineer set?",
+      "options": [
+        {
+          "text": ".option('skipChangeCommits', 'true')",
+          "correct": true,
+          "why": "skipChangeCommits ignores transactions that delete or modify existing records and processes only appends; Databricks recommends it for most workloads that don't use the change data feed."
+        },
+        {
+          "text": ".option('ignoreDeletes', 'true')",
+          "average": true,
+          "why": "ignoreDeletes is a legacy option that only handles deletes at partition boundaries; a DELETE filtered by user_email rewrites files within partitions, which it doesn't cover."
+        },
+        {
+          "text": ".option('ignoreChanges', 'true')",
+          "why": "ignoreChanges is a legacy option for Databricks Runtime 11.3 LTS and lower that re-emits rewritten files, so unchanged rows would arrive downstream again as duplicates."
+        },
+        {
+          "text": ".option('readChangeFeed', 'true')",
+          "why": "Reading the change data feed processes every change type and needs logic for updates and deletes, which this stream doesn't need because deletes are handled separately."
+        }
+      ],
+      "in_practice": "With skipChangeCommits on, compliance deletes can run on bronze at any time without failing the silver stream and paging the on-call engineer.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/delta-lake",
+      "evidence": "Set skipChangeCommits to ignore transactions that delete or modify existing records, and to process only appends. Databricks recommends using skipChangeCommits for most workloads that do not use change data feeds. ignoreDeletes is a legacy option that only handles transactions that delete data at partition boundaries."
+    },
+    {
+      "family": "patterns-standard-connector-access-mode-privilege",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer reads files from a SharePoint document library with spark.read and the databricks.connection option, using a SharePoint connection that an admin already created in Unity Catalog. The engineer's cluster uses dedicated access mode. Which privilege on the connection does the engineer need?",
+      "options": [
+        {
+          "text": "MANAGE CONNECTION",
+          "correct": true,
+          "why": "For SQL and Spark API ingestion from SharePoint, using an existing connection requires MANAGE CONNECTION on compute in dedicated access mode and USE CONNECTION on compute in standard access mode."
+        },
+        {
+          "text": "USE CONNECTION",
+          "average": true,
+          "why": "USE CONNECTION is the documented privilege for compute in standard access mode; on a dedicated access mode cluster, the requirement is MANAGE CONNECTION."
+        },
+        {
+          "text": "CREATE CONNECTION",
+          "why": "CREATE CONNECTION is needed to create a new connection; the engineer is reusing one that an admin already created."
+        },
+        {
+          "text": "READ FILES",
+          "why": "READ FILES is granted on external locations for cloud storage paths; access to SharePoint goes through the Unity Catalog connection."
+        }
+      ],
+      "in_practice": "Checking the cluster's access mode before requesting grants avoids a round of permission errors; on shared standard access mode compute, one USE CONNECTION grant to a group covers every reader.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/sharepoint",
+      "evidence": "CREATE CONNECTION privileges to create a SharePoint connection, or the appropriate privilege to use an existing one based on your cluster access mode: Dedicated Access Mode: MANAGE CONNECTION. Standard Access Mode: USE CONNECTION."
+    },
+    {
+      "family": "patterns-google-sheet-excel-format",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A finance team keeps its budget in a Google Sheet. A data engineer must load the range A1:F200 of its Budget tab into a Unity Catalog table with SQL, through an existing Google Drive connection, without anyone exporting the sheet by hand. Which read_files call meets this?",
+      "options": [
+        {
+          "text": "read_files on the sheet's URL with format => 'excel' and dataAddress => 'Budget!A1:F200'",
+          "correct": true,
+          "why": "Built-in Google files are exported to open formats during ingestion, with Sheets exported as XLSX, so read_files uses format => 'excel', and dataAddress selects the tab and range."
+        },
+        {
+          "text": "read_files on the sheet's URL with format => 'csv', as Sheets are exported to CSV on read",
+          "average": true,
+          "why": "Google Sheets aren't exported as CSV during ingestion; they're exported as XLSX, so the CSV reader isn't the right format for a Sheet."
+        },
+        {
+          "text": "read_files on the Drive folder with pathGlobFilter => '*.gsheet' and format => 'excel'",
+          "why": "pathGlobFilter can't filter built-in Google formats such as Google Sheets, so this filter won't select the Sheet."
+        },
+        {
+          "text": "read_files on a CSV that someone exports from the Budget tab each month",
+          "why": "Manual exports aren't needed, because ingestion exports built-in Google files automatically, and the requirement rules out a hand-made export."
+        }
+      ],
+      "in_practice": "Reading the Sheet directly removes a monthly manual export that often goes stale, so the budget table reflects the finance team's edits at the next refresh.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/google-drive",
+      "evidence": "format(\"excel\") # use 'excel' for Google Sheets. You do not need to export your built-in Google files (Docs, Sheets) manually. They are automatically exported to an open format during ingestion. Google Sheets: spreadsheetml.sheet (XLSX)"
+    },
+    {
+      "family": "patterns-sftp-pgp-binary-ingest",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A logistics partner drops PGP-encrypted CSV files on its SFTP server every night. A data engineer ingests them into a Unity Catalog bronze table with the Lakeflow Connect SFTP connector, which runs Auto Loader over an SFTP connection. How should the engineer handle the encryption?",
+      "options": [
+        {
+          "text": "Ingest the files with the binaryFile format, then decrypt them after ingestion",
+          "correct": true,
+          "why": "The SFTP connector doesn't decrypt files in flight; Databricks suggests ingesting the encrypted files as binary files and decrypting them in a step after ingestion."
+        },
+        {
+          "text": "Store the PGP private key in the SFTP connection so files decrypt in flight",
+          "average": true,
+          "why": "The connection holds authentication details for the SFTP server, such as a PEM private key or a password; the connector doesn't decrypt file contents in flight."
+        },
+        {
+          "text": "Use COPY INTO with an ENCRYPTION clause that supplies the PGP key",
+          "why": "SFTP isn't supported by COPY INTO, and its ENCRYPTION clause is for S3 server-side encryption with customer-provided keys, not PGP."
+        },
+        {
+          "text": "Read them with cloudFiles.format set to csv and let _rescued_data hold them",
+          "why": "Encrypted bytes aren't parseable CSV, so reading them as CSV yields no usable columns; the rescued data column isn't a way to carry encrypted files."
+        }
+      ],
+      "in_practice": "Landing the encrypted files as binary keeps the raw delivery for audit, and a decryption task in the same job means the partner's encryption policy never blocks the nightly load.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/sftp",
+      "evidence": "Can the SFTP connector ingest encrypted files? (Is PGP supported?) The connector doesn't decrypt in flight, but you can ingest the encrypted files as binary files and decrypt them after ingestion."
+    },
+    {
+      "family": "patterns-add-data-ui-s3-external-location",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data analyst must create a Unity Catalog managed table from a 40 GB folder of Parquet files in Amazon S3 without writing code. The path is covered by a Unity Catalog external location on which she has READ FILES, and she has CREATE TABLE on the target schema. Which approach meets these requirements?",
+      "options": [
+        {
+          "text": "New > Add data > Amazon S3, then pick the external location, files and target schema",
+          "correct": true,
+          "why": "The add data UI for Amazon S3 (Public Preview) creates a managed table from S3 data through a Unity Catalog external location; it needs READ FILES on the location and CREATE TABLE on the schema."
+        },
+        {
+          "text": "The legacy S3 table import page, pointed at the bucket path",
+          "average": true,
+          "why": "The legacy S3 table import page only creates tables in the legacy Hive metastore and needs compute that uses an instance profile, so it can't produce a Unity Catalog table."
+        },
+        {
+          "text": "The Create or modify a table using file upload page, after downloading the files",
+          "why": "That page takes local files and caps the total upload under 2 GB, so a 40 GB folder in S3 doesn't fit."
+        },
+        {
+          "text": "A Lakeflow Connect managed connector for Amazon S3",
+          "why": "Cloud object storage is served by standard connectors such as Auto Loader and COPY INTO, not by a managed connector, and those need code or SQL."
+        }
+      ],
+      "in_practice": "Pointing the add data UI at an existing external location means no laptop downloads and no instance-profile cluster, so a one-off 40 GB load stays governed by Unity Catalog end to end.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/add-data-external-locations",
+      "evidence": "This article describes how to use the add data UI to create a managed table from data in Amazon S3 using a Unity Catalog external location. The legacy S3 table import page only supports creating tables in the legacy Hive metastore and requires that you select a compute resource that uses an instance profile."
+    },
+    {
+      "family": "patterns-delta-source-retention-window",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer runs a Structured Streaming job with Trigger.AvailableNow that reads bronze.orders, a Delta table with default retention settings, and appends to silver.orders. The job was paused for six weeks during a migration, and on restart it fails with DELTA_FILE_NOT_FOUND_DETAILED. A teammate suggests setting spark.sql.files.ignoreMissingFiles to true. What should the engineer do?",
+      "options": [
+        {
+          "text": "Reset the stream with a full refresh, and raise the source's retention if long pauses recur",
+          "correct": true,
+          "why": "A stream that falls behind the source table's retention windows, by default 7 days for VACUUM-removed files and 30 days for the log, must be reset with a full refresh; raising the source's retention prevents a repeat."
+        },
+        {
+          "text": "Set spark.sql.files.ignoreMissingFiles to true and restart on the same checkpoint",
+          "average": true,
+          "why": "Databricks warns against this workaround: ignoring missing files silently produces incorrect results, because the data the stream needs has already been removed."
+        },
+        {
+          "text": "Restart on the same checkpoint with larger workers so the backlog fits",
+          "why": "Scaling up helps a micro-batch that fails for lack of resources; it can't bring back files and log entries that retention has already removed."
+        },
+        {
+          "text": "Switch to a processingTime trigger so the stream catches up through the log",
+          "why": "Changing the trigger doesn't restore removed files; the stream still can't read the table versions it fell behind on."
+        }
+      ],
+      "in_practice": "A full refresh of a large silver table can take hours, so teams that plan long pauses for migrations raise the source table's retention beforehand rather than recovering afterward.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/delta-lake",
+      "evidence": "If you use a Delta Lake table as a streaming source, the streaming query must run at least one time within the source table's retention window. If a query falls behind these windows, it fails with DELTA_FILE_NOT_FOUND_DETAILED and must be reset with a full refresh. Do not set spark.sql.files.ignoreMissingFiles to true as a workaround."
+    },
+    {
+      "family": "patterns-availablenow-empty-commits",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer schedules an hourly Structured Streaming job with Trigger.AvailableNow that appends new rows from a bronze Delta table to silver.events, whose schema hasn't changed. Reviewing DESCRIBE HISTORY on silver.events, a platform lead flags commits that add no data on every run and asks whether the job is broken. What explains these commits?",
+      "options": [
+        {
+          "text": "They are expected empty commits with epochId = -1 that the streaming sink writes",
+          "correct": true,
+          "why": "A Delta streaming sink can write empty commits with epochId = -1 on the first batch of each run, which happens every batch with Trigger.AvailableNow; they're intentional and don't indicate an error."
+        },
+        {
+          "text": "The checkpoint resets each run, so the job recommits batches it already wrote",
+          "average": true,
+          "why": "A reset checkpoint would reprocess source data and add duplicate rows, not commits with no data; these commits are normal sink behavior."
+        },
+        {
+          "text": "Each one marks a run that found no new data, so the schedule should be longer",
+          "why": "The empty commits come from how the sink writes batches under Trigger.AvailableNow, not from a lack of new data, so a longer schedule wouldn't remove them."
+        },
+        {
+          "text": "They are micro-batches that failed and were rolled back by Delta Lake",
+          "why": "A failed write doesn't produce a commit in the table history; these commits are written on purpose and don't affect correctness."
+        }
+      ],
+      "in_practice": "Knowing this pattern prevents a false incident: an hourly AvailableNow job shows at least one empty commit per run, and these commits don't affect correctness or performance in any significant way.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/delta-lake",
+      "evidence": "When you write to a Delta Lake table using a Structured Streaming sink, you might see empty commits with epochId = -1. These are expected and typically occur: On the first batch of each run of the streaming query (this happens every batch for Trigger.AvailableNow)."
+    },
+    {
+      "family": "patterns-upload-bigint-date-cast",
+      "objective": "ingestion.patterns",
+      "guide": "2.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data analyst uploads a CSV of property records on the Create or modify a table using file upload page. The year_built column holds values such as 1998 and is inferred as BIGINT. When the analyst changes its type to DATE in the preview, table creation fails. Reports still need a date for that column. What should the analyst do?",
+      "options": [
+        {
+          "text": "Create the table with year_built as BIGINT, then derive a date column with SQL functions",
+          "correct": true,
+          "why": "Casting BIGINT to DATE or TIMESTAMP isn't supported on the upload page, so Databricks recommends creating the table first and transforming those columns with SQL functions afterward."
+        },
+        {
+          "text": "Change the type to TIMESTAMP instead, since timestamps accept year values",
+          "average": true,
+          "why": "The upload page doesn't support casting BIGINT to TIMESTAMP either, so this runs into the same limitation."
+        },
+        {
+          "text": "Enable Rows span multiple lines so the parser reads the column as a date",
+          "why": "That option controls whether one record can span several lines in the file; it doesn't change how a column's type is cast."
+        },
+        {
+          "text": "Turn on Merge the schema across multiple files and retry the DATE type",
+          "why": "Schema merging combines the inferred schemas of several uploaded files; it doesn't change which type casts the page supports."
+        }
+      ],
+      "in_practice": "Loading raw and fixing types in SQL keeps the upload repeatable and puts the conversion rule, such as make_date(year_built, 1, 1), in code that reviewers can check.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/create-or-modify-table",
+      "evidence": "Changing column types can lead to some values being cast to NULL if the value cannot be cast correctly to the target data type. Casting BIGINT to DATE or TIMESTAMP columns is not supported. Databricks recommends that you create a table first and then transform these columns using SQL functions afterwards."
+    },
+    {
+      "family": "copy-into-path-target-write-files",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs COPY INTO delta.`s3://lake-prod/finance/ledger` FROM '/Volumes/fin/raw/ledger_drop' FILEFORMAT = PARQUET, naming the target table by its storage path. The path is covered by a Unity Catalog external location. Which privilege lets Unity Catalog authorize the write to that path?",
+      "options": [
+        {
+          "text": "WRITE FILES on the external location",
+          "correct": true,
+          "why": "When the target is given as a location, Unity Catalog governs the write: defining it as an external location and holding WRITE FILES on that location lets COPY INTO write there."
+        },
+        {
+          "text": "MODIFY on the target table",
+          "average": true,
+          "why": "MODIFY governs writes to tables addressed by name; this target is addressed by its path, so authorization comes from the external location that covers it."
+        },
+        {
+          "text": "READ FILES on the external location",
+          "why": "READ FILES lets you read files under a location, as a COPY INTO source needs; writing to the target path needs WRITE FILES."
+        },
+        {
+          "text": "CREATE EXTERNAL TABLE on the external location",
+          "why": "CREATE EXTERNAL TABLE allows registering tables at paths in the location; it isn't the privilege for writing files to a path."
+        }
+      ],
+      "in_practice": "Granting WRITE FILES on one external location puts path-based loads under Unity Catalog audit, instead of relying on bucket policies that each job's cloud role carries.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
+      "evidence": "If the table name is provided in the form of a location, such as: delta.`/path/to/table` , Unity Catalog can govern access to the locations that are being written to. You can write to an external location by: Defining the location as an external location and having WRITE FILES permissions on that external location."
+    },
+    {
+      "family": "copy-into-sse-c-encryption",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer must load JSON files with COPY INTO from s3://vendor-feed/json, where every object is encrypted with SSE-C using a key the vendor shares with the team. Which clause lets COPY INTO decrypt the files?",
+      "options": [
+        {
+          "text": "FROM 's3://vendor-feed/json' WITH (ENCRYPTION (TYPE = 'AWS_SSE_C', MASTER_KEY = '...'))",
+          "correct": true,
+          "why": "COPY INTO accepts encryption options in the source clause: TYPE = 'AWS_SSE_C' with MASTER_KEY lets it load S3 data encrypted with customer-provided keys."
+        },
+        {
+          "text": "FORMAT_OPTIONS ('encryption' = 'AWS_SSE_C', 'masterKey' = '...')",
+          "average": true,
+          "why": "FORMAT_OPTIONS passes reader options for the file format, such as JSON parsing settings; decryption settings go in the source clause's ENCRYPTION block."
+        },
+        {
+          "text": "COPY_OPTIONS ('decrypt' = 'true', 'masterKey' = '...')",
+          "why": "COPY_OPTIONS controls the load itself, with options such as force and mergeSchema; it has no decryption settings."
+        },
+        {
+          "text": "FROM 's3://vendor-feed/json' WITH (CREDENTIAL (AWS_SSE_C_KEY = '...'))",
+          "why": "The CREDENTIAL block takes access credentials such as AWS_ACCESS_KEY, AWS_SECRET_KEY and AWS_SESSION_TOKEN; the decryption key goes in a separate ENCRYPTION block."
+        }
+      ],
+      "in_practice": "Decrypting in the load itself lets the vendor keep its encryption policy, with no separate decrypt-and-copy step that would double storage for every delivery.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/temporary-credentials",
+      "evidence": "COPY INTO supports loading encrypted data from AWS S3. To load encrypted data, provide the type of encryption and the key to decrypt the data. Using customer-provided encryption keys: FROM 's3://my-bucket/jsonData' WITH ( ENCRYPTION (TYPE = 'AWS_SSE_C', MASTER_KEY = '...') )"
+    },
+    {
+      "family": "copy-into-root-path-trailing-slash",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer must load every Parquet file stored at the root of the S3 bucket partner-drop, not under any prefix, with COPY INTO. Which source path form does the COPY INTO reference call for?",
+      "options": [
+        {
+          "text": "'s3://partner-drop/', with a slash at the end",
+          "correct": true,
+          "why": "The COPY INTO reference says that when the source file path is a root path, you add a slash at the end, as in s3://my-bucket/."
+        },
+        {
+          "text": "'s3://partner-drop', with no slash at the end",
+          "average": true,
+          "why": "This is how bucket URIs are often written, but for a root path the reference asks for a trailing slash."
+        },
+        {
+          "text": "A prefix such as 's3://partner-drop/data', as a bucket root can't be a source",
+          "why": "A bucket root can be a source; the reference shows the root form with a trailing slash, so no prefix is required."
+        },
+        {
+          "text": "'/Volumes/partner-drop/', as bucket roots must be read through a volume",
+          "why": "Volumes are recommended but not required, and a volume path names a catalog, schema and volume rather than a bucket."
+        }
+      ],
+      "in_practice": "Writing the documented root-path form into a shared COPY INTO template saves each new vendor onboarding from a round of trial and error against the bucket root.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
+      "evidence": "If the source file path is a root path, please add a slash (/) at the end of the file path, for example, s3://my-bucket/."
+    },
+    {
+      "family": "copy-into-volume-recommended-access",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "An admin must configure access so that analysts can run COPY INTO from a shared S3 bucket into Unity Catalog tables on a SQL warehouse. Which access method does Databricks recommend?",
+      "options": [
+        {
+          "text": "A Unity Catalog volume over the bucket path, with READ VOLUME granted",
+          "correct": true,
+          "why": "Databricks recommends volumes for accessing files in cloud storage during COPY INTO ingestion; users then need READ VOLUME on the volume."
+        },
+        {
+          "text": "A Unity Catalog external location, with READ FILES granted",
+          "average": true,
+          "why": "External locations with READ FILES are supported, but Databricks documents them as not the recommended approach compared with volumes."
+        },
+        {
+          "text": "An AWS instance profile attached to the SQL warehouse",
+          "why": "An instance profile is a supported method, but it grants access through the compute rather than through Unity Catalog objects, and it isn't the recommended option."
+        },
+        {
+          "text": "Temporary STS credentials that the admin shares with each analyst",
+          "why": "Temporary credentials suit one-off access when nothing else is configured; handing them to every analyst is hard to govern and isn't the recommended method."
+        }
+      ],
+      "in_practice": "One volume and one READ VOLUME grant to an analyst group replace per-user credentials, so onboarding a new analyst is a group membership change rather than a key handoff.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/unity-catalog",
+      "evidence": "Databricks recommends using volumes to access files in cloud storage as part of the ingestion process using COPY INTO. Databricks recommends using volumes to access files in cloud storage. External locations are supported but are not the recommended approach."
+    },
+    {
+      "family": "copy-into-vacuum-metadata-files",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer has run a nightly COPY INTO into a Unity Catalog table for two years on Databricks Runtime 15.4 LTS. A storage review finds unreferenced metadata files that COPY INTO created. Which command cleans them up?",
+      "options": [
+        {
+          "text": "VACUUM on the target table",
+          "correct": true,
+          "why": "In Databricks Runtime 15.2 and above, running VACUUM cleans up unreferenced metadata files that COPY INTO created."
+        },
+        {
+          "text": "OPTIMIZE on the target table",
+          "average": true,
+          "why": "OPTIMIZE compacts small data files to speed up reads; it doesn't remove unreferenced metadata files."
+        },
+        {
+          "text": "FSCK REPAIR TABLE on the target table",
+          "why": "FSCK REPAIR TABLE removes log entries for data files that can no longer be found; it isn't the documented cleanup for COPY INTO metadata files."
+        },
+        {
+          "text": "COPY INTO with COPY_OPTIONS ('force' = 'true')",
+          "why": "force disables idempotency and reloads files regardless of history, which creates duplicates; it doesn't clean up anything."
+        }
+      ],
+      "in_practice": "A table already on a regular VACUUM schedule, such as weekly maintenance, gets these metadata files cleaned up with no extra job to build.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/",
+      "evidence": "Clean up metadata files: You can run VACUUM to clean up unreferenced metadata files created by COPY INTO in Databricks Runtime 15.2 and above."
+    },
+    {
+      "family": "copy-into-validate-constraints",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer loads vendor files into sales.bronze.orders, which has a CHECK constraint requiring amount > 0 and a non-nullable customer_id column. Before tonight's run, the engineer wants to know whether the new files would violate either rule, without writing anything to the table. Which approach meets this?",
+      "options": [
+        {
+          "text": "Run the same COPY INTO with VALIDATE ALL added",
+          "correct": true,
+          "why": "VALIDATE checks the data to be loaded without writing it, including whether it parses, whether the schema matches and whether all nullability and check constraints are met."
+        },
+        {
+          "text": "Load the files into a staging table and query it, as VALIDATE checks only parsing",
+          "average": true,
+          "why": "VALIDATE goes beyond parsing: it also checks schema compatibility and nullability and check constraints, so a staging copy isn't needed."
+        },
+        {
+          "text": "Run the COPY INTO, then use RESTORE if a constraint turns out to fail",
+          "why": "This writes to the table first, which the engineer wants to avoid; a violated constraint also makes the write fail rather than leaving rows to roll back."
+        },
+        {
+          "text": "Run the COPY INTO with COPY_OPTIONS ('mergeSchema' = 'true')",
+          "why": "mergeSchema lets the target schema evolve with the incoming data; it doesn't preview constraint violations, and it does write data."
+        }
+      ],
+      "in_practice": "A VALIDATE pass before a large nightly load turns a 2 a.m. failure into a daytime check, giving the team hours to ask the vendor for corrected files.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
+      "evidence": "The data that is to be loaded into a table is validated but not written to the table. These validations include: Whether the data can be parsed. Whether the schema matches that of the table or if the schema needs to be evolved. Whether all nullability and check constraints are met."
+    },
+    {
+      "family": "copy-into-history-skipped-corrupt-metric",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly COPY INTO uses FORMAT_OPTIONS ('ignoreCorruptFiles' = 'true'), and the job never saved the command's output. An auditor now asks how many files each run over the past month skipped as corrupt. Where can the engineer find this?",
+      "options": [
+        {
+          "text": "In DESCRIBE HISTORY on the table, under numSkippedCorruptFiles in operationMetrics",
+          "correct": true,
+          "why": "COPY INTO returns the count in its num_skipped_corrupt_files column, and the same metric is recorded for each run as numSkippedCorruptFiles in the operationMetrics column of DESCRIBE HISTORY."
+        },
+        {
+          "text": "By rerunning the COPY INTO in VALIDATE mode over the same source folder",
+          "average": true,
+          "why": "VALIDATE mode shows which files are corrupt now, but it reports on the folder's current contents, not on the per-run counts from last month's loads."
+        },
+        {
+          "text": "In the COPY INTO checkpoint folder kept next to the source files",
+          "why": "COPY INTO doesn't keep a streaming-style checkpoint folder beside the source; its per-run metrics are recorded in the Delta table's history."
+        },
+        {
+          "text": "In the system.billing.usage table, filtered to the job's runs",
+          "why": "system.billing.usage records usage for billing and cost analysis; it doesn't hold file-level ingestion metrics such as skipped corrupt files."
+        }
+      ],
+      "in_practice": "Reading the metric from table history lets an alert flag any run that skipped files, so a vendor's broken export is caught the next morning instead of at month-end reconciliation.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/examples",
+      "evidence": "The result of the COPY INTO command returns how many files were skipped due to corruption in the num_skipped_corrupt_files column. This metric also shows up in the operationMetrics column under numSkippedCorruptFiles after running DESCRIBE HISTORY on the Delta table."
+    },
+    {
+      "family": "copy-into-source-and-target-credentials",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer loads JSON files from s3://vendor-feed/json into the external Delta table finance.bronze.invoices with COPY INTO. Reading the source is authorized by the storage credential vendor_reader, and writing to the table's storage by the storage credential lake_writer. Which statement uses both credentials correctly?",
+      "options": [
+        {
+          "text": "COPY INTO finance.bronze.invoices WITH (CREDENTIAL lake_writer) FROM 's3://vendor-feed/json' WITH (CREDENTIAL vendor_reader) FILEFORMAT = JSON",
+          "correct": true,
+          "why": "A WITH (CREDENTIAL ...) after the target names the credential used to write the table, and one after the source path names the credential used to read the files."
+        },
+        {
+          "text": "COPY INTO finance.bronze.invoices FROM 's3://vendor-feed/json' WITH (CREDENTIAL vendor_reader, CREDENTIAL lake_writer) FILEFORMAT = JSON",
+          "average": true,
+          "why": "The source clause's WITH block takes one credential for reading the source; listing the write credential there doesn't apply it to the target table."
+        },
+        {
+          "text": "COPY INTO finance.bronze.invoices FROM 's3://vendor-feed/json' WITH (CREDENTIAL vendor_reader) FILEFORMAT = JSON COPY_OPTIONS ('credential' = 'lake_writer')",
+          "why": "COPY_OPTIONS only controls load behavior such as force and mergeSchema; credentials are given in WITH clauses on the target and the source."
+        },
+        {
+          "text": "COPY INTO finance.bronze.invoices WITH (CREDENTIAL vendor_reader) FROM 's3://vendor-feed/json' WITH (CREDENTIAL lake_writer) FILEFORMAT = JSON",
+          "why": "The placement is right but the credentials are swapped: the table would be written with the reader's credential and the source read with the writer's."
+        }
+      ],
+      "in_practice": "Separate read and write credentials let the vendor bucket stay read-only to Databricks, so a faulty load can't modify or delete the vendor's files.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/temporary-credentials",
+      "evidence": "The command uses one existing credential to write to external Delta table and another to read from the S3 location. COPY INTO my_json_data WITH (CREDENTIAL target_credential) FROM 's3://my-bucket/jsonData' WITH (CREDENTIAL source_credential) FILEFORMAT = JSON"
+    },
+    {
+      "family": "copy-into-external-location-sibling-path",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "An admin defined the external location raw_landing on s3://landing-bucket/raw-data and granted a data engineer READ FILES on it. Loading into the same table, the engineer's COPY INTO from s3://landing-bucket/raw-data/json succeeds, but one from s3://landing-bucket/partner-exports fails with a permission error. Which statement explains this?",
+      "options": [
+        {
+          "text": "Privileges on raw_landing cover paths nested under raw-data, not parent or sibling paths",
+          "correct": true,
+          "why": "External location privileges apply to all directories nested under the location's URL, but they grant nothing on directories above it or parallel to it, such as partner-exports."
+        },
+        {
+          "text": "Privileges on raw_landing cover the whole bucket, so the target table must be the problem",
+          "average": true,
+          "why": "An external location is scoped to its URL, not to the bucket; and since a load into the same table succeeds, the target isn't what fails."
+        },
+        {
+          "text": "READ FILES covers only the location's exact URL, and the json load skipped the check",
+          "why": "Privileges apply to nested directories too, which is why the json subfolder load is authorized; no check is skipped."
+        },
+        {
+          "text": "COPY INTO reads with the SQL warehouse's IAM role, which lacks access to partner-exports",
+          "why": "Here access is authorized through the external location and its storage credential; partner-exports simply falls outside raw_landing's URL."
+        }
+      ],
+      "in_practice": "Scoping each external location to one landing prefix keeps a team's grants from spilling into other partners' folders; a new partner gets its own location or volume and its own grant.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/unity-catalog",
+      "evidence": "External location privileges apply to all nested directories under the specified location. Permissions on this external location do not grant any privileges on directories above or parallel to the location specified."
+    },
+    {
+      "family": "copy-into-select-no-group-by",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer wants a COPY INTO from s3://pos-exports/daily to load one row per store with that store's total sales, using FROM (SELECT store_id, sum(amount) AS total FROM 's3://pos-exports/daily' GROUP BY store_id). Which approach should the engineer take?",
+      "options": [
+        {
+          "text": "Load the raw rows with COPY INTO, then aggregate per store in a downstream table",
+          "correct": true,
+          "why": "The SELECT in COPY INTO allows aggregation only as a global aggregate and can't GROUP BY columns, so per-store totals belong in a downstream step over the loaded rows."
+        },
+        {
+          "text": "Keep the GROUP BY, since COPY INTO's SELECT accepts any SELECT expression",
+          "average": true,
+          "why": "The SELECT does accept a wide range of expressions, including window operations, but aggregation is limited to global aggregates without GROUP BY."
+        },
+        {
+          "text": "Replace GROUP BY with sum(amount) OVER (PARTITION BY store_id)",
+          "why": "Window operations are allowed, but a windowed sum repeats the store total on every source row; it doesn't reduce the data to one row per store."
+        },
+        {
+          "text": "Drop GROUP BY and keep sum(amount), which then returns one row per store",
+          "why": "Without GROUP BY, sum(amount) is a global aggregate that returns a single row for all stores in the load, not one row per store."
+        }
+      ],
+      "in_practice": "Keeping raw rows in bronze also preserves the detail needed to recompute totals when a store resubmits a day, which a pre-aggregated load would have thrown away.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
+      "evidence": "Selects the specified columns or expressions from the source data before copying into the Delta table. The expressions can be anything you use with SELECT statements, including window operations. You can use aggregation expressions only for global aggregates–you cannot GROUP BY on columns with this syntax."
+    },
+    {
+      "family": "copy-into-column-list-identity-default",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer loads headerless CSV files into sales.bronze.shipments, whose columns are shipment_id (an identity column), order_id, carrier, weight_kg and source_system (a column with a DEFAULT value). Each file holds three fields: order_id, carrier and weight_kg, in that order. The engineer wants shipment_id generated and source_system set to its default. Which statement meets this?",
+      "options": [
+        {
+          "text": "COPY INTO sales.bronze.shipments (order_id, carrier, weight_kg) FROM '/Volumes/sales/raw/ship' FILEFORMAT = CSV",
+          "correct": true,
+          "why": "A column name list maps the fields to the listed columns by relative position; columns left out get their default value, or NULL if they have none, so source_system gets its default and shipment_id is generated."
+        },
+        {
+          "text": "COPY INTO sales.bronze.shipments BY POSITION FROM '/Volumes/sales/raw/ship' FILEFORMAT = CSV",
+          "average": true,
+          "why": "BY POSITION ignores identity columns but matches every remaining column; four remaining columns against three source fields is a count mismatch, so COPY INTO raises an error."
+        },
+        {
+          "text": "COPY INTO sales.bronze.shipments (shipment_id, order_id, carrier, weight_kg) FROM '/Volumes/sales/raw/ship' FILEFORMAT = CSV",
+          "why": "Identity and generated columns can't be specified in the column name list; listing shipment_id makes COPY INTO raise an error."
+        },
+        {
+          "text": "COPY INTO sales.bronze.shipments FROM '/Volumes/sales/raw/ship' FILEFORMAT = CSV FORMAT_OPTIONS ('header' = 'true')",
+          "why": "The files have no header row, so header = true would read the first data row as column names, and name matching still wouldn't map the fields as intended."
+        }
+      ],
+      "in_practice": "Listing columns also documents the file layout in the load statement, so when the carrier system adds a field, the count mismatch fails loudly instead of shifting data into the wrong columns.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
+      "evidence": "IDENTITY columns and GENERATED columns of the target table are ignored when matching the source columns. If the number of source columns doesn't equal the filtered target table columns, COPY INTO raises an error. For the columns that are not specified in the column name list, COPY INTO assigns default values, if any, and assigns NULL otherwise."
+    },
+    {
+      "family": "copy-into-deletion-vectors-legacy-readers",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team moves its nightly COPY INTO into finance.bronze.ledger from a job cluster on Databricks Runtime 11.3 LTS to a SQL warehouse. The workspace setting that auto-enables deletion vectors is on. The next morning, a legacy reporting job on a Databricks Runtime 11.3 LTS cluster can no longer query finance.bronze.ledger. What explains this?",
+      "options": [
+        {
+          "text": "COPY INTO on the SQL warehouse enabled deletion vectors on the table, which block Runtime 11.3 LTS readers",
+          "correct": true,
+          "why": "COPY INTO respects the workspace deletion vector setting: on a SQL warehouse or Runtime 14.0 and above it enables deletion vectors on the target, and they block queries from Runtime 11.3 LTS and below."
+        },
+        {
+          "text": "The SQL warehouse holds a lock on the table after COPY INTO, blocking other clusters",
+          "average": true,
+          "why": "Delta Lake doesn't hold locks between transactions; readers on other clusters see committed versions, so a lingering lock isn't the cause."
+        },
+        {
+          "text": "COPY INTO on a SQL warehouse converts the target into a streaming table",
+          "why": "COPY INTO loads into the existing Delta table and leaves its type unchanged; nothing in the move turns it into a streaming table."
+        },
+        {
+          "text": "COPY INTO on a SQL warehouse evolves the schema by default, which older runtimes reject",
+          "why": "mergeSchema defaults to false in COPY_OPTIONS, so the warehouse doesn't evolve the schema on its own; the change that affects old runtimes is deletion vectors."
+        }
+      ],
+      "in_practice": "Before moving loads to SQL warehouses, list every reader of the target table; upgrading a legacy job's runtime ahead of time avoids a morning of broken reports.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/copy-into/",
+      "evidence": "COPY INTO respects the workspace setting for deletion vectors. If enabled, deletion vectors are enabled on the target table when COPY INTO runs on a SQL warehouse or compute running Databricks Runtime 14.0 or above. After deletion vectors are enabled, they block queries against a table in Databricks Runtime 11.3 LTS and below."
+    },
+    {
+      "family": "copy-into-concurrent-distinct-file-sets",
+      "objective": "ingestion.copy-into",
+      "guide": "2.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "Three regional order systems export files to their own subfolders of s3://orders-landing at unpredictable times and can't coordinate with each other. Each export triggers its own COPY INTO into sales.bronze.orders that reads only that region's subfolder. A data engineer worries about running COPY INTO concurrently against one table. What should the engineer expect?",
+      "options": [
+        {
+          "text": "Each run should eventually succeed, because the commands load distinct sets of files",
+          "correct": true,
+          "why": "COPY INTO supports concurrent invocations against the same table; when they work on distinct sets of input files, each should eventually succeed, which suits producers that can't coordinate."
+        },
+        {
+          "text": "Concurrent COPY INTO on one table isn't supported, so the runs must be serialized",
+          "average": true,
+          "why": "Concurrency on one table is supported; Databricks only advises against using it to speed up a single load, where one command over many files performs better."
+        },
+        {
+          "text": "Runs succeed even when file sets overlap, since COPY INTO deduplicates across commands",
+          "why": "Concurrent commands over the same files lead to transaction conflicts; keeping each command on its own subfolder is what avoids them."
+        },
+        {
+          "text": "Runs succeed only when each command sets COPY_OPTIONS ('force' = 'true')",
+          "why": "force disables idempotency so files load again regardless of history; it isn't needed for concurrent runs and would risk duplicates."
+        }
+      ],
+      "in_practice": "Letting each region trigger its own load removes a central scheduler, so each region's data lands minutes after its own export instead of waiting for the slowest region.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-copy-into",
+      "evidence": "COPY INTO supports concurrent invocations against the same table. As long as COPY INTO is invoked concurrently on distinct sets of input files, each invocation should eventually succeed, otherwise you get a transaction conflict. COPY INTO can be called concurrently when: Multiple data producers don't have an easy way to coordinate and cannot make a single invocation."
+    }
+  ]
 }
