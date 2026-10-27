@@ -1,1 +1,753 @@
-{"items": []}
+{
+  "items": [
+    {
+      "family": "aggregation-approx-count-distinct-estimate",
+      "objective": "transformation.aggregation",
+      "guide": "3.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer replaces count(DISTINCT user_id) with approx_count_distinct(user_id) in a SQL query over a large clickstream table. What does the new expression return by default?",
+      "options": [
+        {
+          "text": "An estimate of distinct user_id values from HyperLogLog++, accurate within about 5% by default",
+          "correct": true,
+          "why": "approx_count_distinct estimates cardinality with the dense HyperLogLog++ algorithm. By default its results are accurate within 5%, a bound set by the maximum relative standard deviation, which the relativeSD argument can change."
+        },
+        {
+          "text": "An exact distinct count of user_id computed on a random 5% sample of the table's rows",
+          "average": true,
+          "why": "Sampling is a different technique (TABLESAMPLE). approx_count_distinct reads all rows and estimates cardinality with a HyperLogLog++ sketch; the 5% is its default error bound, not a sample size."
+        },
+        {
+          "text": "The exact distinct count of user_id, served from a result cache after the first run",
+          "why": "The function never promises an exact answer. It trades a small, bounded error for speed compared with an exact distinct count."
+        },
+        {
+          "text": "The number of non-null user_id values in the table, including repeated values",
+          "why": "Counting non-null values including repeats is what count(user_id) does. approx_count_distinct estimates how many different values exist."
+        }
+      ],
+      "in_practice": "On a dashboard tile showing daily active users across billions of events, a few percent of error is invisible to readers, while the approximate count can return much faster and cost less than an exact distinct aggregation.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/approx_count_distinct",
+      "evidence": "Returns the estimated number of distinct values in expr within the group. The implementation uses the dense version of the HyperLogLog++ (HLL++) algorithm... Results are accurate within a default value of 5%, which derives from the value of the maximum relative standard deviation."
+    },
+    {
+      "family": "aggregation-dropduplicates-subset-key",
+      "objective": "transformation.aggregation",
+      "guide": "3.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A PySpark DataFrame of customer records contains rows that share the same customer_id but differ in a load_ts column. Which call removes the extra rows so that each customer_id appears only once?",
+      "options": [
+        {
+          "text": "df.dropDuplicates(['customer_id'])",
+          "correct": true,
+          "why": "dropDuplicates with a subset compares only the listed columns, so rows that repeat a customer_id are removed even when other columns such as load_ts differ."
+        },
+        {
+          "text": "df.distinct()",
+          "average": true,
+          "why": "distinct() removes only rows that are identical across every column. Because load_ts differs, those rows are not duplicates to distinct(), and all of them stay."
+        },
+        {
+          "text": "df.dropna(subset=['customer_id'])",
+          "why": "dropna removes rows that have null values in the listed columns. It does nothing about repeated customer_id values."
+        },
+        {
+          "text": "df.groupBy('customer_id').count()",
+          "why": "This aggregation returns one row per customer_id with a row count and discards the other columns, so it does not keep the deduplicated records."
+        }
+      ],
+      "in_practice": "Deduplicating on the business key in silver keeps gold numbers honest: a re-sent batch that repeats 2% of customers would otherwise inflate every customer count and revenue-per-customer metric downstream.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.dropDuplicates.html",
+      "evidence": "Return a new DataFrame with duplicate rows removed, optionally only considering certain columns. ... subset: List of columns to use for duplicate comparison (default All columns)."
+    },
+    {
+      "family": "aggregation-summary-vs-describe",
+      "objective": "transformation.aggregation",
+      "guide": "3.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer profiling a new silver table in PySpark wants count, mean, standard deviation, min, max and the 25th, 50th and 75th percentiles of its numeric columns from a single call. Which method returns all of these by default?",
+      "options": [
+        {
+          "text": "df.summary()",
+          "correct": true,
+          "why": "With no arguments, summary() computes count, mean, stddev, min, the approximate 25%, 50% and 75% percentiles, and max. You can also pass chosen statistics, such as 'count' or '90%'."
+        },
+        {
+          "text": "df.describe()",
+          "average": true,
+          "why": "describe() returns count, mean, stddev, min and max only. It has no percentiles; the Spark docs point to summary() for expanded statistics."
+        },
+        {
+          "text": "df.count()",
+          "why": "count() returns a single number, the total row count, rather than statistics for each column."
+        },
+        {
+          "text": "df.groupBy().avg()",
+          "why": "groupBy().avg() averages every numeric column but returns no counts, spreads, minimums, maximums or percentiles."
+        }
+      ],
+      "in_practice": "A quick summary() on each new source catches problems such as a negative minimum price or a median of zero before they reach gold. The docs describe it as a tool for exploratory analysis, so production code should not depend on its output schema.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.summary.html",
+      "evidence": "If no statistics are given, this function computes count, mean, stddev, min, approximate quartiles (percentiles at 25%, 50%, and 75%), and max."
+    },
+    {
+      "family": "aggregation-count-star-vs-column",
+      "objective": "transformation.aggregation",
+      "guide": "3.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer validates a silver customers table before publishing a gold report. SELECT count(*) returns 1,250,000, but SELECT count(email) on the same table returns 1,248,800. No rows were written between the two queries. What explains the difference?",
+      "options": [
+        {
+          "text": "count(email) counts only rows where email has a value, while count(*) counts every row",
+          "correct": true,
+          "why": "count(*) counts all rows in the group. count(expr) counts only rows for which the expression is not NULL, so 1,200 rows have a NULL email."
+        },
+        {
+          "text": "count(email) counts distinct emails, so the 1,200 missing rows are duplicate addresses",
+          "average": true,
+          "why": "Distinct counting requires count(DISTINCT email). Plain count(email) includes repeated values; the gap comes from NULLs, so a dedup step would not close it."
+        },
+        {
+          "text": "count(*) also includes rows that were deleted but not yet removed by VACUUM",
+          "why": "Deleted rows are not part of the current table version, so no count includes them. VACUUM only removes data files that the table no longer references."
+        },
+        {
+          "text": "count(email) is approximate on large tables and can differ by a small margin",
+          "why": "count is an exact aggregate. Only functions such as approx_count_distinct return estimates."
+        }
+      ],
+      "in_practice": "Comparing count(*) with count(column) is a cheap completeness check: 1,200 customers without an email may not matter for revenue reports, but they silently shrink a marketing audience built from the same table.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/count",
+      "evidence": "*: Counts all rows in the group. expr: Counts all rows for which all exprN are not NULL. Example: SELECT count(*) FROM VALUES (NULL), (5), (5), (20) returns 4, while count(col) returns 3."
+    },
+    {
+      "family": "aggregation-avg-ignores-nulls",
+      "objective": "transformation.aggregation",
+      "guide": "3.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer builds a gold table with the average discount_pct per region. In silver, orders without a discount store discount_pct as NULL. The finance team wants the average across all orders, treating a missing discount as 0. Which expression meets this requirement?",
+      "options": [
+        {
+          "text": "avg(coalesce(discount_pct, 0))",
+          "correct": true,
+          "why": "avg ignores NULLs within the group, so orders without a discount would drop out and the average would be overstated. Replacing NULL with 0 first keeps every order in the calculation."
+        },
+        {
+          "text": "avg(discount_pct), because avg already treats NULL as 0",
+          "average": true,
+          "why": "avg does not treat NULL as zero; it skips NULLs. The result is the average over discounted orders only, which is higher than the finance definition."
+        },
+        {
+          "text": "avg(DISTINCT discount_pct)",
+          "why": "DISTINCT removes repeated values before averaging, which moves the result further from the requirement, and NULLs are still skipped."
+        },
+        {
+          "text": "sum(discount_pct) / count(discount_pct)",
+          "why": "count(discount_pct) also skips NULLs, so this expression equals avg(discount_pct) and has the same problem."
+        }
+      ],
+      "in_practice": "NULL handling changes business numbers: if 40% of orders have no discount and the rest average 10%, an average that skips NULLs reports 10% while the figure across all orders is 6%. Write the rule into the gold definition so every report agrees.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/avg",
+      "evidence": "Returns the mean calculated from values of a group. ... Nulls within the group are ignored. If a group is empty or consists only of nulls, the result is NULL. Example: SELECT avg(col) FROM VALUES (1), (2), (NULL) returns 1.5."
+    },
+    {
+      "family": "aggregation-approx-rsd-too-small",
+      "objective": "transformation.aggregation",
+      "guide": "3.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer reports distinct device IDs per day from a large telemetry table. Product managers accept the default error of approx_count_distinct, but the billing team needs an error below 0.5%. A colleague suggests sf.approx_count_distinct('device_id', rsd=0.005) for the billing figure. What should the engineer do for billing?",
+      "options": [
+        {
+          "text": "Use an exact count_distinct, because with rsd below 0.01 the exact count is the more efficient choice",
+          "correct": true,
+          "why": "rsd sets the maximum allowed relative standard deviation (0.05 by default). The PySpark docs note that when rsd is below 0.01, count_distinct is more efficient, and it is also exact."
+        },
+        {
+          "text": "Use approx_count_distinct with rsd=0.005, because a smaller rsd is always faster than an exact count",
+          "average": true,
+          "why": "A smaller rsd buys accuracy with more work. Below 0.01 the approximation loses its efficiency advantage, so it is the wrong tool when a near-exact figure is required."
+        },
+        {
+          "text": "Keep the default rsd, because 5% is only an upper bound and actual errors stay under 0.5%",
+          "why": "The default 0.05 is the allowed relative standard deviation, not a promise of a much smaller error. Billing would have no guarantee of staying within 0.5%."
+        },
+        {
+          "text": "Use count('device_id'), which ignores device IDs repeated within each day",
+          "why": "count on a column counts every non-null row, including repeats, so it overstates the number of distinct devices."
+        }
+      ],
+      "in_practice": "Keep approximate counts where small errors are harmless, such as product dashboards, and use exact counts where money or contracts depend on the number; one daily billing aggregation can afford the cost of an exact count.",
+      "source": "https://docs.databricks.com/aws/en/pyspark/reference/functions/approx_count_distinct",
+      "evidence": "rsd: The maximum allowed relative standard deviation (default = 0.05). If rsd < 0.01, it would be more efficient to use count_distinct."
+    },
+    {
+      "family": "aggregation-streaming-dedup-watermark",
+      "objective": "transformation.aggregation",
+      "guide": "3.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer runs a Structured Streaming job that reads events from a bronze table and calls dropDuplicates(['event_id']) before writing to silver. After several weeks, each micro-batch takes longer and memory use keeps growing, although input volume is flat. Duplicate events always arrive within two hours of each other. Which change fixes the root cause?",
+      "options": [
+        {
+          "text": "Set a watermark longer than two hours with withWatermark, then deduplicate with dropDuplicatesWithinWatermark(['event_id'])",
+          "correct": true,
+          "why": "Streaming deduplication keeps the keys it has seen as state across triggers. With a watermark set, dropDuplicatesWithinWatermark removes duplicates that arrive within the delay threshold, which should exceed the largest gap between duplicates."
+        },
+        {
+          "text": "Increase spark.sql.shuffle.partitions so the deduplication state is spread across more tasks",
+          "average": true,
+          "why": "More partitions spread the state more thinly but do not stop it from growing, and a streaming query cannot change this value between restarts from the same checkpoint. Without a watermark, the stream keeps every event_id it has seen."
+        },
+        {
+          "text": "Restart the stream with a new checkpoint location each week to clear the accumulated state",
+          "why": "A new checkpoint discards the stream's progress along with its state, so data can be reprocessed or skipped, and the growth starts again from zero."
+        },
+        {
+          "text": "Run OPTIMIZE on the silver table every night so the stream writes fewer, larger files",
+          "why": "OPTIMIZE compacts the target table's files. It does not touch the deduplication state that the streaming query keeps."
+        }
+      ],
+      "in_practice": "Size the watermark from real arrival data: a three-hour watermark for duplicates that arrive within two hours bounds state to a few hours of keys instead of every event ever seen. Events later than the watermark are dropped, so leave some margin.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.dropDuplicatesWithinWatermark.html",
+      "evidence": "This only works with streaming DataFrame, and watermark for the input DataFrame must be set via withWatermark(). For a streaming DataFrame, this will keep all data across triggers as intermediate state to drop duplicated rows... Users are encouraged to set the delay threshold of watermark longer than max timestamp differences among duplicated events."
+    },
+    {
+      "family": "tuning-default-parallelism-rdd",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer inherits a Spark job that sets spark.default.parallelism. In Apache Spark, which partition count does this property set when the user does not specify one?",
+      "options": [
+        {
+          "text": "Partitions in RDDs returned by transformations such as join, reduceByKey and parallelize",
+          "correct": true,
+          "why": "spark.default.parallelism is the default number of partitions in RDDs returned by transformations like join, reduceByKey and parallelize when the user does not set one."
+        },
+        {
+          "text": "Partitions used when DataFrame and SQL queries shuffle data for joins or aggregations",
+          "average": true,
+          "why": "That is spark.sql.shuffle.partitions (200 by default in Apache Spark). DataFrame and SQL shuffles take their partition count from it, not from spark.default.parallelism."
+        },
+        {
+          "text": "Number of executors that Spark launches for the application",
+          "why": "The executor count is a deploy setting such as spark.executor.instances. spark.default.parallelism is a default partition count, not a resource setting."
+        },
+        {
+          "text": "Number of cores that each executor uses to run tasks in parallel",
+          "why": "Cores per executor is spark.executor.cores. spark.default.parallelism is a default partition count, not a resource setting."
+        }
+      ],
+      "in_practice": "Most pipelines today are DataFrame and SQL code, so raising spark.default.parallelism leaves their shuffle partition counts unchanged; confirming which setting a stage actually uses saves rounds of trial-and-error tuning.",
+      "source": "https://spark.apache.org/docs/latest/configuration.html",
+      "evidence": "spark.default.parallelism ... Default number of partitions in RDDs returned by transformations like join, reduceByKey, and parallelize when not set by user."
+    },
+    {
+      "family": "tuning-autobroadcast-threshold-meaning",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer reviews spark.sql.autoBroadcastJoinThreshold in a job's Spark configuration. What does this property control?",
+      "options": [
+        {
+          "text": "The maximum size of a table that Spark broadcasts to every worker node for a join",
+          "correct": true,
+          "why": "spark.sql.autoBroadcastJoinThreshold is the largest size, in bytes, of a table that Spark broadcasts to all worker nodes when performing a join. In Apache Spark it is 10 MB by default, and -1 disables automatic broadcasting."
+        },
+        {
+          "text": "The minimum size a table must reach before Spark considers broadcasting it",
+          "average": true,
+          "why": "The threshold is an upper limit, not a lower one. Tables below it are the ones that get broadcast, because copying a large table to every node is costly."
+        },
+        {
+          "text": "How long Spark waits for a broadcast to complete before the join fails",
+          "why": "The broadcast wait time is spark.sql.broadcastTimeout (300 seconds by default in Apache Spark), a separate setting."
+        },
+        {
+          "text": "The size above which AQE splits a skewed join partition into smaller tasks",
+          "why": "Skewed partitions are detected with spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes and skewedPartitionFactor, not with the broadcast threshold."
+        }
+      ],
+      "in_practice": "Broadcasting a small dimension table avoids shuffling a large fact table, which can cut a join from minutes to seconds; setting the threshold too high ships big tables to every executor and invites memory errors.",
+      "source": "https://spark.apache.org/docs/latest/sql-performance-tuning.html",
+      "evidence": "spark.sql.autoBroadcastJoinThreshold | 10485760 (10 MB) | Configures the maximum size in bytes for a table that will be broadcast to all worker nodes when performing a join. By setting this value to -1, broadcasting can be disabled."
+    },
+    {
+      "family": "tuning-serverless-shuffle-partitions",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer moves a nightly notebook job from a classic job cluster to serverless compute for jobs. The notebook sets several Spark properties that were hand-tuned for the old cluster. Which of these properties can the engineer still set on serverless compute?",
+      "options": [
+        {
+          "text": "spark.sql.shuffle.partitions",
+          "correct": true,
+          "why": "Serverless compute supports only a short list of Spark properties for notebooks and jobs, and spark.sql.shuffle.partitions is one of them. Its serverless default is auto."
+        },
+        {
+          "text": "spark.executor.memory",
+          "average": true,
+          "why": "Serverless compute manages executor sizing for you, and spark.executor.memory is not on the list of properties you can set for serverless notebooks and jobs."
+        },
+        {
+          "text": "spark.driver.memory",
+          "why": "Databricks manages driver sizing on serverless compute, and spark.driver.memory is not among the supported properties."
+        },
+        {
+          "text": "spark.default.parallelism",
+          "why": "spark.default.parallelism is not on the serverless list of configurable properties, and it affects RDD operations rather than DataFrame shuffles."
+        }
+      ],
+      "in_practice": "Before migrating, strip hand-tuned memory and parallelism settings from notebooks. Leaving shuffle partitions on auto lets each run size its shuffle from its own query plan and input instead of reusing a value picked for last year's data volume.",
+      "source": "https://docs.databricks.com/aws/en/spark/conf",
+      "evidence": "Serverless compute does not support setting most Spark properties for notebooks or jobs. The following are the properties you can configure: ... spark.sql.shuffle.partitions | auto | The default number of partitions to use when shuffling data for joins or aggregations."
+    },
+    {
+      "family": "tuning-driver-max-result-size",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's notebook on a classic cluster calls collect() on a 15 GB DataFrame to build a report in Python. The job aborts because the total size of serialized results is bigger than spark.driver.maxResultSize. What is the most reliable fix?",
+      "options": [
+        {
+          "text": "Aggregate or filter on the cluster, or write to a table, so only a small result returns to the driver",
+          "correct": true,
+          "why": "spark.driver.maxResultSize caps the serialized results that an action such as collect sends to the driver. Keeping heavy work on the executors and returning a small result avoids both the limit and driver memory pressure."
+        },
+        {
+          "text": "Set spark.driver.maxResultSize to 0 so that collect() has no size limit at all",
+          "average": true,
+          "why": "0 removes the limit, but the Spark docs warn that a high limit can cause out-of-memory errors in the driver. Pulling 15 GB into one process is the real problem."
+        },
+        {
+          "text": "Increase spark.executor.memory so the executors can hold the collected results",
+          "why": "collect returns results to the driver, not to the executors, so more executor memory does not change the limit on results sent to the driver."
+        },
+        {
+          "text": "Increase spark.sql.shuffle.partitions so each partition of the result is smaller",
+          "why": "The limit applies to the total size of results from all partitions, so splitting the data into more partitions does not shrink what reaches the driver."
+        }
+      ],
+      "in_practice": "The driver is one machine that receives every task's results. A report that needs 200 summary rows should compute them on the executors, which keeps the job stable as the source grows from 15 GB to 150 GB.",
+      "source": "https://spark.apache.org/docs/latest/configuration.html",
+      "evidence": "spark.driver.maxResultSize: Limit of total size of serialized results of all partitions for each Spark action (e.g. collect) in bytes. Should be at least 1M, or 0 for unlimited. Jobs will be aborted if the total size is above this limit. Having a high limit may cause out-of-memory errors in driver."
+    },
+    {
+      "family": "tuning-sql-explain-initial-plan",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer joins a large fact table to a dimension table of about 20 MB and expects adaptive query execution (AQE) to switch the join to a broadcast hash join at runtime. SQL EXPLAIN on the query still shows a SortMergeJoin, and the engineer is about to raise the broadcast thresholds. How should the engineer check which join strategy actually ran?",
+      "options": [
+        {
+          "text": "Run the query, then read the final plan in the Spark UI or DataFrame.explain() for a broadcast join",
+          "correct": true,
+          "why": "SQL EXPLAIN does not run the query, so it shows only the initial plan before AQE re-optimizes it. After execution, a different physical join node in the final plan shows that AQE changed the join strategy."
+        },
+        {
+          "text": "Trust the SQL EXPLAIN output, because it shows the exact plan the query will run",
+          "average": true,
+          "why": "SQL EXPLAIN shows only the plan compiled before execution. AQE changes join strategies at runtime from actual data sizes, so the plan that runs can differ."
+        },
+        {
+          "text": "Compare total runtime with an earlier run; no speedup means the join was not broadcast",
+          "why": "Runtime depends on many factors, such as data volume and cluster load, so it cannot show which join operator ran. The final query plan shows it directly."
+        },
+        {
+          "text": "Run DESCRIBE DETAIL on the dimension table to see whether it is marked for broadcast",
+          "why": "DESCRIBE DETAIL reports table metadata such as size and file count. Tables are never marked for broadcast; the join strategy is chosen for each query."
+        }
+      ],
+      "in_practice": "Checking the final plan first avoids tuning blind: raising broadcast thresholds when AQE already broadcasts the table adds memory risk for no gain, while the Spark UI shows the plan that actually ran in seconds.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/aqe",
+      "evidence": "SQL EXPLAIN doesn't run the query, so AQE can't re-optimize it. The output shows only the initial plan, which might differ from the plan that AQE runs. ... Join strategy change. The current or final plan has a different physical join node than the initial plan."
+    },
+    {
+      "family": "tuning-spill-shuffle-and-memory",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 3,
+      "type": "multiple",
+      "stem": "A data engineer's nightly batch job on a classic job cluster joins and aggregates about 1.5 TB of orders. In the Spark UI, the longest stage shows large spill to disk. The notebook hardcodes spark.sql.shuffle.partitions = 200, copied from an older and much smaller workload. Which two changes are documented ways to reduce the spill before re-measuring the stage? (Choose two.)",
+      "options": [
+        {
+          "text": "Set spark.sql.shuffle.partitions to auto so Spark sizes the shuffle from the query plan and input data",
+          "correct": true,
+          "why": "Auto-optimized shuffle picks the number of shuffle partitions from the query plan and input size. With 1.5 TB spread over 200 partitions, each task handles several gigabytes, a common cause of spill."
+        },
+        {
+          "text": "Move to worker instance types with more memory so more data fits in memory before spilling",
+          "correct": true,
+          "why": "Total executor memory determines how much data fits in memory before Spark spills to disk, so instances with more memory reduce spill. Re-measure afterwards to confirm the gain is worth the cost."
+        },
+        {
+          "text": "Lower spark.sql.shuffle.partitions to 50 so that fewer tasks compete for executor memory",
+          "average": true,
+          "why": "Fewer partitions make each one larger, so every task must hold more data and spills more. The documented direction is auto-optimized shuffle, not fewer partitions."
+        },
+        {
+          "text": "Raise spark.sql.autoBroadcastJoinThreshold so the large orders table is broadcast instead",
+          "why": "Broadcasting copies a table to every executor. A large broadcast is a documented cause of memory problems, not a cure for spill."
+        },
+        {
+          "text": "Set spark.default.parallelism to 2000 to spread the DataFrame shuffle across more tasks",
+          "why": "spark.default.parallelism sets default partitions for RDD operations. DataFrame and SQL shuffles use spark.sql.shuffle.partitions, so the shuffle partition count stays at 200."
+        }
+      ],
+      "in_practice": "Change one setting at a time and compare the same stage's spill and duration across runs. Otherwise a 20-minute improvement can't be traced to its cause, and a costly instance upgrade may get credit for what auto shuffle did.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/long-spark-stage-page",
+      "evidence": "Use auto-optimized shuffle. Set spark.sql.shuffle.partitions=auto so that Spark picks the number of shuffle partitions based on the query plan and input data size. ... Increase executor memory. Total executor memory determines how much data fits in memory before Spark spills it to disk. Use instances with more memory."
+    },
+    {
+      "family": "gold-view-stores-query-text",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs CREATE VIEW main.gold.active_customers AS SELECT ... over a silver table in Unity Catalog. What does Databricks store when the statement completes?",
+      "options": [
+        {
+          "text": "Only the view's query text, registered in the main.gold schema",
+          "correct": true,
+          "why": "Creating a view does not process or write any data. Only the query text is registered to the metastore in the schema, and the query runs each time someone reads the view."
+        },
+        {
+          "text": "The query results, saved as a Delta table that refreshes on a schedule",
+          "average": true,
+          "why": "Storing results and refreshing them is what a materialized view does. A standard view computes its results when it is queried."
+        },
+        {
+          "text": "A temporary copy of the results that expires when the session ends",
+          "why": "Temporary views are not registered in a schema and live only for a notebook or query. A Unity Catalog view is a persistent object that stores no results."
+        },
+        {
+          "text": "The query results, cached in memory on the compute that ran the statement",
+          "why": "Creating a view caches nothing. Each query against the view reads the underlying tables through the stored query."
+        }
+      ],
+      "in_practice": "Views cost nothing to store and always show current silver data, which suits light filters and column renames for BI users. A heavy aggregation behind a popular dashboard, however, reruns on every load, which is where a materialized view pays off.",
+      "source": "https://docs.databricks.com/aws/en/views/",
+      "evidence": "A view stores the text of a query typically against one or more data sources or tables in the metastore. ... Creating a view does not process or write any data. Only the query text is registered to the metastore in the associated schema."
+    },
+    {
+      "family": "gold-mv-refresh-serverless-pipeline",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer creates a standalone materialized view from a small Databricks SQL warehouse. Which compute performs the materialized view's initial load and its later refreshes?",
+      "options": [
+        {
+          "text": "A serverless pipeline that Databricks creates for the materialized view",
+          "correct": true,
+          "why": "Creating or refreshing a standalone materialized view runs a serverless pipeline that Databricks creates automatically. The warehouse only coordinates the operation."
+        },
+        {
+          "text": "The SQL warehouse that ran the CREATE statement, so its size limits refresh speed",
+          "average": true,
+          "why": "The refresh pipeline is independent of the warehouse, and the warehouse's size does not limit the compute or cost of the refresh."
+        },
+        {
+          "text": "The all-purpose cluster of the user who owns the materialized view",
+          "why": "No user cluster is involved. Refreshes run on serverless compute managed by Databricks and are billed as serverless pipeline usage."
+        },
+        {
+          "text": "Whichever compute next queries the view, which refreshes it before reading",
+          "why": "Materialized views are refreshed by their pipeline, manually, on a schedule or on a trigger, not by the compute that reads them."
+        }
+      ],
+      "in_practice": "Refresh cost scales with the data processed, not the warehouse size, so a small warehouse can serve a gold materialized view over billions of rows; track refresh spend through system tables rather than warehouse usage.",
+      "source": "https://docs.databricks.com/aws/en/views/materialized",
+      "evidence": "When you run CREATE MATERIALIZED VIEW or REFRESH MATERIALIZED VIEW, Databricks automatically creates and runs a serverless pipeline to process the operation. This pipeline is independent of the Databricks SQL warehouse... The cluster size of your warehouse does not limit the compute or cost used by the refresh."
+    },
+    {
+      "family": "gold-streaming-table-exactly-once",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "In Lakeflow Spark Declarative Pipelines, which dataset type processes each input record exactly one time, assuming the source is append-only?",
+      "options": [
+        {
+          "text": "Streaming table",
+          "correct": true,
+          "why": "A streaming table processes each record exactly one time, assuming an append-only source, which suits ingestion and incremental processing of continuously growing data."
+        },
+        {
+          "text": "Materialized view",
+          "average": true,
+          "why": "A materialized view recomputes results as needed to reflect the current state of its sources, often incrementally, rather than handling each record a single time."
+        },
+        {
+          "text": "View",
+          "why": "A pipeline view is evaluated on demand and is not persisted, so it keeps no record of which input rows it has processed."
+        },
+        {
+          "text": "Table rebuilt with INSERT OVERWRITE",
+          "why": "INSERT OVERWRITE replaces the table's contents on every run, so it reprocesses the full input each time instead of handling each record once."
+        }
+      ],
+      "in_practice": "Exactly-once append processing keeps ingestion cost tied to new data: each update reads only new files or messages, so a table that grows by 50 GB a day costs about the same to update on day 300 as on day 1.",
+      "source": "https://docs.databricks.com/aws/en/ldp/concepts",
+      "evidence": "Streaming table: Each record is processed exactly one time, assuming an append-only source. Streaming tables are suited for ingestion and incremental processing of continuously growing data."
+    },
+    {
+      "family": "gold-mv-for-dashboard-aggregate",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A BI team's dashboard shows daily revenue by region, aggregated from a 2-billion-row silver orders table that is loaded once each night. Dozens of analysts open the dashboard every morning, and each load currently scans the full table. A data engineer needs fast dashboard queries without rerunning the aggregation on every load. Which gold object should the engineer create?",
+      "options": [
+        {
+          "text": "A materialized view that precomputes the aggregate and refreshes after the nightly load",
+          "correct": true,
+          "why": "A materialized view stores precomputed results and updates them on refresh, often incrementally. Dashboards read the cached results, which is the documented use case for low-latency BI dashboards."
+        },
+        {
+          "text": "A standard view in the gold schema that wraps the aggregation query",
+          "average": true,
+          "why": "A view stores only its query, so every dashboard load still runs the full aggregation over 2 billion rows. It saves storage, not compute or latency."
+        },
+        {
+          "text": "A streaming table that computes the regional aggregation as a stream",
+          "why": "Streaming tables suit append-only, incremental processing. For aggregates over an entire dataset, Databricks recommends materialized views rather than stateful streaming aggregates."
+        },
+        {
+          "text": "A temporary view created in each analyst's notebook before querying",
+          "why": "Temporary views are scoped to one notebook or query and recompute the aggregation every time, so they help neither sharing nor speed."
+        }
+      ],
+      "in_practice": "Moving the aggregation into a materialized view turns dozens of full scans every morning into one refresh per night, and that refresh can often be incremental, processing only the new day's orders.",
+      "source": "https://docs.databricks.com/aws/en/views/materialized",
+      "evidence": "Materialized views are well-suited for serving precomputed results to dashboards and reports... By precomputing expensive or frequently used queries, Materialized views lower query latency and resource consumption. ... Keeping a BI dashboard up to date with minimal end-user query latency."
+    },
+    {
+      "family": "gold-streaming-table-query-change",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer maintains a streaming table that feeds an operations dashboard. The engineer edits its defining query to wrap country_code in upper() and runs a normal pipeline update, without a full refresh. Analysts then notice a mix of upper- and lowercase country codes. What explains this, and how is it fixed?",
+      "options": [
+        {
+          "text": "Only rows processed after the change are uppercase; a full refresh reprocesses earlier rows with the new query",
+          "correct": true,
+          "why": "A streaming table handles each input row once, so rows appended earlier are not re-queried after a definition change. A full refresh truncates the table and processes all available source data with the latest definition."
+        },
+        {
+          "text": "Every existing row was recomputed, so the mixed case must come from new source data",
+          "average": true,
+          "why": "Recomputing results on update is materialized view behavior. A streaming table keeps the rows it already appended, which is exactly why older rows keep their original case."
+        },
+        {
+          "text": "The query change failed silently, so the table must be dropped and recreated",
+          "why": "The change did take effect for new rows. Dropping the table is unnecessary; a full refresh reprocesses existing data under the new definition."
+        },
+        {
+          "text": "Streaming tables cannot apply functions such as upper(), so the logic needs a view",
+          "why": "Streaming table queries can apply functions like upper(). The issue is that rows already processed are not reprocessed without a full refresh."
+        }
+      ],
+      "in_practice": "Check source retention before a full refresh: it truncates the table and replays the source, so if the source is a Kafka topic with seven days of retention, older rows cannot be rebuilt.",
+      "source": "https://docs.databricks.com/aws/en/ldp/concepts/streaming-tables",
+      "evidence": "Without a full refresh, a streaming table only sees each row once, so different queries will have processed different rows... To reprocess existing rows that were processed prior to the change, a full refresh is required."
+    },
+    {
+      "family": "gold-mv-recompute-dimension-join",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer builds a gold dataset of revenue by customer segment for finance. It joins an append-only orders stream with a customers dimension whose segment values are updated weekly. Finance requires totals that always reflect each customer's current segment, refreshed at least hourly, and several dashboards query the result many times per hour. Which gold object meets these requirements?",
+      "options": [
+        {
+          "text": "A materialized view, which recomputes join results when the dimension changes",
+          "correct": true,
+          "why": "Materialized views stay correct because they automatically recompute joins when dimension rows change, and they store results, so dashboards read precomputed data instead of rerunning the join."
+        },
+        {
+          "text": "A streaming table with a stream-static join, which processes only new orders",
+          "average": true,
+          "why": "Joins in streaming tables do not recompute when dimensions change, so orders already processed keep their old segment. That is fast but wrong for this requirement."
+        },
+        {
+          "text": "A standard view over the join, which is always current and stores nothing",
+          "why": "A view is always current, but every dashboard query reruns the full join, and several dashboards querying many times per hour multiply that cost."
+        },
+        {
+          "text": "A streaming table that is fully refreshed after every weekly segment update",
+          "why": "A full refresh truncates the table and reprocesses the whole source each time, which is costly and must be coordinated by hand; a materialized view handles dimension changes automatically."
+        }
+      ],
+      "in_practice": "Streaming tables suit fast-but-possibly-stale joins, such as enriching events for monitoring. Finance totals by segment need the materialized view's correctness, at the cost of minutes rather than seconds of latency.",
+      "source": "https://docs.databricks.com/aws/en/ldp/concepts/streaming-tables",
+      "evidence": "Joins in streaming tables do not recompute when dimensions change. This characteristic can be good for \"fast-but-wrong\" scenarios. If you want your view to always be correct, you might want to use a materialized view. Materialized views are always correct because they automatically recompute joins when dimensions change."
+    },
+    {
+      "family": "quality-primary-key-informational",
+      "objective": "transformation.medallion",
+      "guide": "3.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer declares order_id as the PRIMARY KEY of a Unity Catalog Delta table in the silver layer. A later batch inserts a row whose order_id already exists in the table. What happens?",
+      "options": [
+        {
+          "text": "The insert succeeds, because primary key constraints are informational and not enforced",
+          "correct": true,
+          "why": "On Databricks, primary key, foreign key and unique constraints are informational only. They document relationships and can help the optimizer, but they do not reject duplicate keys."
+        },
+        {
+          "text": "The insert fails with a constraint violation, and the whole transaction rolls back",
+          "average": true,
+          "why": "That is how enforced constraints such as NOT NULL and CHECK behave. Primary keys are not enforced, so the duplicate row is written."
+        },
+        {
+          "text": "The insert succeeds, and the next OPTIMIZE removes the older duplicate row",
+          "why": "OPTIMIZE compacts data files and never deduplicates rows. Duplicates stay until a job removes them, for example with a dedup step or MERGE."
+        },
+        {
+          "text": "The duplicate row goes to a quarantine table that Databricks creates automatically",
+          "why": "Databricks creates no quarantine table for constraints. Quarantining invalid rows is a pattern you build yourself with filters or expectations."
+        }
+      ],
+      "in_practice": "Because keys are not enforced, add an explicit uniqueness check, such as counting rows per key in a validation step, before gold aggregates run; one duplicated order can double-count revenue in every downstream report.",
+      "source": "https://docs.databricks.com/aws/en/tables/constraints",
+      "evidence": "Informational constraints (primary key, foreign key, and unique constraints) define relationships between fields in tables and aren't enforced. ... Primary key, foreign key, and unique constraints are informational only and aren't enforced."
+    },
+    {
+      "family": "quality-expect-all-or-drop",
+      "objective": "transformation.medallion",
+      "guide": "3.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer keeps five data quality rules in a Python dictionary named rules and wants a pipeline table to drop any row that fails at least one of them. Which decorator applies all five rules this way?",
+      "options": [
+        {
+          "text": "@dp.expect_all_or_drop(rules)",
+          "correct": true,
+          "why": "expect_all_or_drop takes a dictionary of expectation names and constraints and applies the drop action to all of them, so records that violate any rule are dropped before they are written."
+        },
+        {
+          "text": "@dp.expect_all(rules)",
+          "average": true,
+          "why": "expect_all applies the same rules with the default warn action: invalid records are still written to the target, and only the metrics record the failures."
+        },
+        {
+          "text": "@dp.expect_or_drop(rules)",
+          "why": "expect_or_drop defines a single expectation from a name and a constraint string. Applying a dictionary of rules needs the expect_all variants."
+        },
+        {
+          "text": "@dp.expect_all_or_fail(rules)",
+          "why": "expect_all_or_fail stops the update when any record fails a rule, instead of dropping the invalid rows and continuing."
+        }
+      ],
+      "in_practice": "Keeping rules in one dictionary or rules table lets the same checks run on every silver dataset; changing a threshold in one place updates every pipeline that loads it instead of a dozen hand-edited decorators.",
+      "source": "https://docs.databricks.com/aws/en/ldp/expectations",
+      "evidence": "You can group multiple expectations together and specify collective actions using the functions expect_all, expect_all_or_drop, and expect_all_or_fail. These decorators accept a Python dictionary as an argument, where the key is the expectation name and the value is the expectation constraint."
+    },
+    {
+      "family": "quality-check-constraint-existing-rows",
+      "objective": "transformation.medallion",
+      "guide": "3.7",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer wants future writes to silver.payments to fail whenever amount is negative. The table already holds 40 rows with negative amounts from an old bug. The engineer runs ALTER TABLE silver.payments ADD CONSTRAINT non_negative CHECK (amount >= 0). What happens?",
+      "options": [
+        {
+          "text": "The statement fails because existing rows violate the constraint; fix or remove those rows first",
+          "correct": true,
+          "why": "ALTER TABLE ADD CONSTRAINT verifies that all existing rows satisfy a CHECK constraint before adding it, so the 40 negative rows must be corrected, deleted or quarantined first."
+        },
+        {
+          "text": "The constraint is added and is checked only for rows written from now on",
+          "average": true,
+          "why": "Databricks checks existing data when you add a CHECK constraint. It does not add the constraint for new writes while old violations remain in the table."
+        },
+        {
+          "text": "The constraint is added, and the 40 violating rows are deleted automatically",
+          "why": "Constraints never delete data. Adding one either succeeds against clean data or fails, leaving the existing rows untouched."
+        },
+        {
+          "text": "The constraint is added as informational, like a primary key, and never enforced",
+          "why": "CHECK constraints are enforced constraints. Only primary key, foreign key and unique constraints are informational."
+        }
+      ],
+      "in_practice": "Clean historical violations in a separate, reviewed step before adding the constraint. Once it is in place, any job that writes a negative amount fails loudly instead of quietly skewing gold revenue totals.",
+      "source": "https://docs.databricks.com/aws/en/tables/constraints",
+      "evidence": "Manage CHECK constraints with the ALTER TABLE ADD CONSTRAINT and ALTER TABLE DROP CONSTRAINT commands. ALTER TABLE ADD CONSTRAINT verifies that all existing rows satisfy the constraint before adding the constraint to the table."
+    },
+    {
+      "family": "quality-quarantine-separate-writes",
+      "objective": "transformation.medallion",
+      "guide": "3.7",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer loads silver.orders from bronze.orders with scheduled SQL jobs rather than a pipeline. Compliance requires that rows with a negative quantity or a future event_timestamp never reach silver, but they must be kept for investigation. Which approach meets both requirements?",
+      "options": [
+        {
+          "text": "Insert rows that pass the rules into silver.orders and rows that fail into a quarantine table, as separate writes",
+          "correct": true,
+          "why": "WHERE filters let valid rows reach silver while invalid rows go to a quarantine table for review. Databricks recommends processing the filtered data as separate write operations."
+        },
+        {
+          "text": "Add a CHECK constraint to silver.orders so that the invalid rows are rejected on write",
+          "average": true,
+          "why": "A violated CHECK constraint fails the whole transaction, so one bad row blocks every valid row in the batch, and the rejected rows are not kept anywhere."
+        },
+        {
+          "text": "Use foreachBatch to write valid and invalid rows to both tables in one streaming write",
+          "why": "Databricks recommends against using foreachBatch to write to multiple tables, because it can lead to inconsistent results; separate writes are the recommended pattern."
+        },
+        {
+          "text": "Load every row into silver.orders and filter out the invalid rows in each gold query",
+          "why": "This lets invalid rows reach silver, which breaks the compliance rule, and every downstream query must repeat the filter correctly."
+        }
+      ],
+      "in_practice": "A quarantine table turns bad records into a work queue: the source team can fix and replay 300 rejected rows without holding back the 2 million valid rows that reach silver on time.",
+      "source": "https://docs.databricks.com/aws/en/transform/validate",
+      "evidence": "You can use filters and WHERE clauses to define custom logic that quarantines bad records and prevents them from propagating to downstream tables. ... Databricks recommends always processing filtered data as a separate write operation, especially when using Structured Streaming. Using .foreachBatch to write to multiple tables can lead to inconsistent results."
+    },
+    {
+      "family": "quality-validation-table-not-gating",
+      "objective": "transformation.medallion",
+      "guide": "3.7",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer adds a validation materialized view with expect_or_fail to a triggered pipeline to confirm that silver and gold row counts match. During last night's update the expectation failed, yet the gold tables in the same pipeline still updated, and the BI team saw incomplete numbers. How should the engineer make gold updates depend on the validation passing?",
+      "options": [
+        {
+          "text": "Move validation into its own pipeline and run gold in a second pipeline whose job task depends on it",
+          "correct": true,
+          "why": "Expectations control which records reach a dataset, not orchestration. With validation and gold in separate pipelines in a job, the gold task runs only if the validation pipeline's update succeeds."
+        },
+        {
+          "text": "Have the gold tables read from the validation view so that they wait for its result",
+          "average": true,
+          "why": "Reading a validation table from another dataset does not make that dataset wait for the validation result, so a failed check would still not stop gold from updating."
+        },
+        {
+          "text": "Change the validation expectation to expect_or_drop so failing rows never reach gold",
+          "why": "Dropping rows affects only the validation view itself. Gold tables keep reading silver and updating, now without any failure signal."
+        },
+        {
+          "text": "Run the pipeline in continuous mode so that any failed expectation stops every flow",
+          "why": "In continuous mode a failed expectation stops that flow and the flows that depend on it; gold flows that do not depend on it may already have updated, and continuous runs add cost."
+        }
+      ],
+      "in_practice": "Gating with job task dependencies turns a bad night into a late report instead of a wrong one: executives see yesterday's correct numbers for an extra hour rather than today's incomplete ones.",
+      "source": "https://docs.databricks.com/aws/en/ldp/expectation-patterns",
+      "evidence": "A validation table doesn't gate its downstream tables. Reading a validation table from another dataset doesn't make that dataset wait for the validation result... To stop downstream processing when a validation fails, split the validation logic and the downstream work into separate pipelines and orchestrate them with a job."
+    }
+  ]
+}
