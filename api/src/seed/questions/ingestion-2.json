@@ -760,12 +760,12 @@
       "guide": "2.7",
       "difficulty": 3,
       "type": "single",
-      "stem": "A data engineer loads JSON documents from a Unity Catalog volume with Auto Loader using the singleVariantColumn option. Nearly every record lands correctly, but a handful of documents that are each larger than 20 MB never show up as values in the variant column. What explains this?",
+      "stem": "A data engineer loads JSON documents from a Unity Catalog volume with Auto Loader using the singleVariantColumn option. Nearly every record lands correctly, but a handful of documents that are each larger than 200 MB never show up as values in the variant column. What explains this?",
       "options": [
         {
-          "text": "VARIANT holds records up to 16 MB, so larger ones are handled like corrupt records",
+          "text": "They exceed the largest value a VARIANT can hold, so they are handled like corrupt records",
           "correct": true,
-          "why": "A VARIANT value can hold a record of at most 16 MB; overly large records are treated like corrupt records and, in the default PERMISSIVE mode, are captured in the corrupt record column."
+          "why": "A VARIANT value has a maximum size (128 MiB on current runtimes, 16 MiB on Databricks Runtime 17.1 and below). Records over it are treated like corrupt records and, in the default PERMISSIVE mode, captured in the corrupt record column."
         },
         {
           "text": "Schema evolution paused the stream when the large documents added new fields",
@@ -777,13 +777,13 @@
           "why": "rescuedDataColumn isn't supported when the entire record is loaded as a single VARIANT column."
         },
         {
-          "text": "Auto Loader skips any file larger than 16 MB by default",
-          "why": "The 16 MB limit applies to a single record encoded as VARIANT, not to the size of the files Auto Loader reads."
+          "text": "Auto Loader skips any file larger than 100 MB by default",
+          "why": "The size limit applies to a single record encoded as VARIANT, not to the size of the files Auto Loader reads."
         }
       ],
-      "in_practice": "After switching to single-variant ingestion, monitor the corrupt record column: a few oversized documents, such as 25 MB order exports, may need splitting upstream before they can land as VARIANT.",
+      "in_practice": "After switching to single-variant ingestion, monitor the corrupt record column: a few oversized documents, such as very large order exports, may need splitting upstream before they can land as VARIANT.",
       "source": "https://docs.databricks.com/aws/en/ingestion/variant",
-      "evidence": "VARIANT type can only hold records up to 16 MB in size. Variant treats overly large records similar to corrupt records. In the default PERMISSIVE processing mode, overly large records are captured in the corruptRecordColumn."
+      "evidence": "Variant treats overly large records similar to corrupt records. In the default PERMISSIVE processing mode, overly large records are captured in the corruptRecordColumn."
     },
     {
       "family": "semi-structured-variant-path-case-sensitive",

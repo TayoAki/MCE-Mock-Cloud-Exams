@@ -1,3 +1,446 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "spark-ui-peak-execution-memory",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "On the stage page for a slow join stage, a data engineer sees Peak Execution Memory listed next to the spill statistics. What does this metric measure?",
+      "options": [
+        { "text": "The most memory used by data structures built for shuffles, aggregations and joins", "correct": true, "why": "Peak execution memory is the maximum memory used by the internal data structures that tasks create during shuffles, aggregations and joins. That is the execution memory which, when it runs short, makes Spark spill to disk." },
+        { "text": "The total memory configured for each executor through spark.executor.memory", "average": true, "why": "Peak Execution Memory is measured from what the stage's tasks actually used, not read from configuration; the effective memory settings are listed under Spark Properties in the Environment tab." },
+        { "text": "The memory that cached DataFrames occupy on the executors", "why": "Memory reserved for cached data is reported as storage memory in the Storage and Executors tabs; Peak Execution Memory covers shuffle, aggregation and join structures." },
+        { "text": "The largest JVM heap size that the driver reached during the stage", "why": "The metric comes from the stage's tasks, which run on executors; it doesn't describe the driver's heap at all." }
+      ],
+      "in_practice": "Reading peak execution memory next to spill shows how close tasks ran to their limit; a stage that peaks high and spills is a candidate for auto-optimized shuffle or slimmer rows before anyone pays for bigger instances.",
+      "source": "https://spark.apache.org/docs/latest/web-ui.html",
+      "evidence": "Peak execution memory is the maximum memory used by the internal data structures created during shuffles, aggregations and joins."
+    },
+    {
+      "family": "spark-ui-gzip-single-task",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's job reads one 25 GB file, clicks.csv.gz, with an explicit schema and without the multiLine option. The Spark UI shows that the read stage runs a single task for 40 minutes while the other cores of the 64-core cluster sit idle. What is the most likely cause?",
+      "options": [
+        { "text": "Gzip files can't be split, so one task has to read the whole file", "correct": true, "why": "Spark can't read gzip files in multiple parts, so each file becomes one large task. If the data is read repeatedly, Databricks suggests ingesting it once into a Delta table and querying the table instead." },
+        { "text": "spark.sql.shuffle.partitions is set too low for a 25 GB input", "average": true, "why": "spark.sql.shuffle.partitions controls how many partitions a shuffle produces, not how many tasks read an input file, so raising it doesn't split the gzip read." },
+        { "text": "Spark reads compressed CSV files on the driver before distributing them", "why": "The file is read by a task on an executor, not by the driver; the problem is that the compressed file can't be divided among several tasks." },
+        { "text": "Autoscaling hasn't yet added the workers that this stage needs", "why": "More workers wouldn't help: a single unsplittable file gives Spark only one task to schedule, so extra cores would also sit idle." }
+      ],
+      "in_practice": "Landing a large gzip drop in a Delta table once, for example with Auto Loader or COPY INTO, turns every later read from one 40-minute task into many parallel tasks over Parquet files.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/one-spark-task",
+      "evidence": "An unsplittable file type. Spark can't read files such as gzip files in multiple parts, so one large task reads each file. If you read the same files repeatedly, ingest them one time into a Delta Lake table and query the table instead."
+    },
+    {
+      "family": "spark-ui-rebalance-skewed-write",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "The last stage of a data engineer's job writes a query result into a Delta table. Summary Metrics for that stage show a Max task duration of 18 minutes against a 75th percentile of 40 seconds, and the stage contains no join. Adaptive query execution (AQE) is enabled. Which fix does Databricks suggest for this skewed stage?",
+      "options": [
+        { "text": "Add a REBALANCE hint so that Spark splits the skewed output partitions", "correct": true, "why": "For a skewed stage that writes a table, the REBALANCE hint makes Spark split skewed output partitions so that no partition is too large. The hint relies on AQE: Spark ignores it when AQE isn't enabled." },
+        { "text": "Lower the AQE skew-join thresholds so that AQE splits the large partitions", "average": true, "why": "AQE's skew handling, and the thresholds that tune it, apply to sort merge joins and shuffle hash joins. This stage has no join, so changing those thresholds won't split its output partitions." },
+        { "text": "Call coalesce(1) before the write so that the output lands in one file", "why": "coalesce(1) forces all data into one partition and one task, which removes parallelism and makes a slow write stage slower." },
+        { "text": "Disable AQE so that Spark keeps the partitioning chosen at planning time", "why": "Turning AQE off removes the runtime re-optimization that can split skewed partitions; Spark even ignores the REBALANCE hint when AQE isn't enabled." }
+      ],
+      "in_practice": "Splitting an oversized output partition lets the final write finish in roughly the time of a typical task instead of waiting 18 minutes on one straggler, which shortens every downstream dependency in the job.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/long-spark-stage-page",
+      "evidence": "Rebalance output partitions. If the skewed stage writes a table, use the REBALANCE hint. Spark splits skewed output partitions so that no partition is too large. Spark ignores the hint if AQE isn't enabled."
+    },
+    {
+      "family": "spark-ui-udf-fewer-tasks-than-cores",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer applies a Python UDF that calls a third-party address-parsing library, which has no equivalent among Spark's native functions, to a 3 GB table stored in 4 files. On a job cluster with 64 cores, the Spark UI shows the UDF stage running only 4 tasks for 50 minutes while most cores sit idle. Which change speeds up this stage?",
+      "options": [
+        { "text": "Repartition the DataFrame to about 64 partitions before applying the UDF", "correct": true, "why": "When a UDF can't be rewritten with native functions and its stage has fewer tasks than the cluster has cores, Databricks recommends calling repartition() before applying the UDF so that the work spreads across all cores." },
+        { "text": "Add workers to the cluster so that the UDF gets more cores to run on", "average": true, "why": "With only 4 tasks, Spark can use at most 4 cores however many workers exist, so more workers add cost without speeding up the stage." },
+        { "text": "Raise spark.sql.shuffle.partitions so that the UDF stage gets more tasks", "why": "This stage reads files and applies the UDF without a shuffle, so the shuffle partition setting doesn't change its task count." },
+        { "text": "Cache the DataFrame before the UDF so that each task reads from memory", "why": "Caching doesn't change the number of partitions; the same 4 tasks would still do all of the UDF work." }
+      ],
+      "in_practice": "Spreading a CPU-heavy UDF from 4 tasks to 64 can cut the stage's runtime several-fold on the same cluster, and smaller partitions also lower the memory each UDF task holds at once.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/slow-spark-stage-low-io",
+      "evidence": "If the UDF is the bottleneck, rewrite it using native functions when possible. If you can't rewrite it, check the number of tasks that run the UDF. If the stage has fewer tasks than the cluster has cores, repartition() the DataFrame before you apply the UDF"
+    },
+    {
+      "family": "spark-ui-spill-size-by-operator",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer sees 140 GB of Spill (Disk) on the longest stage of a nightly job. That stage runs a sort merge join followed by a hash aggregation, and the engineer wants to know which of the two operators spilled before changing any code. Where should the engineer look?",
+      "options": [
+        { "text": "The spill size metric on the Sort and HashAggregate nodes of the SQL plan", "correct": true, "why": "Each node in the SQL plan visualization carries its own metrics, and spill size reports the bytes an operator such as Sort or HashAggregate spilled from memory to disk, so comparing the two nodes shows which one spilled." },
+        { "text": "The spill percentiles in the Summary Metrics table of the stage page", "average": true, "why": "Summary Metrics show how spill is spread across tasks, which helps spot skew, but each task runs both operators, so the table can't split the spill between the join and the aggregation." },
+        { "text": "The stage's task metrics aggregated by executor", "why": "Aggregating by executor shows which machines spilled, not which operator inside the stage produced the spill." },
+        { "text": "The Event Timeline on the job page", "why": "The event timeline shows when jobs, stages and executors started and ended; it doesn't report spill, let alone spill per operator." }
+      ],
+      "in_practice": "Knowing whether the sort or the aggregation spills tells you whether to slim the join inputs or the grouped rows, which avoids buying larger instances for a problem a projection could fix.",
+      "source": "https://spark.apache.org/docs/latest/web-ui.html",
+      "evidence": "Each node in the SQL Plan Visualization carries its own metrics inline. spill size: number of bytes spilled to disk from memory in the operator (Sort, HashAggregate)."
+    },
+    {
+      "family": "spark-ui-merge-output-deletion-vectors",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A nightly MERGE INTO sales.orders applies about 4 GB of changes that touch rows spread across most of the table's files. The table was created years ago with delta.enableDeletionVectors set to false. In the Spark UI, the MERGE's longest stage shows an Output of about 900 GB, close to the size of the whole table. A data engineer wants to cut the amount of data this stage writes. Which change does that?",
+      "options": [
+        { "text": "Enable deletion vectors on sales.orders", "correct": true, "why": "With deletion vectors, a MERGE marks existing rows as removed or changed without rewriting the Parquet files that hold them, so the stage writes far less than the full files it touches today." },
+        { "text": "Enable Photon on the job cluster", "average": true, "why": "Photon can speed up writes, but it writes the same amount of data; the stage would still rewrite every file that holds a changed row." },
+        { "text": "Set spark.sql.shuffle.partitions to auto", "why": "Auto-optimized shuffle sizes shuffle partitions; it addresses large Shuffle Read and Shuffle Write values, not a large Output caused by rewriting files." },
+        { "text": "Turn on optimized writes for the table", "why": "Optimized writes address writing many small files; they don't stop the MERGE from rewriting every file that holds a changed row, so Output stays about the same." }
+      ],
+      "in_practice": "Moving a MERGE from file rewrites to deletion vectors can shrink a nightly write from hundreds of gigabytes to a few, cutting runtime as well as the storage churn that VACUUM later has to clean up.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/long-spark-stage-io",
+      "evidence": "If the write is a merge, optimize the merge. Use deletion vectors to mark existing rows as removed or changed without rewriting the Parquet file."
+    },
+    {
+      "family": "spark-ui-io-bound-per-core-rate",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer investigates the longest stage of a daily report job on a cluster with 256 worker cores in total. The stage ran for 900 seconds, and its Input column shows 690 GB; Shuffle Read, Shuffle Write and Output are each under 2 GB. Summary Metrics show the Max task duration close to the 75th percentile, and the stage has no spill. The team can't add compute budget. What should the engineer conclude?",
+      "options": [
+        { "text": "It's input bound; make it read less, for example through data skipping", "correct": true, "why": "The stage reads about 690,000 MB / 256 cores / 900 s, or roughly 3 MB per second per core, which is the rate Databricks gives for one core. That marks the stage as I/O bound on input, so reading less, through data skipping or more selective queries, is the fix." },
+        { "text": "Its I/O is light for 256 cores; look for slow UDFs in the SQL DAG", "average": true, "why": "690 GB looks modest for 256 cores, but the per-core throughput is already about 3 MB per second. The checks for a slow stage with little I/O apply only after high I/O has been ruled out." },
+        { "text": "It's skewed; lower the AQE skew-join size thresholds for the stage", "why": "A Max task duration close to the 75th percentile is the healthy pattern; skew would show a Max at least 50% above it." },
+        { "text": "It's shuffle bound; set spark.sql.shuffle.partitions to auto", "why": "Shuffle Read and Shuffle Write are both under 2 GB, so shuffling isn't where this stage spends its time." }
+      ],
+      "in_practice": "Doing the per-core math first stops a team from chasing UDFs or joins in a stage that simply reads too much; liquid clustering on the report's filter columns can cut input several-fold at no extra compute cost.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/long-spark-stage-io",
+      "evidence": "Each CPU core can read and write about 3 MB per second. To check whether a stage's I/O is high, compare its throughput per core with that rate. If the result is around 3 MB per second, the stage might be I/O bound."
+    },
+    {
+      "family": "spark-ui-nested-loop-range-join",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's job on a classic job cluster assigns each web event to its user session with JOIN sessions s ON e.event_ts BETWEEN s.start_ts AND s.end_ts. Sessions usually last about 10 minutes. The longest stage runs for hours with little I/O, no skew and no spill, and the SQL DAG shows a BroadcastNestedLoopJoin node taking almost all of the time, with output rows close to the number of events. Which change addresses the bottleneck?",
+      "options": [
+        { "text": "Add a RANGE_JOIN hint on sessions with a bin size of about 600 seconds", "correct": true, "why": "A point-in-interval condition qualifies for the range join optimization, which bins the value range so that only rows in overlapping bins are compared. A range join hint supplies the bin size, and for fairly uniform intervals the typical interval length is a good choice; timestamp bin sizes are in seconds." },
+        { "text": "Add a BROADCAST hint on sessions so the join uses a broadcast hash join", "average": true, "why": "The DAG already shows a broadcast nested loop join: sessions is broadcast, yet every event is still compared with every session. A broadcast hint doesn't add the equality keys that a hash join needs." },
+        { "text": "Lower the AQE skew-join thresholds so that the long tasks are split", "why": "Summary Metrics show no skew, and AQE skew handling applies to sort merge and shuffle hash joins, not to nested loop joins." },
+        { "text": "Set spark.sql.shuffle.partitions to auto for the whole job", "why": "The stage has little shuffle I/O; its time goes to comparing row pairs inside the nested loop join, which shuffle partition sizing doesn't change." }
+      ],
+      "in_practice": "Binning turns an every-event-against-every-session comparison into a match against a few nearby bins, so jobs like this often drop from hours to minutes; Databricks SQL applies the optimization to qualifying range joins automatically.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/range-join",
+      "evidence": "To enable the range join optimization in a SQL query, use a range join hint to specify the bin size. If interval length is fairly uniform and known, set the bin size to the typical interval length. For TIMESTAMP values, the value of the bin size is interpreted as seconds."
+    },
+    {
+      "family": "layout-cluster-by-none-keeps-layout",
+      "objective": "troubleshooting.layout",
+      "guide": "6.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs ALTER TABLE web.events CLUSTER BY NONE on a liquid clustered Delta table. What happens to the table's existing data files and to later OPTIMIZE runs?",
+      "options": [
+        { "text": "Existing files keep their layout, and later OPTIMIZE runs stop clustering", "correct": true, "why": "Setting the clustering keys to NONE doesn't rewrite data that is already clustered; it only stops future OPTIMIZE operations from using clustering keys." },
+        { "text": "The table is rewritten without clustering, and OPTIMIZE only compacts", "average": true, "why": "Removing the keys isn't a rewrite: files that are already clustered stay as they are, and nothing is reorganized when the command runs." },
+        { "text": "Existing files keep their layout, and OPTIMIZE keeps using the old keys", "why": "NONE removes the clustering keys, so later OPTIMIZE runs no longer cluster new or updated data by the old keys." },
+        { "text": "The command fails until VACUUM removes the clustered files", "why": "CLUSTER BY NONE is a supported change on a clustered table; it doesn't require removing any files first." }
+      ],
+      "in_practice": "Because CLUSTER BY NONE rewrites nothing, it completes quickly even on a multi-terabyte table; the trade-off is that data written afterward isn't clustered, so file skipping on the former keys weakens over time.",
+      "source": "https://docs.databricks.com/aws/en/delta/clustering",
+      "evidence": "Setting cluster keys to NONE does not rewrite clustered data, but prevents future OPTIMIZE operations from using clustering keys."
+    },
+    {
+      "family": "layout-po-serverless-jobs-billing",
+      "objective": "troubleshooting.layout",
+      "guide": "6.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A FinOps analyst asks which compute runs the OPTIMIZE, VACUUM and ANALYZE operations that predictive optimization triggers on Unity Catalog managed tables, and how that compute is billed. What is the answer?",
+      "options": [
+        { "text": "Serverless compute for jobs, billed under a serverless jobs SKU", "correct": true, "why": "Predictive optimization runs its maintenance operations on serverless compute for jobs, and the account is billed for that compute with a serverless jobs SKU." },
+        { "text": "The SQL warehouse that last queried each table, billed as SQL compute", "average": true, "why": "Predictive optimization doesn't borrow the warehouses or clusters that query a table; it runs its operations on serverless compute for jobs." },
+        { "text": "The table owner's all-purpose cluster, billed as all-purpose compute", "why": "No user cluster is needed or used; the operations run on serverless compute for jobs that Databricks manages." },
+        { "text": "No compute is billed, since maintenance is part of storage pricing", "why": "Predictive optimization isn't free: its serverless jobs compute is billed to the account, which is why estimated DBUs per operation are tracked in a system table." }
+      ],
+      "in_practice": "Because the cost lands on a serverless jobs SKU rather than on team clusters, FinOps can attribute maintenance spend per table from the operations history and weigh it against the query time it saves.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization",
+      "evidence": "Predictive optimization runs ANALYZE, OPTIMIZE, VACUUM, and REFRESH INDEX operations using serverless compute for jobs. Your account is billed for this compute using a serverless jobs SKU."
+    },
+    {
+      "family": "layout-po-describe-extended-status",
+      "objective": "troubleshooting.layout",
+      "guide": "6.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants to confirm whether predictive optimization is enabled for the schema finance.reporting, and whether that setting was made on the schema or inherited from the catalog. Which command shows this?",
+      "options": [
+        { "text": "DESCRIBE SCHEMA EXTENDED finance.reporting", "correct": true, "why": "DESCRIBE ... EXTENDED returns the Predictive Optimization field, which shows whether the feature is enabled and indicates when the value is inherited from a parent object." },
+        { "text": "SELECT * FROM system.storage.predictive_optimization_operations_history", "average": true, "why": "The operations history lists maintenance that already ran; it doesn't show the current setting or where it comes from, and a newly enabled schema may have no rows yet." },
+        { "text": "SHOW TBLPROPERTIES on one of the schema's tables", "why": "Predictive optimization is a Unity Catalog setting reported by DESCRIBE ... EXTENDED, not one of the Delta table properties that SHOW TBLPROPERTIES lists." },
+        { "text": "DESCRIBE HISTORY on one of the schema's tables", "why": "DESCRIBE HISTORY lists a table's commits, such as writes and OPTIMIZE runs; it doesn't report whether the schema enables predictive optimization or where that setting comes from." }
+      ],
+      "in_practice": "Checking inheritance before changing anything avoids surprises: a schema that inherits its setting follows the catalog when the catalog changes, while an explicit schema setting stays put.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization",
+      "evidence": "The Predictive Optimization field is a Unity Catalog property that shows whether predictive optimization is enabled. If the setting is inherited from a parent object, the field value indicates this. DESCRIBE (CATALOG | SCHEMA | TABLE) EXTENDED name"
+    },
+    {
+      "family": "layout-hierarchical-clustering-priority",
+      "objective": "troubleshooting.layout",
+      "guide": "6.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer manages retail.sales, a liquid clustered table defined with CLUSTER BY (customer_id, region) on Databricks Runtime 17.3 LTS. Most dashboard queries filter on region, which has 12 distinct values, and the team wants the layout organized by region first while keeping customer_id as a clustering key. What should the engineer do?",
+      "options": [
+        { "text": "Set delta.liquid.hierarchicalClusteringColumns to 'region', then run OPTIMIZE FULL", "correct": true, "why": "Hierarchical clustering organizes data by the prioritized column first. You configure it with the delta.liquid.hierarchicalClusteringColumns table property, and OPTIMIZE FULL reclusters the existing data using that hierarchy." },
+        { "text": "Redefine the keys as CLUSTER BY (region, customer_id) so that region comes first", "average": true, "why": "Listing region first changes nothing, because clustering keys can be defined in any order. Prioritizing one key over another requires hierarchical clustering." },
+        { "text": "Partition the table by region and keep customer_id as a clustering key", "why": "Liquid clustering isn't compatible with partitioning, so the table can't be partitioned by region and clustered at the same time." },
+        { "text": "Run OPTIMIZE retail.sales ZORDER BY (region) after each daily load", "why": "ZORDER isn't compatible with liquid clustering, so it can't be used to prioritize region on this table." }
+      ],
+      "in_practice": "Prioritizing a low-cardinality column like region keeps each region's rows in fewer files, so region-filtered dashboards skip more data; Databricks warns that prioritizing a high-cardinality key instead can weaken clustering on the other keys.",
+      "source": "https://docs.databricks.com/aws/en/delta/clustering",
+      "evidence": "Hierarchical clustering organizes data by the highest-priority column first, then by each subsequent column in the order you specify. To configure hierarchical clustering, set the delta.liquid.hierarchicalClusteringColumns table property. On an existing clustered table, use ALTER TABLE, and then run OPTIMIZE FULL to recluster all existing data"
+    },
+    {
+      "family": "layout-po-retention-before-enabling",
+      "objective": "troubleshooting.layout",
+      "guide": "6.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "An auditor requires that the Unity Catalog managed table finance.ledger supports time travel to versions up to 30 days old. The table uses default table properties, and a platform team is about to enable predictive optimization on the finance catalog. What should the team do first?",
+      "options": [
+        { "text": "Set delta.deletedFileRetentionDuration to '30 days' on finance.ledger", "correct": true, "why": "Predictive optimization's VACUUM takes its retention window from delta.deletedFileRetentionDuration, which defaults to 7 days. Databricks says to raise it before enabling predictive optimization when you need longer time travel." },
+        { "text": "Set delta.logRetentionDuration to '30 days' on finance.ledger", "average": true, "why": "Keeping 30 days of log history isn't enough on its own: VACUUM still deletes unreferenced data files once they fall outside the 7-day deletedFileRetentionDuration, so older versions become unreadable." },
+        { "text": "Run VACUUM finance.ledger RETAIN 720 HOURS once before enabling it", "why": "A one-off manual VACUUM doesn't change the retention that later automatic VACUUM runs use, which still follows the table's 7-day default." },
+        { "text": "Nothing, because predictive optimization keeps every version in the history", "why": "Predictive optimization runs VACUUM, which deletes data files no longer referenced by any version inside the retention window; with the 7-day default, 30-day-old versions lose their files." }
+      ],
+      "in_practice": "Setting retention first costs some extra storage for unreferenced files, but versions whose files VACUUM has already removed can't be brought back for an audit at any price.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization",
+      "evidence": "The retention window for VACUUM is determined by the delta.deletedFileRetentionDuration table property, which defaults to 7 days. To retain data for longer durations (for example, to support extended time travel), set this property before you enable predictive optimization"
+    },
+    {
+      "family": "layout-clustering-on-write-size-threshold",
+      "objective": "troubleshooting.layout",
+      "guide": "6.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's job appends about 40 MB to the Unity Catalog managed table iot.events with INSERT INTO every 15 minutes. The table uses liquid clustering on two keys, and predictive optimization is turned off for its schema. A week later, queries that filter on the clustering keys still read most files written that week. What explains this?",
+      "options": [
+        { "text": "Each insert is below the size that triggers clustering on write, so new data waits for OPTIMIZE", "correct": true, "why": "Clustering on write only triggers when a transaction's data meets a size threshold, 256 MB for two keys on a Unity Catalog managed table. Smaller writes stay unclustered until OPTIMIZE runs, which is why Databricks recommends running OPTIMIZE frequently." },
+        { "text": "INSERT INTO doesn't cluster on write; only CTAS and RTAS statements do", "average": true, "why": "INSERT INTO is one of the operations that cluster on write, alongside CTAS, RTAS and COPY INTO from Parquet; the issue here is the size of each transaction." },
+        { "text": "New rows are clustered only when the INSERT INTO statement names the clustering keys", "why": "Clustering keys belong to the table definition; writes don't restate them, and inserts that meet the size threshold are clustered automatically." },
+        { "text": "Liquid clustering reorganizes data only when OPTIMIZE FULL runs on the whole table", "why": "Plain OPTIMIZE clusters new data incrementally; OPTIMIZE FULL is needed only to recluster all existing data, such as after the keys change." }
+      ],
+      "in_practice": "Frequent small appends are the normal case, so an OPTIMIZE every hour or two, or predictive optimization, is what keeps such tables clustered; because clustering is incremental, those runs are usually quick.",
+      "source": "https://docs.databricks.com/aws/en/delta/clustering",
+      "evidence": "Clustering on write only triggers when data in the transaction meets a size threshold. These thresholds vary by the number of clustering columns and are lower for Unity Catalog managed tables than other Delta Lake tables. Because not all operations apply liquid clustering, Databricks recommends frequently running OPTIMIZE"
+    },
+    {
+      "family": "layout-auto-clustering-small-table",
+      "objective": "troubleshooting.layout",
+      "guide": "6.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "Three weeks ago, a data engineer ran ALTER TABLE ref.store_codes CLUSTER BY AUTO on a 400 MB Unity Catalog managed table that a dashboard queries thousands of times a day. Predictive optimization is enabled, the table had no clustering keys before, and every workload runs on Databricks Runtime 16.4 LTS. DESCRIBE TABLE shows clusterByAuto as true but no clustering columns. What is the most likely explanation?",
+      "options": [
+        { "text": "Databricks judged the table too small to benefit, so it selected no keys", "correct": true, "why": "Automatic liquid clustering is cost-aware, and a table that is too small to benefit from clustering is one of the documented reasons it might not select keys." },
+        { "text": "Automatic clustering selects keys only after someone runs OPTIMIZE FULL", "average": true, "why": "Key selection runs asynchronously through predictive optimization, based on the table's query workload; it doesn't wait for a manual OPTIMIZE FULL." },
+        { "text": "Automatic key selection requires Databricks Runtime 17.3 LTS or above", "why": "Intelligent key selection relies on metadata introduced in Databricks Runtime 15.4 LTS, so workloads on 16.4 LTS are supported." },
+        { "text": "CLUSTER BY AUTO selects keys only on tables created with that clause", "why": "ALTER TABLE ... CLUSTER BY AUTO is the documented way to turn on automatic clustering for an existing table, including one with manual keys." }
+      ],
+      "in_practice": "Skipping a small table is the cost-aware design at work: clustering 400 MB would spend DBUs for little skipping gain. The AUTO LIQUID row in the table's History tab in Catalog Explorer shows the exact skip reason.",
+      "source": "https://docs.databricks.com/aws/en/delta/clustering",
+      "evidence": "Automatic liquid clustering might not select keys for the following reasons: The table is too small to benefit from liquid clustering. The table already has an effective clustering scheme. The table doesn't have frequent queries."
+    },
+    {
+      "family": "layout-po-private-link-failure",
+      "objective": "troubleshooting.layout",
+      "guide": "6.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A platform team enabled predictive optimization on the secure catalog, whose Unity Catalog managed tables live in an S3 bucket locked down with a firewall and Private Link. Classic job clusters read and write the tables normally, but a week later system.storage.predictive_optimization_operations_history shows every operation on those tables with the status FAILED: PRIVATE_LINK_SETUP_ERROR. What is the cause?",
+      "options": [
+        { "text": "The bucket's network rules block the serverless compute that runs the operations", "correct": true, "why": "This status means the table's cloud storage denied access to serverless compute, usually because of Private Link or firewall settings. Predictive optimization runs on serverless compute for jobs, so the storage must admit that compute, not only the classic clusters." },
+        { "text": "The tables are external, so predictive optimization can't maintain them", "average": true, "why": "Predictive optimization doesn't run on external tables at all, so they would have no operations in the history; these managed tables had operations attempted that then failed." },
+        { "text": "The team lacks the MANAGE privilege that automatic maintenance needs", "why": "MANAGE or ownership is what enabling the feature requires, and that already succeeded; this failure status points to storage access, not privileges." },
+        { "text": "The operations conflicted with concurrent writes from the classic jobs", "why": "Conflicts with concurrent writes are reported as FAILED: TRANSACTION_CONFLICT_ERROR; PRIVATE_LINK_SETUP_ERROR is specific to storage denying serverless access." }
+      ],
+      "in_practice": "Before enabling predictive optimization on locked-down storage, set up serverless network access to the bucket; otherwise every maintenance run fails while small files and unreferenced data keep piling up.",
+      "source": "https://docs.databricks.com/aws/en/admin/system-tables/predictive-optimization",
+      "evidence": "FAILED: PRIVATE_LINK_SETUP_ERROR: The table's cloud storage denied access to serverless compute, usually because of Private Link or firewall settings."
+    },
+    {
+      "family": "compute-issues-pool-max-capacity",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Several job clusters draw their nodes from one instance pool. At 02:00, when many jobs start together, some clusters fail to launch with INSTANCE_POOL_MAX_CAPACITY_REACHED and the message 'Instance pool is full'. Which change does Databricks recommend?",
+      "options": [
+        { "text": "Raise the pool's maximum capacity or terminate idle clusters that use it", "correct": true, "why": "The error means the pool reached its configured maximum capacity. Databricks recommends raising that maximum, terminating idle clusters on the pool, spreading load over more pools, or pointing clusters at other pools." },
+        { "text": "Switch the clusters to the auto availability zone setting", "average": true, "why": "The auto availability zone setting helps when one zone lacks cloud capacity or free addresses; here the limit is the pool's own configured maximum, which no zone change lifts." },
+        { "text": "Upgrade the clusters to the latest Databricks Runtime LTS version", "why": "The runtime version has nothing to do with how many instances a pool is allowed to hand out." },
+        { "text": "Grant the job owners the CAN ATTACH TO permission on the pool", "why": "A permission problem would stop clusters from using the pool at all; this message says the pool is full, which is a capacity limit." }
+      ],
+      "in_practice": "A pool's maximum capacity is a cost guardrail, so raising it is a budget decision; staggering a burst of 02:00 starts often fits the same work under the existing cap.",
+      "source": "https://docs.databricks.com/aws/en/compute/troubleshooting/cluster-error-codes",
+      "evidence": "The instance pool has reached its configured maximum capacity limit and cannot provide additional instances. Increase the instance pool maximum capacity, create additional instance pools to distribute load, terminate idle clusters using the pool, or configure clusters to use different pools."
+    },
+    {
+      "family": "compute-issues-dbfs-init-script-eol",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer inherits an all-purpose cluster on Databricks Runtime 15.4 LTS with Unity Catalog whose configuration still runs the init script dbfs:/databricks/scripts/install-odbc.sh. The cluster can no longer start. What should the engineer do?",
+      "options": [
+        { "text": "Move the script to a Unity Catalog volume and point the cluster at it", "correct": true, "why": "Init scripts on DBFS have reached end of life and must be migrated before the compute can start. For Databricks Runtime 13.3 LTS and above with Unity Catalog, Databricks recommends storing init scripts in volumes." },
+        { "text": "Upload a fresh copy of the script to the same DBFS path", "average": true, "why": "Re-uploading doesn't help, because init scripts stored on DBFS can no longer be used at all, whatever their contents." },
+        { "text": "Have a workspace admin turn the script into a global init script", "why": "Global init scripts aren't the fix and aren't recommended, since they run on many clusters and can cause conflicts; the script just needs a supported location." },
+        { "text": "Downgrade the cluster to an older runtime that still runs DBFS scripts", "why": "DBFS init scripts are end of life, so a downgrade isn't a way forward; the script has to move to a volume, workspace files or cloud object storage." }
+      ],
+      "in_practice": "Migrating to a volume puts the script under Unity Catalog permissions, which closes the old gap where any workspace user could edit a DBFS file that every node of the cluster runs at startup.",
+      "source": "https://docs.databricks.com/aws/en/init-scripts",
+      "evidence": "Init scripts on DBFS have reached end-of-life and can no longer be used. You must migrate your init scripts to a supported location before you can start compute. Databricks Runtime 13.3 LTS and above with Unity Catalog: Store init scripts in Unity Catalog volumes."
+    },
+    {
+      "family": "compute-issues-policy-enforced-libraries",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer opens the Libraries tab of a cluster created from a compute policy that defines library installations. The policy's libraries are installed, but the engineer can't install another library or uninstall one of the existing ones. Why?",
+      "options": [
+        { "text": "The policy enforces its libraries, so library changes happen in the policy", "correct": true, "why": "Compute created from a policy that enforces library installation gets the specified libraries automatically, and users can't install or uninstall libraries on it; workspace admins manage them at the policy level." },
+        { "text": "The engineer lacks the CAN MANAGE permission on the cluster", "average": true, "why": "Cluster permissions aren't the issue: on compute with an enforcing policy, libraries can't be added or removed from the Libraries tab, and admins change them in the policy instead." },
+        { "text": "The cluster must restart before its Libraries tab accepts changes", "why": "A restart doesn't lift the policy's restriction; on clusters where library changes are allowed, a restart is what completes a pending uninstall." },
+        { "text": "Libraries can be changed only while the cluster is terminated", "why": "Libraries can normally be installed on running clusters; the restriction here comes from the policy, not from the cluster's state." }
+      ],
+      "in_practice": "Policy-managed libraries give every cluster built from the policy the same vetted versions, which removes version drift between teams; a team that needs another package asks the admin to add it to the policy.",
+      "source": "https://docs.databricks.com/aws/en/libraries/cluster-libraries",
+      "evidence": "If you create a cluster using a policy that enforces library installation, specified libraries automatically install on your cluster. You cannot install additional libraries or uninstall any libraries."
+    },
+    {
+      "family": "compute-issues-requirements-txt-reinstall",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A shared cluster on Databricks Runtime 15.4 LTS installs its Python dependencies from /Volumes/ops/libs/reqs/requirements.txt as a compute-scoped library. A data engineer edits the file to pin pyarrow to a newer version that resolves a conflict. How does the engineer apply the change to the cluster?",
+      "options": [
+        { "text": "Reinstall the requirements.txt library; no uninstall or restart is needed", "correct": true, "why": "Requirements.txt files are the exception to the uninstall-and-restart update path: after editing the file, you reinstall it to update what the cluster has installed." },
+        { "text": "Uninstall the requirements.txt library, restart, then install it again", "average": true, "why": "Uninstalling and restarting is how you update other compute-scoped libraries, but a requirements.txt file doesn't need it; reinstalling the file is enough." },
+        { "text": "Nothing, because the cluster rereads the file whenever a notebook attaches", "why": "The cluster installs the file's packages when the library is installed; editing the file later doesn't change the cluster until you reinstall it." },
+        { "text": "Delete the cluster and create a new one with the same configuration", "why": "Recreating the cluster is needless disruption; reinstalling the requirements.txt library updates the installed packages." }
+      ],
+      "in_practice": "Keeping pins in one requirements.txt on a volume lets a platform team roll out a dependency fix to a shared cluster without the restart that the uninstall path would force on every attached user.",
+      "source": "https://docs.databricks.com/aws/en/libraries/cluster-libraries",
+      "evidence": "Requirements.txt files do not require uninstalling and restarting. If you have modified the contents of a requirements.txt file, you can simply reinstall it to update the contents of the installed file."
+    },
+    {
+      "family": "compute-issues-rate-limited-launches",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team schedules about 80 Lakeflow Jobs to start at 02:00, each on its own job cluster. Several runs now fail at startup with RATE_LIMITED and a message that the workspace upsize request exceeded the workspace-level capacity limit. Nights with fewer jobs run cleanly. Which change does Databricks recommend?",
+      "options": [
+        { "text": "Stagger the job schedules so that fewer clusters launch at once", "correct": true, "why": "RATE_LIMITED means the workspace exceeded its capacity or request limits while launching clusters. Databricks recommends reducing concurrent launches, staggering job schedules or waiting before retrying." },
+        { "text": "Switch every job cluster to the auto availability zone setting", "average": true, "why": "The auto availability zone setting helps when AWS lacks instance capacity in one zone; this limit is the workspace's own launch capacity, which changing zones doesn't raise." },
+        { "text": "Switch the job clusters from spot to on-demand instances", "why": "Spot versus on-demand affects interruption and capacity risk on AWS, not the workspace's limit on concurrent launch requests." },
+        { "text": "Request an AWS service quota increase for the instance type", "why": "AWS quotas are behind AWS_RESOURCE_QUOTA_EXCEEDED; RATE_LIMITED comes from a workspace-level capacity limit on launches." }
+      ],
+      "in_practice": "Spreading 80 starts across, say, 02:00 to 02:30 rarely costs nightly batch any freshness, while a single burst risks failed runs whose retries push the whole schedule later.",
+      "source": "https://docs.databricks.com/aws/en/compute/troubleshooting/cluster-error-codes",
+      "evidence": "The cluster launch was rate limited because the workspace exceeded its capacity or request limits. Reduce concurrent cluster launches, stagger job schedules, or wait before retrying."
+    },
+    {
+      "family": "compute-issues-pip-uninstall-reverts",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A shared cluster has numpy 1.26 installed as a compute-scoped library. Earlier in a session, a data engineer ran %pip install numpy==2.1.3 in a notebook to test an upgrade, and now wants that notebook back on the cluster's version without affecting other notebooks. What does running %pip uninstall -y numpy in the notebook do?",
+      "options": [
+        { "text": "It reverts the notebook to the cluster's numpy 1.26", "correct": true, "why": "When a notebook has installed a different version than the cluster's, %pip uninstall reverts it to the version installed on the cluster. The command can't remove the cluster's own version, and other notebooks are unaffected." },
+        { "text": "It uninstalls numpy from the cluster for every notebook", "average": true, "why": "%pip works on the notebook-scoped environment and can't uninstall a library installed on the cluster, so other notebooks keep numpy 1.26." },
+        { "text": "It leaves the notebook without numpy until it is reinstalled", "why": "Removing the notebook-scoped 2.1.3 exposes the cluster's 1.26 again; the notebook isn't left without numpy." },
+        { "text": "It fails, because %pip can't uninstall a cluster library", "why": "%pip can't remove the cluster's own version, but it can remove a different version installed in the notebook, which is the case here." }
+      ],
+      "in_practice": "Because %pip doesn't restart Python on its own, follow the uninstall with dbutils.library.restartPython() so the notebook re-imports the cluster's numpy; a clean revert path makes upgrade tests on shared clusters low-risk.",
+      "source": "https://docs.databricks.com/aws/en/libraries/notebooks-python-libraries",
+      "evidence": "If you have installed a different library version than the one included in Databricks Runtime or the one installed on the cluster, you can use %pip uninstall to revert the library to the default version in Databricks Runtime or the version installed on the cluster"
+    },
+    {
+      "family": "compute-issues-streaming-state-memory",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's Structured Streaming job deduplicates click events with dropDuplicates over a 7-day watermark on a classic cluster. After a few days of running, executors are repeatedly removed and tasks fail with ExecutorLostFailure, while the compute event log shows no spot losses or autoscaling. Workers with twice the memory per core only delay the failures. Which change addresses this memory pressure?",
+      "options": [
+        { "text": "Use the RocksDB state store and cap its memory usage", "correct": true, "why": "Deduplicating over a 7-day watermark keeps a lot of streaming state. For queries that keep streaming state, Databricks recommends the RocksDB state store with a cap on its memory usage." },
+        { "text": "Set spark.sql.shuffle.partitions to auto and restart the stream", "average": true, "why": "Auto-optimized shuffle helps queries with too few shuffle partitions, but for Structured Streaming this value can't change between restarts from the same checkpoint location." },
+        { "text": "Give the cluster a larger driver node", "why": "The failures are on executors, not the driver, so a larger driver doesn't relieve the memory pressure that removes them." },
+        { "text": "Run the query with Trigger.AvailableNow once an hour", "why": "Changing the trigger changes when micro-batches run, but the query still keeps 7 days of deduplication state, so the memory pressure remains." }
+      ],
+      "in_practice": "Capping state store memory turns a stream that falls over every few days into one with predictable memory use, which matters more for an always-on pipeline than for a nightly batch that can simply be rerun.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/spark-memory-issues",
+      "evidence": "Streaming state. For queries that keep streaming state, use the RocksDB state store and cap its memory usage."
+    },
+    {
+      "family": "compute-issues-global-init-script",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "Since this morning, every dedicated and no-isolation cluster in a workspace fails to start with a termination reason that points to an init script exiting with a non-zero status, while clusters in standard access mode start normally. A data engineer checks a failing cluster and finds no cluster-scoped init scripts in its configuration. What explains the pattern, and who has to fix it?",
+      "options": [
+        { "text": "A failing global init script, which skips standard clusters; a workspace admin fixes it", "correct": true, "why": "Global init scripts run on dedicated and no-isolation clusters but not on standard clusters, so one failing script blocks exactly this set of launches. Workspace admins manage global init scripts, so an admin has to fix the script or its location." },
+        { "text": "A broken init script allowlist entry; a metastore admin adds the script back", "average": true, "why": "The allowlist governs init scripts and libraries on standard access mode clusters, and those are the clusters starting normally here." },
+        { "text": "A cluster-scoped script the owners can no longer read; each owner fixes it", "why": "The failing clusters have no cluster-scoped init scripts, and an unreadable cluster-scoped script wouldn't single out every dedicated and no-isolation cluster in the workspace." },
+        { "text": "A runtime image missing from regional storage; retry until it's republished", "why": "An unavailable runtime image surfaces as INVALID_SPARK_IMAGE and has nothing to do with init scripts or access mode; this failure follows the access mode." }
+      ],
+      "in_practice": "One bad global script can stop every dedicated cluster at once, which is why Databricks recommends cluster-scoped scripts or compute policies instead; the init script logs name the global script that failed.",
+      "source": "https://docs.databricks.com/aws/en/compute/troubleshooting/cluster-error-codes",
+      "evidence": "Global init scripts run on dedicated (single-user) and no-isolation clusters, but not on standard (shared) clusters. Because the script runs on every applicable cluster, a single failure can block cluster launches across the workspace. Global init scripts are managed by workspace admins"
+    },
+    {
+      "family": "compute-issues-broadcast-hint-oom",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer owns a nightly job whose SQL joins a large fact table to the customers dimension with a /*+ BROADCAST(customers) */ hint, added when customers was about 200 MB. The table has since grown to 9 GB, and the job now fails with ExecutorLostFailure ... Remote RPC client disassociated. The compute event log shows no spot losses or autoscaling, and a test on workers with twice the memory per core runs longer before failing. Which change addresses the cause?",
+      "options": [
+        { "text": "Remove the BROADCAST hint so that Spark chooses the join strategy itself", "correct": true, "why": "A broadcast join hint on a large table is a documented cause of executor memory failures. Without the hint, Spark plans the join from size estimates and runtime statistics instead of forcing a 9 GB table into every executor." },
+        { "text": "Keep the larger workers, since they let the job run longer", "average": true, "why": "Doubling memory per core confirmed a memory problem, but larger workers only postpone the failure while the forced broadcast keeps growing, and they raise the cost of every run." },
+        { "text": "Set spark.sql.shuffle.partitions to auto for the job", "why": "Too few shuffle partitions is a different memory cause; the broadcast side isn't shuffled, so shuffle partition sizing doesn't shrink the 9 GB broadcast." },
+        { "text": "Add more workers of the same size to spread out the join", "why": "Each executor needs a full copy of a broadcast table, so more workers of the same size each still have to hold all 9 GB." }
+      ],
+      "in_practice": "Hints that were right at 200 MB become liabilities as tables grow; reviewing hard-coded broadcast hints when a dimension reaches a few gigabytes is cheaper than paying for memory-optimized workers to carry them.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/spark-memory-issues",
+      "evidence": "A large broadcast. Check for broadcast join hints on large tables, and review the runtime broadcast threshold."
+    },
+    {
+      "family": "compute-issues-git-folder-import-precedence",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data team keeps a helper module, holidays.py, next to its notebooks in a Git folder, and import holidays loads it. A data engineer copies the notebook and holidays.py into a folder under /Workspace/Users/, outside any Git folder, and runs it on a cluster that has the PyPI package holidays installed as a compute-scoped library. Now import holidays loads the PyPI package, and calls to the team's functions fail with AttributeError. What explains this?",
+      "options": [
+        { "text": "Outside Git folders, the notebook's directory ranks below installed libraries", "correct": true, "why": "A Git folder puts the current working directory on the path before all other libraries, while notebooks outside Git folders add it after installed libraries, so the compute-scoped package now wins the name clash." },
+        { "text": "Workspace files can be imported only from notebooks inside Git folders", "average": true, "why": "Notebooks outside Git folders can import modules from their working directory too; the module is found, but it ranks below the installed package with the same name." },
+        { "text": "Compute-scoped libraries always outrank files in the notebook's directory", "why": "In a Git folder, the working directory ranks above every installed library, which is why the same import found the team's module before the copy." },
+        { "text": "The cluster must restart before it can see newly copied workspace files", "why": "Restarting the cluster doesn't change import precedence; the copied module is visible, but the installed package with the same name ranks above it." }
+      ],
+      "in_practice": "Giving team modules a distinctive name, such as acme_holidays, avoids clashes with PyPI packages entirely, so the same code imports the same thing in Git folders, workspace folders and jobs.",
+      "source": "https://docs.databricks.com/aws/en/libraries/",
+      "evidence": "A Databricks Git folder adds the current working directory to the path before all other libraries, while notebooks outside Git folders add the current working directory after other libraries are installed."
+    }
+  ]
 }

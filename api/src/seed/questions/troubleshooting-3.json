@@ -1,3 +1,413 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "monitoring-update-progress-stage-durations",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A triggered pipeline's updates have grown from about 20 to 35 minutes over the last three months. Before changing compute, the data engineer wants to chart, for every update in that period, how long it spent waiting for resources, initializing and setting up tables compared with running. Which source supports this breakdown?",
+      "options": [
+        { "text": "The update_progress events in the pipeline's event log, whose state changes are timestamped", "correct": true, "why": "Each update_progress event records the update's new state, such as WAITING_FOR_RESOURCES, INITIALIZING, SETTING_UP_TABLES or RUNNING. The gaps between those timestamps give the time each update spent in every stage." },
+        { "text": "system.lakeflow.pipeline_update_timeline, which records every update's active period", "average": true, "why": "The pipeline update timeline table gives each update's start and end periods, result and compute. That supports total-duration trends, but it doesn't split an update into its stages." },
+        { "text": "The update history drop-down on the pipeline's monitoring page", "why": "The drop-down opens one update at a time, and the monitoring page keeps only 60 days of updates, so it can't chart three months of stage durations." },
+        { "text": "The flow_progress events, which record each flow's output rows", "why": "flow_progress events describe individual flows and their metrics. They don't record update-level stages such as waiting for resources or setting up tables." }
+      ],
+      "in_practice": "Splitting the growth by stage points to the fix: extra time in WAITING_FOR_RESOURCES calls for compute changes, while growth in INITIALIZING and SETTING_UP_TABLES often means the pipeline has accumulated too many flows.",
+      "source": "https://docs.databricks.com/aws/en/ldp/monitor-event-log-schema",
+      "evidence": "update_progress: Describes the lifecycle of a pipeline update from starting, running, to completed, or failed. State values include WAITING_FOR_RESOURCES, INITIALIZING, SETTING_UP_TABLES, RUNNING. Useful for calculating the duration of various stages of a pipeline update from total duration to time spent waiting for resources, for example."
+    },
+    {
+      "family": "monitoring-cost-list-prices-join",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A FinOps analyst wants the list-price cost of each job in Lakeflow Jobs over the last 30 days. The analyst already sums usage_quantity per usage_metadata.job_id from system.billing.usage. Which table supplies the prices that turn this usage into cost?",
+      "options": [
+        { "text": "system.billing.list_prices, joined on SKU and the price's effective time window", "correct": true, "why": "The documented job cost queries join system.billing.usage to system.billing.list_prices on cloud and sku_name, with the usage time inside the price's validity window, and multiply usage_quantity by pricing.default." },
+        { "text": "None, because usage_quantity in system.billing.usage is already in dollars", "average": true, "why": "usage_quantity counts usage units such as DBUs, not currency. The documented cost queries multiply it by pricing.default from the list prices table to get list cost." },
+        { "text": "system.lakeflow.job_run_timeline, which records the compute each run used", "why": "The job run timeline describes runs and their compute but holds no prices. It is joined to usage for run metadata, not to price that usage." },
+        { "text": "system.compute.node_types, which lists each instance type's hardware", "why": "The node types table describes available instance types, such as their cores and memory. It has no prices to apply to billing records." }
+      ],
+      "in_practice": "Joining on the price's validity window matters when list prices change: a 12-month spend trend priced at today's rate would misstate every month before the change.",
+      "source": "https://docs.databricks.com/aws/en/admin/system-tables/jobs-cost",
+      "evidence": "SUM(t1.usage_quantity * list_prices.pricing.default) as list_cost ... FROM system.billing.usage t1 INNER JOIN system.billing.list_prices list_prices on t1.cloud = list_prices.cloud and t1.sku_name = list_prices.sku_name and t1.usage_start_time >= list_prices.price_start_time"
+    },
+    {
+      "family": "monitoring-cost-all-purpose-unattributed",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A FinOps analyst ranks last month's job spend with a query that filters system.billing.usage on billing_origin_product = 'JOBS' and groups by usage_metadata.job_id. The nightly customer_360 job, one of the heaviest workloads, is missing. Its tasks run on a shared all-purpose cluster that analysts also use for notebooks. Which explanation and fix are correct?",
+      "options": [
+        { "text": "All-purpose usage isn't billed as jobs; run the job on jobs compute or serverless", "correct": true, "why": "usage_metadata.job_id is populated only for jobs that run on job compute or serverless compute. Databricks recommends dedicated job compute or serverless compute for accurate per-job cost tracking." },
+        { "text": "The job lacks custom tags; add tags so billing can attribute its cost", "average": true, "why": "Tags help group usage, but on a shared all-purpose cluster many workloads run at once, so the cluster's cost can't be split precisely between this job and everything else on it." },
+        { "text": "Join system.lakeflow.jobs by job name to bring the job's cost back in", "why": "Joining job metadata adds names to usage rows that already carry a job_id. It can't create job attribution for usage billed to an all-purpose cluster." },
+        { "text": "Filter on billing_origin_product = 'INTERACTIVE' and the job's job_id instead", "why": "usage_metadata.job_id is populated only for job and serverless compute, so all-purpose usage rows carry no job_id to filter on." }
+      ],
+      "in_practice": "Moving scheduled work off shared clusters also ends arguments over who pays: per-run cost becomes a query result instead of an estimate split by hand across teams.",
+      "source": "https://docs.databricks.com/aws/en/admin/system-tables/jobs",
+      "evidence": "In system.billing.usage, the usage_metadata.job_id is only populated for jobs that run on job compute or serverless compute. ... For accurate job cost tracking, Databricks recommends running jobs on dedicated job compute or serverless compute"
+    },
+    {
+      "family": "monitoring-serverless-usage-sum-records",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer charts DBUs per run for a serverless job in Lakeflow Jobs from system.billing.usage. Seeing several rows with the same usage_metadata.job_run_id in the same hour but different usage_quantity values, the engineer treats them as duplicates and keeps one row per run and hour with ROW_NUMBER() ... QUALIFY rn = 1. The chart now shows far fewer DBUs than the account is billed for that job. What should the engineer change?",
+      "options": [
+        { "text": "Sum usage_quantity across all of a run's records, since together they make up its usage", "correct": true, "why": "Because of Databricks' distributed architecture, one serverless workload can produce several usage records with the same job_run_id in a timeframe. The sum of their DBUs is the run's consumption for that hour." },
+        { "text": "Keep the record with the largest usage_quantity per run and hour instead", "average": true, "why": "Picking the largest record still discards the others. Each record carries part of the run's consumption, so any one-row-per-hour rule undercounts." },
+        { "text": "Filter on product_features.is_serverless to drop classic rows mixed into the job", "why": "The job runs only on serverless, so there are no classic rows to remove. The shortfall comes from discarding valid serverless records." },
+        { "text": "Join system.lakeflow.job_run_timeline to drop records outside the run's periods", "why": "Restricting records to run periods doesn't restore the DBUs the deduplication threw away. The multiple records are expected and must be added up." }
+      ],
+      "in_practice": "Cost dashboards that 'deduplicate' billing rows are a common source of under-reported spend; a chargeback report that's off by half can hide a job whose cost has doubled.",
+      "source": "https://docs.databricks.com/aws/en/admin/system-tables/serverless-billing",
+      "evidence": "you might see multiple records associated with a given serverless compute workload in a given timeframe. For example, you might see multiple records with the same job_id, job_run_id, or job_name but with different DBU consumption values for each. The sum of these DBUs represents the hourly DBU consumption for a given job run in that timeframe."
+    },
+    {
+      "family": "monitoring-runs-never-started-termination-code",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A platform lead averages the run times of a scheduled job over the last quarter using the jobs run timeline system table. A dozen runs come out at exactly 0 seconds and pull the average down. Each of them is a single row whose period_start_time equals its period_end_time. What do these rows represent, and where should the lead look next?",
+      "options": [
+        { "text": "Runs that never began executing; check their termination_code for the reason", "correct": true, "why": "A run that never began execution is recorded as a row whose period_start_time equals period_end_time, meaning no active runtime. Its termination_code explains why it didn't start." },
+        { "text": "Hourly slices of long runs; exclude the rows whose result_state is NULL", "average": true, "why": "Slices of a long run cover real time ranges and share a run_id with other rows. A lone row with equal start and end times marks a run with no active runtime at all." },
+        { "text": "Runs still in progress whose end time hasn't been recorded yet", "why": "Timeline rows are immutable and complete when produced, so a zero-length row isn't a placeholder for a running job; it records a run that never started." },
+        { "text": "Runs that hit the job's timeout before they could record an end time", "why": "A run that times out has run until its timeout, so its rows span that time. Zero-length rows record runs that never started executing." }
+      ],
+      "in_practice": "Excluding never-started runs keeps the baseline honest, and counting them by termination code, such as MAX_CONCURRENT_RUNS_EXCEEDED, turns a hidden scheduling problem into a metric someone owns.",
+      "source": "https://docs.databricks.com/aws/en/admin/system-tables/jobs",
+      "evidence": "If a run never began execution, it is represented by a row where period_start_time equals period_end_time. This indicates no active runtime. To understand why the run didn't start, check the termination_code column."
+    },
+    {
+      "family": "monitoring-system-tables-same-region",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform lead queries system.lakeflow.job_run_timeline from a workspace in us-east-1 to compare job run times across all of the account's workspaces. Runs from the account's workspace in eu-west-1 never appear. Why?",
+      "options": [
+        { "text": "The table only holds records for workspaces in the querying workspace's cloud region", "correct": true, "why": "The lakeflow system tables include records from all workspaces in the account deployed in the same cloud region. To see another region's records, the lead must query from a workspace deployed in that region." },
+        { "text": "The lead needs workspace admin rights in the eu-west-1 workspace to see its runs", "average": true, "why": "Access to these tables comes from USE and SELECT on the system schemas, not from admin rights in each workspace. The gap is regional, so the query must run from a workspace in eu-west-1." },
+        { "text": "Records from other workspaces take about a week to arrive in the table", "why": "Jobs system table records are typically available within an hour. The eu-west-1 runs are missing because they belong to a different region." },
+        { "text": "Those runs are stored only in system.lakeflow.job_task_run_timeline", "why": "Standard job runs appear in all of the job-related tables. The task run timeline has the same regional scope, so it doesn't hold the eu-west-1 runs either." }
+      ],
+      "in_practice": "Multi-region accounts schedule the same monitoring query from one workspace per region, so no region's jobs silently drop out of an account-wide performance baseline.",
+      "source": "https://docs.databricks.com/aws/en/admin/system-tables/jobs",
+      "evidence": "The lakeflow system tables record job and pipeline activity in your account. These tables include records from all workspaces in your account deployed in the same cloud region. To see records from another region, you must view the tables from a workspace deployed in that region."
+    },
+    {
+      "family": "monitoring-jobs-scd2-latest-row-join",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer adds job names to a six-month run-duration trend by joining system.lakeflow.job_run_timeline to system.lakeflow.jobs on workspace_id and job_id. After the join, jobs whose settings are edited often show several times more runs and runtime than before, while rarely edited jobs look right. Which change fixes the trend?",
+      "options": [
+        { "text": "Join only each job's latest row, using ROW_NUMBER() per job ordered by change_time DESC", "correct": true, "why": "system.lakeflow.jobs is a slowly changing dimension table: each change emits a new row, so it holds every version of every job. Keeping the most recent change_time per workspace_id and job_id gives one row per job." },
+        { "text": "Filter system.lakeflow.jobs on delete_time IS NULL before joining", "average": true, "why": "Filtering on delete_time only removes rows that record a deletion. Every settings change still leaves its own row per job, so the join keeps multiplying runs." },
+        { "text": "Join on the job name instead of job_id to avoid the repeated rows", "why": "Names aren't unique and can change, and the jobs table still holds one row per version of each job, so a name join doesn't remove the repeats." },
+        { "text": "Take the names from system.lakeflow.job_tasks, which has one row per job", "why": "job_tasks has a row per task, is also a slowly changing table and has no job name column, so it can't supply one name per job." }
+      ],
+      "in_practice": "This bug scales with how actively a job is maintained, so the most-edited production jobs look worst on the dashboard: the kind of false alarm that erodes trust in system-table reporting.",
+      "source": "https://docs.databricks.com/aws/en/admin/system-tables/jobs",
+      "evidence": "When a row changes, a new row is emitted with the updated values, so the table holds the full history of every entity. ... To find the current state of an entity in an SCD2 table, take the row with the most recent change_time"
+    },
+    {
+      "family": "monitoring-task-run-breakdown-later-waits",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A multi-task job on classic jobs compute has slowed from 40 to 70 minutes per run. Hovering over the run's Duration shows only 2 minutes of Waiting for resources, but the data engineer suspects that tasks starting later in the run, which use a second job cluster, now wait several minutes for compute. Where should the engineer check?",
+      "options": [
+        { "text": "The run breakdown in each later task's run output", "correct": true, "why": "Each task run has its own breakdown into Queued, Waiting for resources, Library installation and Running. The full breakdown for a task is shown in its task run output." },
+        { "text": "The job-level breakdown, which already shows waiting is negligible", "average": true, "why": "For a multi-task job, the job-level breakdown counts Waiting for resources only until the first task starts running, so waits for the second cluster don't appear there." },
+        { "text": "queue_duration_seconds in system.lakeflow.job_run_timeline", "why": "The job run timeline's duration columns are populated only for single-task jobs created with the legacy Jobs API; multi-task runs log 0 there." },
+        { "text": "The Spark UI event timeline of the first task's cluster", "why": "The first cluster's Spark UI shows work on that cluster. It doesn't show how long later tasks waited for the second job cluster to start." }
+      ],
+      "in_practice": "If later tasks wait minutes for a second cluster, letting tasks share one job cluster or using an instance pool removes the wait; finding it at the task level keeps the team from tuning code that isn't slow.",
+      "source": "https://docs.databricks.com/aws/en/jobs/diagnose-job-performance",
+      "evidence": "The run breakdown is available for both job runs and task runs. For a job with multiple tasks, the job-level breakdown counts Waiting for resources only until the first task starts running. For the full breakdown of each task, view the run breakdown in the task run output."
+    },
+    {
+      "family": "monitoring-library-installation-phase",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A serverless job in Lakeflow Jobs has slowed down, and its run breakdown shows that most of the extra time is in the Library installation phase. Which change does Databricks suggest for this phase?",
+      "options": [
+        { "text": "Reduce the packages the job installs, or use a workspace base environment", "correct": true, "why": "On serverless compute, installation is slow when the environment isn't cached yet, when many packages are installed or when a custom PyPI repository responds slowly. Databricks suggests fewer packages or a workspace base environment." },
+        { "text": "Switch the job to performance-optimized mode to skip installation", "average": true, "why": "Performance-optimized mode targets the Waiting for resources phase by cutting serverless startup latency. It isn't the documented fix for time spent installing packages." },
+        { "text": "Increase the job's maximum concurrent runs setting", "why": "Raising maximum concurrent runs addresses the Queued phase, where runs wait on concurrency limits, not the time spent installing libraries." },
+        { "text": "Install the packages from an init script when compute starts", "why": "Init scripts are a classic-compute pattern, and the documentation names installing libraries with init scripts at startup as a cause of long installation times." }
+      ],
+      "in_practice": "Trimming an environment from dozens of packages to the few a job actually imports can save minutes on every run, which adds up quickly for a job that runs every 15 minutes.",
+      "source": "https://docs.databricks.com/aws/en/jobs/diagnose-job-performance",
+      "evidence": "Databricks has not yet cached the environment and must create it. The job installs many packages. A custom PyPI repository might be slow to respond, especially when many tasks install packages in parallel. Reduce the number of packages needed. Consider using a workspace base environment."
+    },
+    {
+      "family": "monitoring-streaming-backlog-metrics-tab",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A serverless job in Lakeflow Jobs runs a streaming task that reads from Kafka. The on-call engineer wants to see how the task's backlog has trended over the past day. Where in the Lakeflow Jobs UI are these charts (Public Preview)?",
+      "options": [
+        { "text": "On the Metrics tab of the task run pane in the job run details", "correct": true, "why": "Streaming observability charts backlog metrics, such as backlog bytes and records for Kafka, in the task run pane. Each chart shows per-minute maximum values for up to the previous 48 hours." },
+        { "text": "On the Streaming tab of the Spark UI for the task's compute", "average": true, "why": "The Spark UI's Streaming tab reports input rate, processing rate and batch duration. The Jobs UI's backlog charts for a task are on the Metrics tab of the task run pane." },
+        { "text": "In the Timeline view of the job run", "why": "The Timeline view shows which tasks and queries took longest and how they overlapped, not a streaming source's backlog over time." },
+        { "text": "In the Finished runs count graph on the Runs tab", "why": "The Finished runs count graph counts completed runs by status over the last 48 hours. It doesn't chart any task's streaming backlog." }
+      ],
+      "in_practice": "A backlog that climbs every evening and drains overnight shows a stream sized for average load rather than peak, which is a capacity decision, not a code bug.",
+      "source": "https://docs.databricks.com/aws/en/jobs/diagnose-job-performance",
+      "evidence": "These metrics include backlog seconds, backlog bytes, backlog records, and backlog files for sources supported by Spark Structured Streaming, including Apache Kafka. When you view the run details for a task, the metrics appear as charts in the right-hand pane. Each chart shows maximum values aggregated by minute, for up to the previous 48 hours. Click the Metrics tab in the Task run pane."
+    },
+    {
+      "family": "monitoring-event-log-runtime-version",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A triggered pipeline's updates have run about 30% longer since early this month, though nobody changed its code or settings and input volumes are flat. The data engineer suspects the pipeline started running on a newer Databricks Runtime. How can the engineer see which runtime version each update used?",
+      "options": [
+        { "text": "Query the runtime_details events in the pipeline's event log for dbr_version", "correct": true, "why": "Each update emits a runtime_details event with the Databricks Runtime version, so querying these events by update_id shows exactly when the version changed and whether it lines up with the slowdown." },
+        { "text": "Read the channel in the pipeline settings, which names the runtime in use", "average": true, "why": "The channel is only current or preview, and nobody changed it. It doesn't record which runtime version each past update actually ran on." },
+        { "text": "Compare the update_progress events, which carry the runtime with each state", "why": "update_progress events record the update's state changes, such as RUNNING or COMPLETED. The runtime version is reported in runtime_details events." },
+        { "text": "Read the user_action events, which log every runtime upgrade", "why": "user_action events record actions users take, such as creating a pipeline or starting an update. A runtime change on the channel isn't a user action." }
+      ],
+      "in_practice": "Lining up dbr_version with update durations turns a hunch into evidence, and a support case that names the exact update IDs before and after the change gets resolved far faster.",
+      "source": "https://docs.databricks.com/aws/en/ldp/monitor-event-logs",
+      "evidence": "You can view runtime information for a pipeline update, for example, the Databricks Runtime version for the update. SELECT origin.update_id, details:runtime_details:runtime_version:dbr_version FROM event_log_raw WHERE event_type = 'runtime_details'"
+    },
+    {
+      "family": "monitoring-query-metrics-first-hundred",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A task in a serverless job executes about 400 SQL statements per run in a loop. Comparing a slow run with a fast run from last week, the data engineer finds nearly identical rows read and query counts in the task run sidebar, although the slow run processed far more data in its later statements. What explains the misleading comparison?",
+      "options": [
+        { "text": "Task run query metrics cover only the first 100 queries of each task run", "correct": true, "why": "Task run query metrics include the first 100 queries in each task run. When a task runs more statements, its rows read, rows written and query count reflect only those first 100, so growth in later statements is invisible." },
+        { "text": "The sidebar shows per-query averages, which hide the larger statements", "average": true, "why": "The sidebar reports totals such as rows read, rows written and the number of queries, not averages. The figures match because only the first 100 queries are counted." },
+        { "text": "Job run metrics combine only the first 50 task runs, so later work is dropped", "why": "The 50-task-run cap applies when metrics are combined at the job run level. This task's figures come from its own task run, which is capped at its first 100 queries." },
+        { "text": "Query metrics apply only to classic compute, so serverless figures are estimates", "why": "It's the reverse: these query metrics and insights are shown for serverless jobs only, and job runs on classic compute don't show them." }
+      ],
+      "in_practice": "For loop-heavy tasks, query history or splitting the loop across tasks gives trustworthy numbers; otherwise a fourfold data increase in late statements looks like a run that slowed down for no reason.",
+      "source": "https://docs.databricks.com/aws/en/jobs/diagnose-job-performance",
+      "evidence": "Task run query metrics include the first 100 queries in each task run. If a task run has more queries, its metrics reflect only the first 100. Job run query metrics combine metrics from up to 50 task runs, using the first 100 queries in each task run."
+    },
+    {
+      "family": "monitoring-run-status-leaf-task-failed",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A job in Lakeflow Jobs has two independent branches that end in the leaf tasks publish_finance and publish_marketing. In last night's run, every task succeeded except publish_marketing, which failed. Which status does the job run show?",
+      "options": [
+        { "text": "Failed", "correct": true, "why": "Databricks derives a job run's status from its leaf tasks, the tasks with no downstream dependencies. If one or more leaf tasks fail, the run is Failed, even when another branch succeeded." },
+        { "text": "Succeeded with failures", "average": true, "why": "Succeeded with failures means some tasks failed but every leaf task succeeded. Here a leaf task failed, so the run is Failed." },
+        { "text": "Succeeded", "why": "Succeeded means every task was successful. A failed task always rules out a plain Succeeded status." },
+        { "text": "Canceled", "why": "Canceled means the run was stopped, for example by a user. publish_marketing ran and failed, so the run wasn't canceled." }
+      ],
+      "in_practice": "Because status follows the leaf tasks, DAG design decides what a red run means: placing a critical check at a leaf guarantees its failure fails the run and fires job-level failure alerts.",
+      "source": "https://docs.databricks.com/aws/en/jobs/monitor",
+      "evidence": "Databricks determines whether a job run was successful based on the outcome of the job's leaf tasks. A leaf task is a task that has no downstream dependencies. Succeeded with failures: Some tasks failed, but all leaf tasks were successful. Failed: One or more leaf tasks failed."
+    },
+    {
+      "family": "monitoring-finished-runs-graph-run-as",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer who isn't a workspace admin opens the Runs tab under Jobs & Pipelines with All selected. The list of recent runs appears, but the Finished runs count graph doesn't. The engineer wants the graph to track how many of their own job runs failed in the last 48 hours. What should the engineer do?",
+      "options": [
+        { "text": "Filter to Jobs and set the Run as filter to me", "correct": true, "why": "The Finished runs count graph appears only when the list is filtered to Jobs or Pipelines. Admins see it for all runs; non-admins must also click Run as and select me." },
+        { "text": "Filter to Jobs, since the graph is hidden only when All is selected", "average": true, "why": "Choosing Jobs is necessary but not enough for a non-admin. The graph covers all runs only for admins; other users must also filter Run as to themselves." },
+        { "text": "Ask an admin for CAN MANAGE on the jobs to unlock the graph", "why": "Job permissions don't control the graph. It depends on the type filter and, for non-admins, on filtering Run as to themselves." },
+        { "text": "Narrow the Start time filter to the last 48 hours", "why": "The graph already covers the last 48 hours by default. Changing the time range doesn't make it appear while All is selected." }
+      ],
+      "in_practice": "A personal failure-count graph gives an engineer a quick morning check of their own jobs, with the Top 5 error types table beside it pointing to what broke most often.",
+      "source": "https://docs.databricks.com/aws/en/jobs/monitor",
+      "evidence": "The Finished runs count graph appears only when you filter to Jobs or Pipelines. It is not shown when All is selected. The graph is shown for admins for all runs. For non-admins, you must click Run as and select me."
+    },
+    {
+      "family": "monitoring-for-each-only-failed-iterations",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A job's For each task runs a nested notebook task once for each of 250 store IDs. Last night's run failed, and the data engineer needs to find which iterations failed and open their output. What should the engineer do?",
+      "options": [
+        { "text": "Open the For each task's run details and select Only failed iterations", "correct": true, "why": "Run details for a For each task are a table of the nested task's iterations. Only failed iterations filters that table, and clicking an iteration's Start time or End time opens its output." },
+        { "text": "Read the matrix view, where each iteration has its own cell", "average": true, "why": "The matrix view has one cell for the For each task as a whole. Clicking it leads to run details, where the iterations appear as a table." },
+        { "text": "Filter the Runs tab by Run status and select Failed", "why": "The Runs tab lists job runs, so it shows last night's run as failed but not which of its 250 iterations failed." },
+        { "text": "Export the run to HTML, which lists each iteration's result", "why": "Exporting to HTML captures a notebook's source and cell outputs as a static file. It isn't a way to list and filter a For each task's iterations." }
+      ],
+      "in_practice": "Filtering 250 iterations down to the few that failed shows at a glance whether they share a cause, such as one region's stores missing a source file, before anyone repairs the run.",
+      "source": "https://docs.databricks.com/aws/en/jobs/monitor",
+      "evidence": "unlike a standard task, the run details for a For each task are presented as a table of the nested task's iterations. To view only failed iterations, click Only failed iterations. To view the output of an iteration, click the Start time or End time values of the iteration."
+    },
+    {
+      "family": "monitoring-slack-destination-admin",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants a job's failure notifications posted to the team's Slack channel. In the job's notification settings, the Destination list offers only Email address. What has to happen first?",
+      "options": [
+        { "text": "A workspace admin creates a Slack notification destination", "correct": true, "why": "Only workspace admins manage notification destinations such as Slack, Microsoft Teams, PagerDuty and webhooks. Once configured, a destination is available to all users in a job's notification settings." },
+        { "text": "The engineer pastes a Slack incoming webhook URL into the job's settings", "average": true, "why": "Jobs pick from destinations an admin has already configured. The Slack webhook URL is pasted once, when the admin creates the destination, not in each job." },
+        { "text": "The engineer gets CAN MANAGE on the job to unlock system destinations", "why": "CAN MANAGE or IS OWNER is needed to edit a job's notifications, but it doesn't create destinations; only admins configure them." },
+        { "text": "The engineer installs a Slack client library on the job's compute", "why": "Notifications are sent by Databricks, not by code running on the job's compute, so installing a library doesn't add a destination." }
+      ],
+      "in_practice": "Because destinations are shared, one admin-managed Slack destination can serve every job in the workspace, and rotating its webhook URL is a single change rather than an edit to every job.",
+      "source": "https://docs.databricks.com/aws/en/admin/workspace-settings/notification-destinations",
+      "evidence": "You must be a Databricks workspace admin to manage notification destinations. After a destination is configured, it is available to all users. After configuring destinations, you can access them in a job's Job notifications settings."
+    },
+    {
+      "family": "monitoring-pipeline-list-view-status",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A pipeline maintains about 300 datasets, and its graph on the pipeline monitoring page is too large to read. After a failed update, a data engineer wants to see only the datasets that failed. What should the engineer use?",
+      "options": [
+        { "text": "The List tab on the monitoring page, filtered by dataset status", "correct": true, "why": "The List tab shows every dataset in the pipeline as a row and is meant for graphs too large to view. Filters on dataset name, type and status narrow it to the failed datasets." },
+        { "text": "The update history drop-down, which lists the failed datasets", "average": true, "why": "The update history drop-down selects which update the page shows. It doesn't list or filter that update's datasets by status." },
+        { "text": "The Runs tab under Jobs & Pipelines, filtered by Error code", "why": "The Runs tab lists whole runs of jobs and pipelines and filters them by error code. It doesn't show the datasets inside a pipeline update." },
+        { "text": "Catalog Explorer, sorted by each table's last modified time", "why": "Catalog Explorer shows table metadata, not the status each dataset had in a pipeline update, so failed datasets aren't marked there." }
+      ],
+      "in_practice": "On large pipelines, filtering to failed datasets shows at once whether a failure is isolated to one table or has spread downstream, which decides between fixing one flow and investigating a shared source.",
+      "source": "https://docs.databricks.com/aws/en/ldp/monitoring-ui",
+      "evidence": "The List view allows you to see all datasets in your pipeline represented as a row in a table and is useful when your pipeline graph is too large to visualize in the Graph view. You can control the datasets displayed in the table using multiple filters such as dataset name, type, and status."
+    },
+    {
+      "family": "monitoring-pipeline-full-error-event-log",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A pipeline update failed, and the error message in the bottom pane of the pipeline monitoring page is cut off before the root cause. Where does the data engineer find the full stack trace?",
+      "options": [
+        { "text": "In the error and details columns of the pipeline's event log", "correct": true, "why": "The monitoring UI can truncate error messages. The event log's error and details columns carry the full stack trace and structured context, and View logs jumps to the relevant entries." },
+        { "text": "In the Top 5 error types table on the Runs tab", "average": true, "why": "The Top 5 error types table summarizes the most frequent error types across runs. It doesn't hold the full stack trace of one update's failure." },
+        { "text": "In the result_state of system.lakeflow.pipeline_update_timeline", "why": "result_state records only an update's outcome, such as COMPLETED, FAILED or CANCELED, not the error details behind it." },
+        { "text": "In the data quality metrics of the table that failed", "why": "Data quality metrics show how records fared against a table's expectations. They don't contain exceptions or stack traces from a failed update." }
+      ],
+      "in_practice": "Reading the full exception first often separates a code problem from a data problem in minutes, which decides whether a quick Validate run or reprocessing data is the next step.",
+      "source": "https://docs.databricks.com/aws/en/ldp/monitoring-ui",
+      "evidence": "Query the event log for the full error. The UI can truncate messages. The event log's error and details columns carry the full stack trace and structured context."
+    },
+    {
+      "family": "monitoring-pipeline-events-system-table",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform team runs about 200 pipelines across several workspaces in one region and wants a single SQL query that returns the most recent error for every pipeline. Which source does Databricks recommend for querying these events?",
+      "options": [
+        { "text": "The pipeline_events system table (Beta)", "correct": true, "why": "The pipeline_events system table contains events for all pipelines across the workspaces in a region and is the recommended way to query pipeline events. It is in Beta." },
+        { "text": "Each pipeline's event log, combined with UNION ALL", "average": true, "why": "Each event log holds the events of a single pipeline, so covering 200 pipelines means maintaining 200 sources. The recommended source for all of a region's pipelines is the system table." },
+        { "text": "The system.lakeflow.pipeline_update_timeline table", "why": "The update timeline records each update's outcome and timing, but not the error messages and exceptions that pipeline events carry." },
+        { "text": "The Top 5 error types table on the Runs tab", "why": "The Top 5 error types table is a UI summary of the most frequent error types. It isn't a SQL source and doesn't return each pipeline's latest error." }
+      ],
+      "in_practice": "One regional query makes a 'latest error per pipeline' tile cheap to build, so on-call engineers start the day from a short list of broken pipelines instead of opening 200 monitoring pages.",
+      "source": "https://docs.databricks.com/aws/en/ldp/monitor-and-query-events",
+      "evidence": "The pipeline_events system table contains events for all pipelines across the workspaces in a region and is the recommended way to query events. It is in Beta. The per-pipeline event log is a Delta table that contains events for a single pipeline."
+    },
+    {
+      "family": "monitoring-pipeline-fatal-failure-email",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A production pipeline runs on a schedule, so recoverable failures are retried automatically. The on-call engineer gets an email for every failed update, including failures that a retry then fixes, and wants email only when an update fails in a way retrying can't fix. Which pipeline notification setting meets this?",
+      "options": [
+        { "text": "Notify when an update fails with a non-retryable (fatal) error", "correct": true, "why": "Pipeline email notifications can cover all update failures or only failures with a non-retryable (fatal) error. The fatal-only option skips failures that automatic retries can recover from." },
+        { "text": "Mute notifications until the last retry", "average": true, "why": "Mute notifications until the last retry is an option on job task notifications. A pipeline's own email notifications instead offer a choice to notify only on non-retryable errors." },
+        { "text": "Notify when a single data flow fails", "why": "A flow failure notification fires when any one flow fails, whether or not a retry would fix it, so it adds alerts rather than filtering to fatal errors." },
+        { "text": "Disable automatic retries so that every failure becomes final", "why": "Turning off retries makes recoverable failures stop updates, trading reliability for fewer emails. The fatal-only option keeps retries and still cuts the noise." }
+      ],
+      "in_practice": "Paging only on fatal errors keeps the on-call rotation focused: a pipeline that hits a few transient errors a week stops waking people up, while a schema break still alerts immediately.",
+      "source": "https://docs.databricks.com/aws/en/ldp/monitoring-ui",
+      "evidence": "A pipeline update fails, either with a retryable or a non-retryable error. Select this option to receive a notification for all pipeline failures. A pipeline update fails with a non-retryable (fatal) error. Select this option to receive a notification only when a non-retryable error occurs."
+    },
+    {
+      "family": "monitoring-webhook-instead-of-slack-parsing",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "An SRE team wants its incident tool to open a ticket whenever a production job in Lakeflow Jobs fails. Their prototype parses the failure messages that Databricks posts to a Slack channel, and the team worries the parser will break. Which setup does Databricks recommend for a dependable format?",
+      "options": [
+        { "text": "A user-defined HTTP webhook that receives the jobs.on_failure JSON payload", "correct": true, "why": "When a specific schema is needed, Databricks recommends a user-defined webhook. Job webhooks send a documented JSON payload with an event_type such as jobs.on_failure plus the run and job IDs and the job name." },
+        { "text": "Keep the Slack destination and pin the parser to today's message layout", "average": true, "why": "Databricks warns that Slack and Microsoft Teams message content might change in future releases, so clients shouldn't depend on its content or formatting." },
+        { "text": "A Microsoft Teams destination, whose message format is fixed", "why": "Teams messages carry the same caveat as Slack: their content might change, so they aren't a stable schema for automation." },
+        { "text": "An email destination whose subject line the tool parses", "why": "Email notifications are written for people to read. The documented JSON payload is the one sent to webhooks, which is the format to automate against." }
+      ],
+      "in_practice": "Keying tickets on the payload's job_id and run_id makes the integration survive message rewording and lets each ticket link straight back to the failed run.",
+      "source": "https://docs.databricks.com/aws/en/jobs/notifications",
+      "evidence": "The content of Slack and Microsoft Teams messages might change in future releases. You should not implement clients or processing that depend on the specific content or formatting of these messages. If you require a specific schema or formatting for notifications, Databricks recommends configuring a user-defined webhook."
+    },
+    {
+      "family": "monitoring-pipeline-task-backlog-alerts",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 2,
+      "type": "multiple",
+      "stem": "A job in Lakeflow Jobs runs a Lakeflow Spark Declarative Pipelines pipeline as a pipeline task, and the pipeline streams from Kafka. The data engineering team wants an alert when the pipeline's streaming backlog grows too large. Which two approaches can provide this? (Choose two.)",
+      "options": [
+        { "text": "A Databricks SQL alert on a query of the pipeline event log", "correct": true, "why": "The pipeline event log records backlog metrics, and a Databricks SQL alert can query it on a schedule and notify when the backlog crosses a threshold. This is a documented way to monitor a pipeline's backlog." },
+        { "text": "A pipeline event hook (Public Preview) that sends the alert", "correct": true, "why": "Event hooks are Python callbacks that run as events are written to the pipeline's event log, so they can send custom alerts. They are a documented way to monitor a pipeline's backlog." },
+        { "text": "A streaming backlog threshold and notification on the pipeline task", "average": true, "why": "Streaming backlog thresholds and notifications work for other streaming tasks in a job, but they aren't supported for pipeline tasks." },
+        { "text": "A Duration Warning notification on the pipeline task", "why": "A Duration Warning fires when a run exceeds its expected duration. It measures run time, not how much data is waiting in the Kafka backlog." },
+        { "text": "A table update trigger on the pipeline's target streaming table", "why": "A table update trigger starts a job when a table receives new commits. It doesn't evaluate backlog or send alerts." }
+      ],
+      "in_practice": "An alert on backlog lets the team act when a consumer falls an hour behind, long before downstream dashboards go stale and the business notices.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/pipeline",
+      "evidence": "Streaming backlog metric thresholds and notifications aren't supported for pipeline tasks. To monitor a pipeline's streaming backlog, use one of the following instead: A Databricks SQL alert that queries the pipeline event log. A pipeline event hook."
+    },
+    {
+      "family": "monitoring-pipeline-workflow-cancellation",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A nightly job in Lakeflow Jobs runs a pipeline task. On some nights the pipeline update ends as Canceled, though nobody canceled anything in the pipeline UI and the event log shows no error. The update_progress events for those updates show cancellation_cause WORKFLOW_CANCELLATION. Where should the data engineer look for the cause?",
+      "options": [
+        { "text": "At the job run that started the update, since that run was canceled", "correct": true, "why": "WORKFLOW_CANCELLATION means the workflow that triggered the update was canceled, taking the update with it. The job run's history explains why it was canceled on those nights." },
+        { "text": "At the pipeline's user_action events, to find who canceled the update", "average": true, "why": "An update that someone cancels in the pipeline shows USER_ACTION as its cancellation cause. WORKFLOW_CANCELLATION points to the job run that triggered the update instead." },
+        { "text": "At the pipeline's automatic retries, which cancel each failed attempt", "why": "Nothing failed: the event log shows no error, and the cancellation cause names the triggering workflow, not a retry." },
+        { "text": "At the pipeline's channel, since runtime upgrades cancel running updates", "why": "The channel selects the runtime version the pipeline uses. The cancellation cause names the workflow that triggered the update, not a runtime change." }
+      ],
+      "in_practice": "Investigating the pipeline alone finds nothing wrong here; the parent job run's history, such as runs stopped during deployments, explains the pattern of canceled updates in one step.",
+      "source": "https://docs.databricks.com/aws/en/ldp/monitor-event-log-schema",
+      "evidence": "cancellation_cause: The reason why an update entered the CANCELED state. Includes reasons such as USER_ACTION or WORKFLOW_CANCELLATION (the workflow that triggered the update was canceled)."
+    },
+    {
+      "family": "monitoring-mute-canceled-task-notifications",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "During weekly deployments, engineers cancel in-flight runs of a job in Lakeflow Jobs. To cut the noise, the team selected Mute notifications for canceled runs on the job's notifications, yet the on-call channel still gets notifications about the canceled runs from two tasks that have their own notifications. What should the team change?",
+      "options": [
+        { "text": "Also select Mute notifications for canceled runs on each task's notifications", "correct": true, "why": "Muting skipped or canceled runs at the job level doesn't filter notifications configured on job tasks. To silence every notification for canceled runs, the task-level notifications need the same mute." },
+        { "text": "Remove the job-level notifications, since they override the mute", "average": true, "why": "Job-level notifications don't override the mute. The job-level setting simply doesn't apply to task-level notifications, which need their own mute." },
+        { "text": "Select Mute notifications until the last retry on the two tasks", "why": "That option holds back notifications while a task still has retries left. It doesn't filter notifications for canceled runs." },
+        { "text": "Use Cancel all queued runs instead of canceling the active runs", "why": "Cancel all queued runs removes only runs waiting in the queue. The in-flight runs still need canceling, and the task-level notifications remain unmuted." }
+      ],
+      "in_practice": "Noise from planned cancellations trains people to ignore the channel; muting canceled runs at both levels keeps every remaining notification worth reading.",
+      "source": "https://docs.databricks.com/aws/en/jobs/notifications",
+      "evidence": "When you select Mute notifications for skipped runs or Mute notifications for canceled runs for a job, it doesn't filter out notifications configured for job tasks. To filter all notifications for skipped or canceled runs, you must also filter out any task-level notifications you have configured."
+    }
+  ]
 }

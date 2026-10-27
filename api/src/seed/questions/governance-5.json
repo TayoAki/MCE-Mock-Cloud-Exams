@@ -1,3 +1,691 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "tables-managed-external-variant-securables",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "multiple",
+      "stem": "A data engineer is documenting which Unity Catalog objects exist in two flavors: one where Unity Catalog decides where files live and deletes them after a drop, and one where the engineer's team picks the path and keeps the files. Which two securable object types come in managed and external variants? (Choose two.)",
+      "options": [
+        {
+          "text": "Tables",
+          "correct": true,
+          "why": "Tables come in both variants: Unity Catalog picks the storage location and deletes the files of a managed table, while you set the location and keep control of the files of an external table."
+        },
+        {
+          "text": "Volumes",
+          "correct": true,
+          "why": "Volumes also come in both variants: a managed volume lives in the schema's managed storage, while an external volume is registered on a path you choose under an external location."
+        },
+        {
+          "text": "Views",
+          "average": true,
+          "why": "Views feel like tables, so it is tempting to think a view over an external table is itself external, but views have no managed or external variant."
+        },
+        {
+          "text": "Functions",
+          "why": "Functions are governed by Unity Catalog like any securable, but they have no data files whose storage or lifecycle could be managed, so they have no managed or external variant."
+        },
+        {
+          "text": "Registered models",
+          "why": "Registered models are governed securables too, but Databricks lists models among the objects that don't have managed and external variants."
+        }
+      ],
+      "in_practice": "Knowing that only tables and volumes carry the distinction keeps storage reviews focused: they are the two object types whose files can outlive a DROP, so cleanup jobs and storage cost audits only need to look at them.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/managed-versus-external",
+      "evidence": "The distinction between managed and external applies to tables and volumes only. Other Unity Catalog securable objects, such as views, models, and functions, do not have managed and external variants."
+    },
+    {
+      "family": "tables-schema-location-needs-create-managed-storage",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants to create the schema main.hr with MANAGED LOCATION 's3://acme-hr/managed', a path inside the registered external location hr_loc, so that HR's managed tables land in their own bucket. The engineer already has USE CATALOG and CREATE SCHEMA on main. Which privilege on hr_loc does the engineer also need?",
+      "options": [
+        {
+          "text": "CREATE MANAGED STORAGE",
+          "correct": true,
+          "why": "CREATE MANAGED STORAGE on an external location is the privilege that lets a user use a path under it as the managed storage location of a new catalog or schema."
+        },
+        {
+          "text": "CREATE EXTERNAL TABLE",
+          "average": true,
+          "why": "CREATE EXTERNAL TABLE is the external location privilege engineers meet most often, but it lets them register external tables on a path, not assign managed storage to a schema."
+        },
+        {
+          "text": "WRITE FILES",
+          "why": "WRITE FILES lets a user write files directly to paths under the external location; it doesn't authorize using the location as a schema's managed storage."
+        },
+        {
+          "text": "EXTERNAL USE LOCATION",
+          "why": "EXTERNAL USE LOCATION is for external engines that create external tables through Unity Catalog's open APIs; it doesn't authorize assigning managed storage to a schema."
+        }
+      ],
+      "in_practice": "Giving a sensitive domain its own managed location keeps its files in a separate bucket with its own bucket policies, and granting CREATE MANAGED STORAGE only to platform admins stops teams from scattering managed data across arbitrary paths.",
+      "source": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage",
+      "evidence": "Users who have the CREATE MANAGED STORAGE privilege on an external location can configure managed storage locations during catalog or schema creation."
+    },
+    {
+      "family": "tables-schema-location-change-keeps-existing",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "To meet a new compliance rule, a platform engineer on Databricks Runtime 18.1 runs ALTER SCHEMA main.finance SET MANAGED LOCATION 's3://acme-fin-secure/managed', a path under a registered external location. The schema already holds 40 managed tables whose files sit in the main catalog's managed location. What happens to those 40 tables?",
+      "options": [
+        {
+          "text": "They stay where they are; only tables and volumes created afterward use the new path",
+          "correct": true,
+          "why": "Changing a schema's managed location affects only managed tables and volumes created after the change. Existing managed objects aren't moved, so the 40 tables keep their files in the catalog's location."
+        },
+        {
+          "text": "They are copied to the new path in the background, with no downtime for readers",
+          "average": true,
+          "why": "It is natural to expect Unity Catalog to relocate managed data, since it controls managed storage, but altering the managed location doesn't move existing objects at all."
+        },
+        {
+          "text": "The statement fails until the 40 tables are dropped or moved out of the schema",
+          "why": "The statement doesn't require an empty schema; it succeeds and only changes where future managed tables and volumes are stored."
+        },
+        {
+          "text": "They become external tables that keep pointing at their current paths",
+          "why": "Changing the schema's managed location doesn't change any table's type; the existing tables remain managed tables in their original storage."
+        }
+      ],
+      "in_practice": "After a managed location change, check where each table's files actually live before declaring compliance: the 40 existing tables still sit in the old bucket, under its access policies, until the team re-creates them.",
+      "source": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage",
+      "evidence": "Altering the managed storage location affects only new managed tables and volumes created after the change. Existing managed objects are not moved to the new location."
+    },
+    {
+      "family": "tables-truncate-external-delta-only",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Before a full reload, a data engineer must remove all rows from two Unity Catalog external tables: main.raw.events_delta, stored in Delta Lake format, and main.raw.events_csv, stored as CSV files. How does TRUNCATE TABLE behave on these tables?",
+      "options": [
+        {
+          "text": "It works on the external Delta table but not on the external CSV table",
+          "correct": true,
+          "why": "Delta Lake tables can be truncated whether they are managed or external, but tables in other formats, such as CSV, Parquet or ORC, must not be external, so TRUNCATE fails on events_csv."
+        },
+        {
+          "text": "It fails on both tables, because only managed tables can be truncated",
+          "average": true,
+          "why": "Many people assume TRUNCATE is for managed tables only, but Delta tables can be truncated when external too; the restriction applies only to non-Delta formats."
+        },
+        {
+          "text": "It works on both tables and deletes the CSV files from the S3 path",
+          "why": "TRUNCATE isn't supported on the external CSV table, and Unity Catalog doesn't manage or delete the files behind a non-Delta external table."
+        },
+        {
+          "text": "It works on the CSV table only, because Delta tables need DELETE FROM",
+          "why": "Delta tables support TRUNCATE TABLE whether they are managed or external; it's the external CSV table that can't be truncated."
+        }
+      ],
+      "in_practice": "Delta is the easier format for external tables that get reloaded: emptying them is one logged table operation, while emptying a CSV-backed external table means deleting S3 files by hand, outside Unity Catalog's audit trail.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-truncate-table",
+      "evidence": "Delta Lake tables can be truncated whether they are managed or external. For other table formats, such as Parquet, CSV, or ORC, the table must not be external."
+    },
+    {
+      "family": "tables-storage-credential-grant-create-location-only",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A cloud admin registers an IAM role in Unity Catalog as the storage credential lake_cred. The platform team will define external locations from it, and analysts will later read data under those locations. Following Databricks' recommendation, which privilege should be granted on lake_cred itself?",
+      "options": [
+        {
+          "text": "CREATE EXTERNAL LOCATION, to the platform team only",
+          "correct": true,
+          "why": "Databricks recommends granting only CREATE EXTERNAL LOCATION on a storage credential, to the people who define external locations. Data access is then granted on the narrower external locations."
+        },
+        {
+          "text": "READ FILES, to the analysts who will read the data",
+          "average": true,
+          "why": "READ FILES on the credential looks like a shortcut to data access, but it lets analysts read any path the IAM role can reach instead of a scoped external location."
+        },
+        {
+          "text": "ALL PRIVILEGES, to the platform team",
+          "why": "ALL PRIVILEGES gives the platform team far more than it needs; the recommendation is to grant CREATE EXTERNAL LOCATION and no other privileges on storage credentials."
+        },
+        {
+          "text": "CREATE EXTERNAL TABLE, to the analysts",
+          "why": "Analysts who only read data don't need to create external tables, and that privilege belongs on a scoped external location rather than on the credential."
+        }
+      ],
+      "in_practice": "Keeping storage credentials to CREATE EXTERNAL LOCATION means one IAM role that reaches a whole bucket can back many narrow external locations, so a grant mistake exposes one path instead of every dataset the role can touch.",
+      "source": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/manage-storage-credentials",
+      "evidence": "Databricks recommends that you grant only CREATE EXTERNAL LOCATION and no other privileges on storage credentials."
+    },
+    {
+      "family": "tables-drop-storage-credential-dependent-locations",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A security team is retiring the IAM role behind the storage credential legacy_cred. A platform engineer who owns the credential runs DROP STORAGE CREDENTIAL legacy_cred, and it fails because two external locations still use it. The external tables under both locations must keep working. What should the engineer do?",
+      "options": [
+        {
+          "text": "Assign a new storage credential to both external locations, then drop legacy_cred",
+          "correct": true,
+          "why": "A storage credential that external locations depend on isn't deleted by default. Moving both locations to a new credential first removes the dependency, so the drop succeeds and the locations stay usable."
+        },
+        {
+          "text": "Rerun the drop with FORCE, since the external locations keep working without it",
+          "average": true,
+          "why": "FORCE does delete a credential that external locations depend on, but those locations become unusable until a new credential is assigned, so the external tables would break."
+        },
+        {
+          "text": "Revoke every grant on legacy_cred, then run the drop again",
+          "why": "The drop is blocked by the external locations that depend on the credential, not by grants on it, so revoking privileges doesn't let it succeed."
+        },
+        {
+          "text": "Mark legacy_cred as read-only, then run the drop again",
+          "why": "Marking a credential read-only only makes the storage it covers read-only; the external locations still depend on it, so the drop is still refused."
+        }
+      ],
+      "in_practice": "Rotating credentials in this order is invisible to users: the locations switch to the new IAM role, queries keep running, and only then is the old role removed, instead of a FORCE drop that takes every table under those locations offline.",
+      "source": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/manage-storage-credentials",
+      "evidence": "By default, if the credential is used by an external location, it is not deleted. FORCE deletes the credential even if external locations depend on it. Those external locations are no longer usable until you assign a new credential."
+    },
+    {
+      "family": "tables-external-location-read-only-flag",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team must guarantee, as a regulator requires, that the archive bucket s3://acme-archive is never modified from Databricks. Several groups hold WRITE FILES on archive_loc, the external location for the bucket, some hold MODIFY on external tables stored there, and the IAM role behind its storage credential must keep write access because other systems share it. Which single change blocks writes from Databricks for every user?",
+      "options": [
+        {
+          "text": "Mark archive_loc as read-only in Catalog Explorer",
+          "correct": true,
+          "why": "A read-only external location blocks writes to its files and inserts into tables stored there, regardless of the IAM role's permissions and of any Unity Catalog grants on the location."
+        },
+        {
+          "text": "Revoke WRITE FILES on archive_loc from every group",
+          "average": true,
+          "why": "Revoking WRITE FILES stops direct file writes, but users with MODIFY on the external tables could still insert rows, and a later grant could reopen file writes."
+        },
+        {
+          "text": "Remove the S3 write actions from the credential's IAM role",
+          "why": "Changing the IAM role would block writes, but the other systems that share the role need its write access, so this breaks them."
+        },
+        {
+          "text": "Bind archive_loc to a single production workspace",
+          "why": "Workspace binding limits where the location's privileges can be used, but users in the bound workspace could still write to it."
+        }
+      ],
+      "in_practice": "A read-only flag is a guardrail that survives grant mistakes: even if someone later grants WRITE FILES or MODIFY, the archive stays unchanged. The change can take up to 60 minutes to reach all compute, so set it before the deadline.",
+      "source": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/manage-external-locations",
+      "evidence": "Making external locations read-only: Prevents users from writing to files in those external locations, regardless of any write permissions granted by the IAM role that underlies the storage credential, and regardless of the Unity Catalog permissions granted on that external location. Prevents users from inserting data into tables in those external locations."
+    },
+    {
+      "family": "tables-shared-location-one-writer-metastore",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A company runs two Unity Catalog metastores, one per AWS region. The S3 external location s3://acme-shared/reference is registered in both, and each metastore has an external Delta table over s3://acme-shared/reference/products. Data engineering teams in both regions now ask for MODIFY so they can MERGE product updates from their own workspaces. What should the platform team do?",
+      "options": [
+        {
+          "text": "Let only one metastore's table accept writes and give the other region read access",
+          "correct": true,
+          "why": "Writes from different metastores to the same external table can cause consistency issues, while reading one S3 location from several metastores is safe, so a single writing metastore with readers elsewhere is the safe pattern."
+        },
+        {
+          "text": "Grant MODIFY in both metastores, since the Delta log serializes concurrent writes",
+          "average": true,
+          "why": "Delta's optimistic concurrency is the usual reassurance, but Databricks warns against granting write access to tables on an S3 location shared by multiple metastores, because their writes can leave the table inconsistent."
+        },
+        {
+          "text": "Grant WRITE FILES on the location in both metastores instead of MODIFY",
+          "why": "Moving the grant to the file level doesn't change the problem: both metastores would still write to the same table data in the same S3 location."
+        },
+        {
+          "text": "Convert both tables to managed so that each metastore controls its own writes",
+          "why": "Converting both would copy the data into each metastore's managed storage, leaving two diverging product tables instead of one shared reference dataset."
+        }
+      ],
+      "in_practice": "One writer per shared dataset is cheap insurance: one region's pipeline owns the MERGE, the other region reads the same files with no copy, and nobody has to repair a table after two metastores commit conflicting changes.",
+      "source": "https://docs.databricks.com/aws/en/tables/external",
+      "evidence": "When an S3 external location is associated with multiple metastores, avoid granting write access to tables that use that S3 location because writes from different metastores to the same external table can cause consistency issues. However, reading from the same S3 external location across multiple metastores is safe."
+    },
+    {
+      "family": "tables-recovery-period-schema-overrides-catalog",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team ran ALTER CATALOG analytics RETAIN DROPPED TO 30 DAYS to protect its curated tables (configurable recovery periods are in Public Preview). In the analytics.etl_scratch schema, nightly pipelines create and drop hundreds of staging tables, and their dropped data now stays in storage for 30 days. The team wants scratch data purged sooner while the curated schemas keep 30 days. What should the team do?",
+      "options": [
+        {
+          "text": "Run ALTER SCHEMA analytics.etl_scratch RETAIN DROPPED TO 7 DAYS",
+          "correct": true,
+          "why": "Recovery periods can be set on both a catalog and a schema, and the schema-level setting takes precedence for tables in that schema, so the scratch schema gets 7 days while the rest of the catalog keeps 30."
+        },
+        {
+          "text": "Run ALTER CATALOG analytics RETAIN DROPPED TO 7 DAYS",
+          "average": true,
+          "why": "Lowering the catalog setting does shorten retention for the scratch tables, but it also cuts the curated schemas to 7 days, which breaks the team's requirement."
+        },
+        {
+          "text": "Drop the staging tables with DROP TABLE ... FORCE",
+          "why": "FORCE lets you drop a managed table that has dependent shallow clones; it doesn't skip the recovery period for the dropped data."
+        },
+        {
+          "text": "Set delta.deletedFileRetentionDuration to 1 day on each staging table",
+          "why": "That property controls how long VACUUM keeps files removed from a live table; it doesn't change how long a dropped table stays recoverable."
+        }
+      ],
+      "in_practice": "Per-schema recovery periods let one catalog hold both kinds of data: a scratch schema churning through hundreds of tables a night stops paying for weeks of dead files, while curated tables keep a month of protection against accidental drops.",
+      "source": "https://docs.databricks.com/aws/en/tables/managed",
+      "evidence": "If recovery periods are set at both levels, the schema-level setting takes precedence for tables in that schema. The recovery period can be 0 hours, which disables recovery, or 7 to 30 days."
+    },
+    {
+      "family": "tables-recovery-period-only-future-drops",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "On Friday, October 2, a teammate dropped the managed table main.finance.fx_rates while the main.finance schema used the default recovery period. On Monday, October 5, a governance lead ran ALTER SCHEMA main.finance RETAIN DROPPED TO 30 DAYS (Public Preview). On Wednesday, October 14, a data engineer notices the missing table and runs UNDROP TABLE main.finance.fx_rates. What happens?",
+      "options": [
+        {
+          "text": "It fails, because the new period applies only to tables dropped after it was set",
+          "correct": true,
+          "why": "A recovery period setting affects only tables dropped after it is configured. fx_rates was dropped under the 7-day default, so its recovery window closed on October 9."
+        },
+        {
+          "text": "It succeeds, because the schema's 30-day period now covers the dropped table",
+          "average": true,
+          "why": "It's easy to assume the new setting extends every dropped table in the schema, but tables that were already dropped keep the period that applied when they were dropped."
+        },
+        {
+          "text": "It succeeds, but only when the schema owner runs the command",
+          "why": "Who runs UNDROP doesn't matter here: the table is past its recovery window, so no principal can undrop it."
+        },
+        {
+          "text": "It fails, because recovery periods must first be set at the catalog level",
+          "why": "A recovery period can be set on a schema directly, and the schema setting even takes precedence over the catalog's. The failure comes from timing, not from the level."
+        }
+      ],
+      "in_practice": "Recovery periods are a policy to set before an incident, not a fix after one: teams with critical tables set a long period when the schema is created, because raising it after a drop doesn't help the table already lost.",
+      "source": "https://docs.databricks.com/aws/en/tables/managed",
+      "evidence": "By default, tables are recoverable for 7 days after being dropped. ... This setting only applies to tables dropped after it is configured. It doesn't affect tables that were already dropped."
+    },
+    {
+      "family": "tables-undrop-readd-key-constraints",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer runs UNDROP TABLE main.sales.customers to recover a managed table that a teammate dropped yesterday. Before the drop, the table had SELECT granted to the analysts group, the property delta.enableChangeDataFeed = true, and a PRIMARY KEY constraint on customer_id that a BI tool relies on. What must the engineer re-create by hand after the UNDROP?",
+      "options": [
+        {
+          "text": "The PRIMARY KEY constraint, with ALTER TABLE ... ADD CONSTRAINT",
+          "correct": true,
+          "why": "UNDROP recovers table metadata such as privileges, column specs and properties, but primary and foreign key constraints aren't recovered and must be re-added with ALTER TABLE ADD CONSTRAINT."
+        },
+        {
+          "text": "The SELECT grant for the analysts group, with GRANT",
+          "average": true,
+          "why": "Grants are what people most expect to lose, yet UNDROP restores table privileges along with the table, so the analysts' access comes back on its own."
+        },
+        {
+          "text": "The change data feed property, with ALTER TABLE ... SET TBLPROPERTIES",
+          "why": "Table properties are part of the metadata UNDROP recovers, so delta.enableChangeDataFeed is already set again after the command."
+        },
+        {
+          "text": "Nothing, because UNDROP restores the table exactly as it was",
+          "why": "UNDROP restores privileges, column specs and properties, but not primary and foreign key constraints, so one piece still needs manual work."
+        }
+      ],
+      "in_practice": "A recovery runbook that ends with re-adding key constraints keeps BI tools that read them for relationships working; keeping the constraint DDL in source control turns that step into a quick rerun.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-undrop-table",
+      "evidence": "Table metadata – such as table privileges, column spec, and properties – will be recovered. Primary and foreign key constraints are not recovered by the UNDROP command. Recreate them manually using ALTER TABLE ADD CONSTRAINT after the table has been recovered."
+    },
+    {
+      "family": "tables-undrop-older-version-by-id",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "In the schema main.ml, the managed table features was dropped on Monday, re-created by a job, and dropped again on Wednesday. On Thursday, a data scientist needs the version that was dropped on Monday. How can a data engineer recover that specific table?",
+      "options": [
+        {
+          "text": "Find its tableId with SHOW TABLES DROPPED, then run UNDROP TABLE WITH ID",
+          "correct": true,
+          "why": "SHOW TABLES DROPPED lists the dropped tables in a schema that can still be undropped, with a tableId for each dropped version, and UNDROP TABLE WITH ID recovers exactly that one."
+        },
+        {
+          "text": "Run UNDROP TABLE main.ml.features",
+          "average": true,
+          "why": "UNDROP by name recovers the most recently dropped table with that name, which is Wednesday's version, not Monday's."
+        },
+        {
+          "text": "Run RESTORE TABLE main.ml.features TO TIMESTAMP AS OF Monday",
+          "why": "RESTORE rolls back a table that exists; it can't bring back a dropped table, and no table named features exists right now."
+        },
+        {
+          "text": "Run DESCRIBE HISTORY main.ml.features to find Monday's version",
+          "why": "DESCRIBE HISTORY needs an existing table and shows its commits, not the separate dropped tables that once used the name."
+        }
+      ],
+      "in_practice": "Jobs that drop and re-create tables by name leave several dropped versions behind; listing them by ID turns a guess into a precise recovery, and the deletedAt and createdAt columns show which version is which.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-aux-show-tables-dropped",
+      "evidence": "This command lists all tables which have been dropped within the schema in Unity Catalog, but can still be undropped. ... tableId: The table ID that can be used to identify and undrop a specific version of the dropped table."
+    },
+    {
+      "family": "tables-undrop-external-keeps-grants",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "On Wednesday morning, a data engineer accidentally ran DROP TABLE on main.partner.shipments, an external Delta table over s3://acme-partner/shipments. The engineer owns the table, holds USE CATALOG, USE SCHEMA and CREATE TABLE on its parents, and has CREATE EXTERNAL TABLE on the external location. Partner analysts need the table back the same day with its grants and properties, with as little rework as possible. What should the engineer do?",
+      "options": [
+        {
+          "text": "Run UNDROP TABLE main.partner.shipments",
+          "correct": true,
+          "why": "UNDROP recovers dropped managed or external tables in Unity Catalog within the recovery period, with their metadata. For an external table it also needs CREATE EXTERNAL TABLE on the location, which the engineer has."
+        },
+        {
+          "text": "Re-register the path with CREATE TABLE ... LOCATION, then re-apply the grants",
+          "average": true,
+          "why": "Because an external table's files survive a drop, re-registering the path brings the data back, but it creates a new table, so every grant and property must be rebuilt by hand."
+        },
+        {
+          "text": "Run RESTORE TABLE main.partner.shipments to its last version",
+          "why": "RESTORE rolls an existing table back to an earlier version; it can't recover a table that has been dropped from Unity Catalog."
+        },
+        {
+          "text": "Ask a metastore admin to run UNDROP, since owners can't recover external tables",
+          "why": "A table owner with CREATE TABLE and USE SCHEMA on the schema, USE CATALOG, and CREATE EXTERNAL TABLE on the location can run UNDROP; no admin is needed."
+        }
+      ],
+      "in_practice": "UNDROP keeps an accidental drop from turning into an access incident: re-registering an external path by hand restores the data but loses every grant and property, which for a shared partner table can mean hours of access requests.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-undrop-table",
+      "evidence": "The UNDROP command addresses the concern of managed or external relations (tables or materialized views) located in Unity Catalog being accidentally dropped or deleted. ... For example, to undrop an external table, you must also have CREATE EXTERNAL TABLE on the external location or storage credential, which must exist."
+    },
+    {
+      "family": "tables-rename-stays-in-catalog",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer finished building main_dev.sales.orders_v2 and tries to promote it by running ALTER TABLE main_dev.sales.orders_v2 RENAME TO main_prod.sales.orders. The statement fails. What is the cause?",
+      "options": [
+        {
+          "text": "A Unity Catalog table can be renamed only within its own catalog",
+          "correct": true,
+          "why": "For Unity Catalog tables, the new name given to RENAME TO must be in the same catalog as the original table, so a rename can't move a table from main_dev to main_prod."
+        },
+        {
+          "text": "The engineer lacks CREATE TABLE on the main_prod.sales schema",
+          "average": true,
+          "why": "Missing privileges are a common cause of failures, but even with every privilege on main_prod, RENAME TO can't cross catalogs, so the statement would still fail."
+        },
+        {
+          "text": "Managed tables can't be renamed once data has been written to them",
+          "why": "ALTER TABLE ... RENAME TO works on managed tables that hold data; the limit is that the new name must stay in the same catalog."
+        },
+        {
+          "text": "RENAME TO accepts only a bare table name, not a qualified one",
+          "why": "A qualified target name is accepted; what breaks this statement is that the target is in a different catalog."
+        }
+      ],
+      "in_practice": "Promoting a table from a dev catalog to a prod catalog therefore needs a copy or a rebuild, such as a CTAS or a pipeline run that writes the table in prod; renames only help within one catalog, for example swapping a staging name for the final one.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-alter-table",
+      "evidence": "RENAME TO to_table_name Renames the table. ... For Unity Catalog tables, the to_table_name must be within the same catalog as table_name."
+    },
+    {
+      "family": "tables-foreign-to-managed-copy-keeps-source",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A company federates its AWS Glue catalog into Unity Catalog as the foreign catalog glue_fed. A data engineer must convert the Delta foreign table glue_fed.sales.orders to a Unity Catalog managed table on Databricks Runtime 17.3, but another team's Glue-based jobs must keep reading the original Glue table for one more month. Which command fits?",
+      "options": [
+        {
+          "text": "ALTER TABLE glue_fed.sales.orders SET MANAGED COPY",
+          "correct": true,
+          "why": "For a foreign table, SET MANAGED needs MOVE or COPY. COPY converts the table to managed without modifying or disabling the source table in the external catalog, so the Glue jobs keep working."
+        },
+        {
+          "text": "ALTER TABLE glue_fed.sales.orders SET MANAGED",
+          "average": true,
+          "why": "The plain form is the one used for external tables; on a foreign table it fails with DELTA_ALTER_TABLE_SET_MANAGED_COPY_OR_MOVE_REQUIRED because MOVE or COPY must be chosen."
+        },
+        {
+          "text": "ALTER TABLE glue_fed.sales.orders SET MANAGED MOVE",
+          "why": "MOVE converts the table but disables access to the source table in the external catalog, so the other team's Glue jobs would stop working."
+        },
+        {
+          "text": "ALTER TABLE glue_fed.sales.orders SET EXTERNAL",
+          "why": "SET EXTERNAL turns a foreign table into a Unity Catalog external table, not a managed one, so it misses the goal."
+        }
+      ],
+      "in_practice": "COPY buys a safe overlap period but leaves two copies of the data, so the team owns the cut-over: stopping writes to the Glue table and moving the last workloads before the two copies drift apart.",
+      "source": "https://docs.databricks.com/aws/en/tables/convert-to-managed",
+      "evidence": "COPY Converts the table to managed without modifying or disabling access to the source table in the external catalog. ... If you omit both MOVE and COPY when converting a foreign table, the command fails with DELTA_ALTER_TABLE_SET_MANAGED_COPY_OR_MOVE_REQUIRED."
+    },
+    {
+      "family": "tables-set-managed-truncate-uniform-history",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer must convert the external Delta table main.bi.sales to a Unity Catalog managed table. The table has Apache Iceberg reads (UniForm) enabled so that an external Iceberg client can query it. Which command should the engineer run?",
+      "options": [
+        {
+          "text": "ALTER TABLE main.bi.sales SET MANAGED TRUNCATE UNIFORM HISTORY",
+          "correct": true,
+          "why": "External tables with Iceberg reads enabled are converted with SET MANAGED TRUNCATE UNIFORM HISTORY, which truncates only the UniForm Iceberg history and keeps the Delta Lake history."
+        },
+        {
+          "text": "ALTER TABLE main.bi.sales SET MANAGED",
+          "average": true,
+          "why": "The plain form is right for most external tables, but with Iceberg reads enabled it fails with DELTA_ALTER_TABLE_SET_MANAGED_DOES_NOT_SUPPORT_UNIFORM_ICEBERG."
+        },
+        {
+          "text": "ALTER TABLE main.bi.sales SET MANAGED COPY",
+          "why": "MOVE and COPY apply only to foreign tables; adding COPY to an external table conversion makes the command fail."
+        },
+        {
+          "text": "ALTER TABLE main.bi.sales SET EXTERNAL",
+          "why": "SET EXTERNAL converts foreign tables into external tables; main.bi.sales is already external and needs to become managed."
+        }
+      ],
+      "in_practice": "Truncating the UniForm history causes a short Iceberg read and write outage, so schedule the conversion when the Iceberg client is idle; the Delta history is kept, so Delta time travel still works afterward.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-alter-table",
+      "evidence": "TRUNCATE UNIFORM HISTORY Applies to external tables that have Apache Iceberg reads enabled. If the table has Iceberg reads enabled and you omit this option, Databricks raises DELTA_ALTER_TABLE_SET_MANAGED_DOES_NOT_SUPPORT_UNIFORM_ICEBERG."
+    },
+    {
+      "family": "tables-conversion-restart-reader-stream",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer converted the external Delta table main.iot.readings to a managed table with SET MANAGED. Minutes later, a downstream Structured Streaming job on Databricks Runtime 18.2 that reads the table stops with DELTA_STREAMING_INTERRUPTED_BY_MANAGED_TABLE_CONVERSION. The team needs it running again without reprocessing or skipping data. What should the engineer do?",
+      "options": [
+        {
+          "text": "Restart the stream with its existing configuration and checkpoint",
+          "correct": true,
+          "why": "A conversion stops existing streams on purpose; restarting with the same configuration lets the stream resume from its last committed offset, now reading the converted table."
+        },
+        {
+          "text": "Delete the checkpoint, then restart the stream from the beginning",
+          "average": true,
+          "why": "A fresh checkpoint feels like a clean start after a table change, but it makes the stream re-read the whole table and reprocess data it already handled."
+        },
+        {
+          "text": "Point the stream at the old S3 path instead of the table name",
+          "why": "The stream isn't failing because of how it names the table; every existing stream must be restarted after conversion, and path-based reads only add redirect overhead."
+        },
+        {
+          "text": "Run MSCK REPAIR TABLE main.iot.readings SYNC METADATA first",
+          "why": "REPAIR TABLE SYNC METADATA syncs external table metadata changed outside Unity Catalog; it doesn't restart a stream that the conversion stopped."
+        }
+      ],
+      "in_practice": "Plan every conversion with a restart step for each stream that touches the table: the streams stop to protect consistency, and an orchestrator retry with the same checkpoint brings them back quickly with no data loss.",
+      "source": "https://docs.databricks.com/aws/en/tables/convert-to-managed",
+      "evidence": "For reads, the stream raises an error: DELTA_STREAMING_INTERRUPTED_BY_MANAGED_TABLE_CONVERSION: ... Restart the stream and it will automatically resume from the last committed offset using the converted table"
+    },
+    {
+      "family": "tables-foreign-parquet-set-external",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A company federated its Hive metastore into Unity Catalog as the foreign catalog hms_fed. The table hms_fed.logs.web_events is an external HMS table stored as Parquet in S3, and several readers depend on the Parquet files. A data engineer with the required permissions must make it a writable Unity Catalog table that keeps its name, permissions and history, without changing its file format. Which command should the engineer run on Databricks Runtime 17.3?",
+      "options": [
+        {
+          "text": "ALTER TABLE hms_fed.logs.web_events SET EXTERNAL",
+          "correct": true,
+          "why": "SET EXTERNAL converts a foreign table into a Unity Catalog external table and keeps its name, settings, permissions, views and history. It supports Parquet as well as Delta, ORC, Avro, JSON, CSV and TEXT."
+        },
+        {
+          "text": "ALTER TABLE hms_fed.logs.web_events SET MANAGED COPY",
+          "average": true,
+          "why": "Converting to managed is the usual recommendation, but SET MANAGED needs a Delta Lake source, so it can't convert this Parquet foreign table, and managed tables don't store data as plain Parquet tables."
+        },
+        {
+          "text": "ALTER TABLE hms_fed.logs.web_events SET MANAGED MOVE",
+          "why": "MOVE is the other foreign-table form of SET MANAGED and has the same Delta-only requirement; it would also cut off access through the Hive metastore."
+        },
+        {
+          "text": "CREATE TABLE main.logs.web_events AS SELECT * FROM hms_fed.logs.web_events",
+          "why": "CTAS rewrites the data into a new managed Delta table with a new name and no history or grants, which misses every stated requirement."
+        }
+      ],
+      "in_practice": "Before converting, stop writers on the Hive metastore side and run ALTER TABLE ... SET EXTERNAL DRY RUN, which returns DRY_RUN_SUCCESS when the table can be converted; concurrent writes from both sides aren't supported.",
+      "source": "https://docs.databricks.com/aws/en/tables/convert-foreign-external",
+      "evidence": "The ALTER TABLE ... SET EXTERNAL command converts a foreign table to a Unity Catalog external table ... It supports Delta Lake, Parquet, ORC, Avro, JSON, CSV, and TEXT source tables in Databricks Runtime 17.3 and above."
+    },
+    {
+      "family": "tables-volume-files-load-into-table",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "CSV exports land every day in the Unity Catalog volume /Volumes/main/raw/exports. A data engineer wants analysts to query the data as a governed table in the main.raw schema. Which approach does Unity Catalog support?",
+      "options": [
+        {
+          "text": "Load the files into a table, for example with CTAS, COPY INTO or Auto Loader",
+          "correct": true,
+          "why": "Files in a volume can't be registered as a Unity Catalog table, because volumes are for path-based access. A volume serves as a staging location that Auto Loader, COPY INTO or CTAS reads to load a table."
+        },
+        {
+          "text": "Create an external table whose LOCATION is the volume's /Volumes path",
+          "average": true,
+          "why": "Pointing a table at the volume path looks like the natural way to expose the files, but Unity Catalog doesn't let files in a volume be registered as a table."
+        },
+        {
+          "text": "Grant analysts READ VOLUME so that they can query the volume as a table",
+          "why": "READ VOLUME lets users read and list files in the volume; it doesn't turn the volume into a table that can be queried by name."
+        },
+        {
+          "text": "Convert the volume into a managed table with an ALTER VOLUME statement",
+          "why": "No statement converts a volume into a table; tabular data in a volume has to be loaded into a table."
+        }
+      ],
+      "in_practice": "Treating the volume as the landing zone and the table as the governed product keeps both clean: raw files stay available for replays and audits, while analysts get a typed table with grants, lineage and history.",
+      "source": "https://docs.databricks.com/aws/en/volumes/",
+      "evidence": "You can't register files in volumes as tables in Unity Catalog. Volumes are intended for path-based data access only. Use tables when you want to work with tabular data in Unity Catalog. ... Register staging locations for ingestion. For example, using Auto Loader, COPY INTO, or CTAS (CREATE TABLE AS) statements."
+    },
+    {
+      "family": "tables-managed-iceberg-using-clause",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer needs an Apache Iceberg table in main.lake that Iceberg clients can write to through the Iceberg REST catalog, with Unity Catalog deciding where its files live and handling its upkeep. Which statement creates it?",
+      "options": [
+        {
+          "text": "CREATE TABLE main.lake.events (id BIGINT, ts TIMESTAMP) USING iceberg",
+          "correct": true,
+          "why": "A managed Iceberg table is created by naming the format with USING iceberg and giving no LOCATION; Unity Catalog then stores it in managed storage, and the Iceberg REST catalog gives Iceberg clients read and write access."
+        },
+        {
+          "text": "CREATE TABLE main.lake.events (id BIGINT, ts TIMESTAMP)",
+          "average": true,
+          "why": "Leaving out the format is how most managed tables are made, but without USING iceberg Databricks creates a Delta Lake table by default."
+        },
+        {
+          "text": "CREATE TABLE main.lake.events (id BIGINT, ts TIMESTAMP) USING iceberg LOCATION 's3://acme-lake/events'",
+          "why": "Adding LOCATION would make an external table, and Databricks supports the Iceberg format only for managed and foreign tables."
+        },
+        {
+          "text": "CREATE TABLE main.lake.events (id BIGINT, ts TIMESTAMP) TBLPROPERTIES ('delta.universalFormat.enabledFormats' = 'iceberg')",
+          "why": "UniForm adds Iceberg metadata to a Delta table, and the Iceberg REST catalog gives Iceberg clients only read access to such tables, so they couldn't write to it."
+        }
+      ],
+      "in_practice": "Choosing native managed Iceberg for tables that Iceberg engines must write avoids a two-format compromise, while Databricks still optimizes the table's metadata in the background with serverless compute.",
+      "source": "https://docs.databricks.com/aws/en/tables/managed",
+      "evidence": "To create an Apache Iceberg table, explicitly specify USING iceberg. Otherwise, Databricks creates a Delta Lake table by default. ... Iceberg REST Catalog (IRC) has read, write, and create access for Apache Iceberg clients to managed tables using Apache Iceberg and read-only access to Delta Lake tables with Apache Iceberg reads enabled."
+    },
+    {
+      "family": "tables-catalog-commits-transaction-prep",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer is writing a nightly SQL script that must update main.fin.ledger, a managed Delta table, and main.fin.ledger_audit, an external Delta table, inside one BEGIN ATOMIC ... END block, so that both changes commit or roll back together. Multi-table transactions rely on catalog commits, which are in Beta. Which preparation do the tables need?",
+      "options": [
+        {
+          "text": "Convert ledger_audit with SET MANAGED, then set 'delta.feature.catalogManaged' = 'supported' on both tables",
+          "correct": true,
+          "why": "Catalog commits, which let several tables commit as one atomic transaction, require Unity Catalog managed tables. The external audit table must be converted first; then the property turns catalog commits on for each table."
+        },
+        {
+          "text": "Set 'delta.feature.catalogManaged' = 'supported' on both tables and leave ledger_audit external",
+          "average": true,
+          "why": "The table property is the right one, but catalog commits work only on managed tables, so the external audit table can't take part until it is converted."
+        },
+        {
+          "text": "Set 'delta.isolationLevel' = 'Serializable' on both tables so that they commit as one unit",
+          "why": "A stricter isolation level changes how concurrent writes conflict on a single table; it doesn't let two tables commit atomically together."
+        },
+        {
+          "text": "Nothing, because any two Delta tables can already share one BEGIN ATOMIC transaction",
+          "why": "Delta Lake gives ACID guarantees per table; committing several tables together requires managed tables with catalog commits turned on."
+        }
+      ],
+      "in_practice": "Committing the ledger and its audit trail together removes a class of reconciliation jobs: a failed run leaves neither table half-updated, so finance never finds a ledger posting without its audit record.",
+      "source": "https://docs.databricks.com/aws/en/tables/features/catalog-commits",
+      "evidence": "Transactions spanning multiple tables: Run multiple SQL statements across multiple tables as a single atomic commit. ... Tables must be Unity Catalog managed tables (Delta or Iceberg) ... ALTER TABLE sales_data SET TBLPROPERTIES ('delta.feature.catalogManaged' = 'supported');"
+    },
+    {
+      "family": "tables-managed-open-apis-external-engines",
+      "objective": "governance.tables",
+      "guide": "7.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team keeps 300 Delta tables external only because an analytics group queries them from a self-managed Trino cluster. The team wants predictive optimization and lower storage costs, but the analytics lead worries that converting the tables to managed would lock Trino out. Which statement is accurate?",
+      "options": [
+        {
+          "text": "Trino can keep reading them through Unity Catalog's open APIs, such as the Unity REST API",
+          "correct": true,
+          "why": "Managed and external tables both support access from external engines through open APIs, including the Unity REST API and the Iceberg REST catalog, so managed tables don't cause vendor lock-in."
+        },
+        {
+          "text": "Managed tables are readable only from Databricks compute, so Trino would need exports",
+          "average": true,
+          "why": "This lock-in worry is common, but Databricks documents open API access to managed tables, and any engine that supports those APIs can reach them."
+        },
+        {
+          "text": "Trino could read the managed files directly with an IAM role on the managed bucket",
+          "why": "Direct storage access to managed tables bypasses Unity Catalog; Databricks warns against giving identities outside Unity Catalog access to managed storage."
+        },
+        {
+          "text": "Trino would have to use OpenSharing, the only external path to managed tables",
+          "why": "OpenSharing is one way to share managed tables, but not the only one: the Unity REST API and the Iceberg REST catalog also serve external engines."
+        }
+      ],
+      "in_practice": "Converting tables that an outside engine reads usually means pointing the engine at Unity Catalog's REST endpoint with credential vending, after a metastore admin enables external data access, rather than handing it bucket credentials.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/managed-versus-external",
+      "evidence": "Both managed and external tables support read, write, and create access from external engines via open APIs, including the Unity REST API and the Iceberg REST Catalog (IRC). This means that managed tables do not cause vendor lock-in."
+    }
+  ]
 }
