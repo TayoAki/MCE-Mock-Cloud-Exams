@@ -8,11 +8,29 @@
       "type": "multiple",
       "stem": "A data engineer compares a Lakeflow Connect SaaS connector for Salesforce with a Lakeflow Connect database connector for SQL Server. Which two components does the database connector use that the SaaS connector doesn't? (Choose two.)",
       "options": [
-        { "text": "An ingestion gateway that extracts snapshots and change logs from the source", "correct": true, "why": "Database connectors add an ingestion gateway, a pipeline that extracts snapshots, change logs and metadata from the source database and runs in its own job as a continuous task to capture changes." },
-        { "text": "Staging storage that holds extracted data before it is applied", "correct": true, "why": "Database connectors also use staging storage, a Unity Catalog volume that temporarily holds extracted data until the ingestion pipeline applies it to the destination tables." },
-        { "text": "A Unity Catalog connection that stores the source credentials", "average": true, "why": "Every Lakeflow Connect connector, SaaS and database alike, stores its authentication details in a Unity Catalog connection, so the connection isn't what sets the database connector apart." },
-        { "text": "A foreign catalog that mirrors the source database in Unity Catalog", "why": "A foreign catalog belongs to Lakehouse Federation and to query-based foreign catalog ingestion; a CDC database connector captures changes through its gateway instead." },
-        { "text": "A SQL warehouse that merges changes into the destination tables", "why": "The ingestion pipeline, not a SQL warehouse, writes the data into the destination streaming tables, and it runs on serverless compute." }
+        {
+          "text": "An ingestion gateway that extracts snapshots and change logs from the source",
+          "correct": true,
+          "why": "Database connectors add an ingestion gateway, a pipeline that extracts snapshots, change logs and metadata from the source database and runs in its own job as a continuous task to capture changes."
+        },
+        {
+          "text": "Staging storage that holds extracted data before it is applied",
+          "correct": true,
+          "why": "Database connectors also use staging storage, a Unity Catalog volume that temporarily holds extracted data until the ingestion pipeline applies it to the destination tables."
+        },
+        {
+          "text": "A Unity Catalog connection that stores the source credentials",
+          "average": true,
+          "why": "Every Lakeflow Connect connector, SaaS and database alike, stores its authentication details in a Unity Catalog connection, so the connection isn't what sets the database connector apart."
+        },
+        {
+          "text": "A foreign catalog that mirrors the source database in Unity Catalog",
+          "why": "A foreign catalog belongs to Lakehouse Federation and to query-based foreign catalog ingestion; a CDC database connector captures changes through its gateway instead."
+        },
+        {
+          "text": "A SQL warehouse that merges changes into the destination tables",
+          "why": "The ingestion pipeline, not a SQL warehouse, writes the data into the destination streaming tables, and it runs on serverless compute."
+        }
       ],
       "in_practice": "The gateway is what lets a database connector capture changes continuously, so plan for it as a separate always-on component with its own job and compute when you size and budget a CDC ingestion.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/",
@@ -26,10 +44,24 @@
       "type": "single",
       "stem": "A platform team adds a daily 06:00 schedule to a Lakeflow Connect pipeline. Which object is created behind the scenes to carry out that schedule?",
       "options": [
-        { "text": "A Lakeflow Job with the ingestion pipeline as a task, which can take more tasks", "correct": true, "why": "For each schedule added to an ingestion pipeline, Lakeflow Connect automatically creates a job in which the pipeline is a task, and you can add more tasks, such as downstream transformations, to that job." },
-        { "text": "A cron setting stored on the pipeline itself, with no job involved", "average": true, "why": "Treating the schedule as a pipeline-level cron setting is a common assumption, but Lakeflow Connect creates a real job for each schedule, which is why further tasks can be chained after the ingestion." },
-        { "text": "A continuous pipeline that polls the source once a day", "why": "A schedule runs the pipeline in triggered mode at the set times; continuous mode processes data as it arrives and isn't how a daily schedule works." },
-        { "text": "A file arrival trigger on the destination schema's storage", "why": "File arrival triggers start jobs when new files land in a storage location; they aren't how Lakeflow Connect runs an ingestion pipeline on a time schedule." }
+        {
+          "text": "A Lakeflow Job with the ingestion pipeline as a task, which can take more tasks",
+          "correct": true,
+          "why": "For each schedule added to an ingestion pipeline, Lakeflow Connect automatically creates a job in which the pipeline is a task, and you can add more tasks, such as downstream transformations, to that job."
+        },
+        {
+          "text": "A cron setting stored on the pipeline itself, with no job involved",
+          "average": true,
+          "why": "Treating the schedule as a pipeline-level cron setting is a common assumption, but Lakeflow Connect creates a real job for each schedule, which is why further tasks can be chained after the ingestion."
+        },
+        {
+          "text": "A continuous pipeline that polls the source once a day",
+          "why": "A schedule runs the pipeline in triggered mode at the set times; continuous mode processes data as it arrives and isn't how a daily schedule works."
+        },
+        {
+          "text": "A file arrival trigger on the destination schema's storage",
+          "why": "File arrival triggers start jobs when new files land in a storage location; they aren't how Lakeflow Connect runs an ingestion pipeline on a time schedule."
+        }
       ],
       "in_practice": "Because the schedule is a regular job, a team can add a dependent task, such as refreshing a silver table right after ingestion, and get one run history and one set of alerts for the whole flow instead of two schedules to keep in step.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/",
@@ -43,10 +75,24 @@
       "type": "single",
       "stem": "A data engineer wants per-table row counts and snapshot progress for a running Lakeflow Connect ingestion gateway, to feed an alerting dashboard. Where are these progress events available?",
       "options": [
-        { "text": "In the gateway's event log, which can be queried with SQL through event_log()", "correct": true, "why": "The gateway writes flow_progress and operation_progress events to its event log table; you can view them on the Event log tab or query them with SQL using event_log('<gateway-id>')." },
-        { "text": "In the system.billing.usage system table for the workspace", "average": true, "why": "The system.billing.usage table tracks cost and usage of ingestion pipelines, not per-table row counts or snapshot completion percentages." },
-        { "text": "In the run output returned by the Jobs REST API for the gateway", "why": "Progress events are stored in the event log table and are not available through public APIs, so a Jobs API run output doesn't carry them." },
-        { "text": "In the DESCRIBE HISTORY output of each destination table", "why": "Table history lists commits to the destination tables; it doesn't report the gateway's per-table snapshot progress or its row counters per emission." }
+        {
+          "text": "In the gateway's event log, which can be queried with SQL through event_log()",
+          "correct": true,
+          "why": "The gateway writes flow_progress and operation_progress events to its event log table; you can view them on the Event log tab or query them with SQL using event_log('<gateway-id>')."
+        },
+        {
+          "text": "In the system.billing.usage system table for the workspace",
+          "average": true,
+          "why": "The system.billing.usage table tracks cost and usage of ingestion pipelines, not per-table row counts or snapshot completion percentages."
+        },
+        {
+          "text": "In the run output returned by the Jobs REST API for the gateway",
+          "why": "Progress events are stored in the event log table and are not available through public APIs, so a Jobs API run output doesn't carry them."
+        },
+        {
+          "text": "In the DESCRIBE HISTORY output of each destination table",
+          "why": "Table history lists commits to the destination tables; it doesn't report the gateway's per-table snapshot progress or its row counters per emission."
+        }
       ],
       "in_practice": "The gateway emits events for every table every few minutes, even when nothing changed, so a dashboard can tell a stalled table from an idle one and estimate how long a multi-terabyte initial snapshot still needs.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/gateway-event-logs",
@@ -60,10 +106,24 @@
       "type": "single",
       "stem": "A data engineer's Lakeflow Connect pipeline for a SaaS source starts failing on Saturday because the OAuth credentials in its connection have expired, and the automatic retries can't fix it. On Monday an admin updates the connection, and the next scheduled run starts. What does the connector do?",
       "options": [
-        { "text": "Resumes from the last cursor position it stored, so weekend changes are picked up", "correct": true, "why": "When an error needs human intervention, such as expired credentials, the connector stores the last position of its cursor and, when possible, picks up from that position on the next run, so changes made during the outage aren't skipped." },
-        { "text": "Requires a full refresh, because changes made during the outage were missed", "average": true, "why": "Assuming an outage forces a full reload is common, but the connector keeps its cursor position precisely to avoid missing data, so a full refresh isn't the normal recovery." },
-        { "text": "Ingests only changes made after Monday's run starts, so weekend changes are lost", "why": "The stored cursor marks where ingestion stopped, so the next run reads from that point rather than from the moment the run begins." },
-        { "text": "Keeps retrying with exponential backoff until the old token works again", "why": "Automatic retries with exponential backoff handle transient failures; an expired credential needs someone to update the connection, after which the next run proceeds." }
+        {
+          "text": "Resumes from the last cursor position it stored, so weekend changes are picked up",
+          "correct": true,
+          "why": "When an error needs human intervention, such as expired credentials, the connector stores the last position of its cursor and, when possible, picks up from that position on the next run, so changes made during the outage aren't skipped."
+        },
+        {
+          "text": "Requires a full refresh, because changes made during the outage were missed",
+          "average": true,
+          "why": "Assuming an outage forces a full reload is common, but the connector keeps its cursor position precisely to avoid missing data, so a full refresh isn't the normal recovery."
+        },
+        {
+          "text": "Ingests only changes made after Monday's run starts, so weekend changes are lost",
+          "why": "The stored cursor marks where ingestion stopped, so the next run reads from that point rather than from the moment the run begins."
+        },
+        {
+          "text": "Keeps retrying with exponential backoff until the old token works again",
+          "why": "Automatic retries with exponential backoff handle transient failures; an expired credential needs someone to update the connection, after which the next run proceeds."
+        }
       ],
       "in_practice": "Cursor-based recovery turns a credential lapse into a delay rather than a data gap: after a weekend outage, the Monday run catches up on two days of changes without a full reload of a multi-million-row object.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/",
@@ -77,10 +137,24 @@
       "type": "single",
       "stem": "A data engineer is preparing a production SQL Server database for a Lakeflow Connect database connector. Every table to be ingested has a primary key, and the DBA's top priority is keeping the extra load on the server as low as possible. Which change-capture setup should the DBA enable on these tables?",
       "options": [
-        { "text": "Change tracking on each table", "correct": true, "why": "Databricks recommends change tracking for any table with a primary key because it is a lightweight process that minimizes load on the source; it records that rows changed without storing every operation." },
-        { "text": "Change data capture (CDC) on each table", "average": true, "why": "CDC records every operation and keeps a history of changes, but that extra work can have more impact on source performance; it is the option for tables that lack a primary key." },
-        { "text": "Both change tracking and CDC on each table", "why": "When change tracking and CDC are both enabled, the SQL Server connector uses change tracking, so turning on CDC as well only adds load." },
-        { "text": "Neither; the gateway reads the transaction log unaided", "why": "The source must be prepared before ingestion, including enabling change tracking or CDC and creating a dedicated database user with the required privileges." }
+        {
+          "text": "Change tracking on each table",
+          "correct": true,
+          "why": "Databricks recommends change tracking for any table with a primary key because it is a lightweight process that minimizes load on the source; it records that rows changed without storing every operation."
+        },
+        {
+          "text": "Change data capture (CDC) on each table",
+          "average": true,
+          "why": "CDC records every operation and keeps a history of changes, but that extra work can have more impact on source performance; it is the option for tables that lack a primary key."
+        },
+        {
+          "text": "Both change tracking and CDC on each table",
+          "why": "When change tracking and CDC are both enabled, the SQL Server connector uses change tracking, so turning on CDC as well only adds load."
+        },
+        {
+          "text": "Neither; the gateway reads the transaction log unaided",
+          "why": "The source must be prepared before ingestion, including enabling change tracking or CDC and creating a dedicated database user with the required privileges."
+        }
       ],
       "in_practice": "On a busy OLTP server, change tracking on the primary-keyed tables keeps ingestion overhead low enough to avoid a special maintenance window, and CDC is kept for the few tables without a key.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/sql-server",
@@ -94,10 +168,24 @@
       "type": "single",
       "stem": "A data engineer runs a Lakeflow Connect Salesforce ingestion pipeline into a Unity Catalog schema. A Salesforce admin renames the custom field Region__c to Sales_Region__c on the Account object. After the next pipeline run, what does the destination table show?",
       "options": [
-        { "text": "A new Sales_Region__c column, with Region__c handled as a deleted column", "correct": true, "why": "The Salesforce connector supports column renames through automated schema evolution by treating them as a new column with the new name and a deleted column with the old name." },
-        { "text": "The Region__c column renamed in place to Sales_Region__c, history intact", "average": true, "why": "An in-place rename is the natural expectation, but the connector sees a rename as one column added and another removed, so queries that use the old name need updating." },
-        { "text": "A failed run until someone triggers a full refresh of the table", "why": "Renames are handled automatically; for the Salesforce connector, data type changes are the schema change that isn't evolved automatically." },
-        { "text": "No change, because renamed fields are ignored until the table is recreated", "why": "Automated schema evolution picks up the renamed field on the next run, so nothing has to be recreated." }
+        {
+          "text": "A new Sales_Region__c column, with Region__c handled as a deleted column",
+          "correct": true,
+          "why": "The Salesforce connector supports column renames through automated schema evolution by treating them as a new column with the new name and a deleted column with the old name."
+        },
+        {
+          "text": "The Region__c column renamed in place to Sales_Region__c, history intact",
+          "average": true,
+          "why": "An in-place rename is the natural expectation, but the connector sees a rename as one column added and another removed, so queries that use the old name need updating."
+        },
+        {
+          "text": "A failed run until someone triggers a full refresh of the table",
+          "why": "Renames are handled automatically; for the Salesforce connector, data type changes are the schema change that isn't evolved automatically."
+        },
+        {
+          "text": "No change, because renamed fields are ignored until the table is recreated",
+          "why": "Automated schema evolution picks up the renamed field on the next run, so nothing has to be recreated."
+        }
       ],
       "in_practice": "Because a rename arrives as a new column plus a retired one, a silver view that coalesces Sales_Region__c and Region__c keeps reports working across the change without touching the bronze table.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/salesforce",
@@ -111,10 +199,24 @@
       "type": "single",
       "stem": "A data engineer sets up a Lakeflow Connect database connector for SQL Server and schedules the ingestion pipeline to run once a day at 02:00 to keep costs low. A week later, the billing review shows classic compute running around the clock for this ingestion. What explains the charges?",
       "options": [
-        { "text": "The ingestion gateway runs continuously on classic compute, whatever the pipeline schedule", "correct": true, "why": "The gateway runs on classic compute and runs continuously to capture changes into staging storage, so its compute is billed even while the scheduled ingestion pipeline is idle." },
-        { "text": "Database ingestion pipelines ignore schedules and always run continuously", "average": true, "why": "The ingestion pipeline does follow its schedule and runs on serverless compute; the always-on part is the gateway, which is what lets the pipeline run at any schedule you choose." },
-        { "text": "The staging volume bills compute while it holds data for the next run", "why": "Staging storage is a Unity Catalog volume, which is storage rather than compute; it holds extracted data until it is applied or purged after 30 days." },
-        { "text": "The job created for the schedule keeps an all-purpose cluster running", "why": "The job created for a schedule runs the ingestion pipeline on serverless compute; it doesn't keep an all-purpose cluster alive between runs." }
+        {
+          "text": "The ingestion gateway runs continuously on classic compute, whatever the pipeline schedule",
+          "correct": true,
+          "why": "The gateway runs on classic compute and runs continuously to capture changes into staging storage, so its compute is billed even while the scheduled ingestion pipeline is idle."
+        },
+        {
+          "text": "Database ingestion pipelines ignore schedules and always run continuously",
+          "average": true,
+          "why": "The ingestion pipeline does follow its schedule and runs on serverless compute; the always-on part is the gateway, which is what lets the pipeline run at any schedule you choose."
+        },
+        {
+          "text": "The staging volume bills compute while it holds data for the next run",
+          "why": "Staging storage is a Unity Catalog volume, which is storage rather than compute; it holds extracted data until it is applied or purged after 30 days."
+        },
+        {
+          "text": "The job created for the schedule keeps an all-purpose cluster running",
+          "why": "The job created for a schedule runs the ingestion pipeline on serverless compute; it doesn't keep an all-purpose cluster alive between runs."
+        }
       ],
       "in_practice": "Budget a CDC ingestion as two parts: an always-on gateway sized for the source's change volume, plus serverless pipeline runs. Running the pipeline less often trims serverless cost but doesn't stop the gateway's classic compute.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/cdc-overview",
@@ -128,10 +230,24 @@
       "type": "single",
       "stem": "A data engineer ingests an Oracle orders table with a Lakeflow Connect query-based connector on an hourly schedule, using updated_at as the cursor column and SCD type 2 history. One order moved from PLACED to PAID to SHIPPED within 20 minutes, but the destination shows only a PLACED version followed by a SHIPPED version. What explains the missing PAID version?",
       "options": [
-        { "text": "Each run captures only the latest state of changed rows, not the states in between", "correct": true, "why": "Query-based connectors run on a schedule and read rows whose cursor value is above the last high-water mark, so they capture only the latest state of each changed row, not every intermediate state between runs." },
-        { "text": "The updated_at cursor isn't strictly increasing, so the PAID update was skipped", "average": true, "why": "A cursor problem would make changed rows go missing, yet this order was captured on both runs; the PAID state existed only between two runs, so no query ever saw it." },
-        { "text": "SCD type 2 tracks inserts and deletes but not updates to existing rows", "why": "SCD type 2 preserves the full history of row changes by adding new versioned rows; updates are exactly what it records." },
-        { "text": "The late-arrival re-read window merged the PAID version away as a duplicate", "why": "The re-read window only reconciles rows that haven't changed, idempotently; it doesn't remove distinct versions of a row." }
+        {
+          "text": "Each run captures only the latest state of changed rows, not the states in between",
+          "correct": true,
+          "why": "Query-based connectors run on a schedule and read rows whose cursor value is above the last high-water mark, so they capture only the latest state of each changed row, not every intermediate state between runs."
+        },
+        {
+          "text": "The updated_at cursor isn't strictly increasing, so the PAID update was skipped",
+          "average": true,
+          "why": "A cursor problem would make changed rows go missing, yet this order was captured on both runs; the PAID state existed only between two runs, so no query ever saw it."
+        },
+        {
+          "text": "SCD type 2 tracks inserts and deletes but not updates to existing rows",
+          "why": "SCD type 2 preserves the full history of row changes by adding new versioned rows; updates are exactly what it records."
+        },
+        {
+          "text": "The late-arrival re-read window merged the PAID version away as a duplicate",
+          "why": "The re-read window only reconciles rows that haven't changed, idempotently; it doesn't remove distinct versions of a row."
+        }
       ],
       "in_practice": "If every state transition matters, for example to measure time from payment to shipment, consider a CDC database connector, which reads the source's change log instead of polling for each row's latest state.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/query-based-overview",
@@ -145,10 +261,24 @@
       "type": "single",
       "stem": "Which Unity Catalog securable object stores the endpoint and credentials that Lakehouse Federation, Lakeflow Connect managed ingestion and governed JDBC access use to reach an external database?",
       "options": [
-        { "text": "A connection", "correct": true, "why": "A Unity Catalog connection is a securable that stores the endpoint and credentials for an external system, and it serves federation, managed ingestion, JDBC and HTTP access." },
-        { "text": "A storage credential", "average": true, "why": "A storage credential wraps a cloud credential for reaching cloud object storage; it doesn't hold a database host or a database login." },
-        { "text": "An external location", "why": "An external location pairs a cloud storage path with a storage credential; it governs file access, not database endpoints." },
-        { "text": "A service credential", "why": "A service credential gives access to non-storage cloud services, such as a secrets manager, rather than to an external relational database." }
+        {
+          "text": "A connection",
+          "correct": true,
+          "why": "A Unity Catalog connection is a securable that stores the endpoint and credentials for an external system, and it serves federation, managed ingestion, JDBC and HTTP access."
+        },
+        {
+          "text": "A storage credential",
+          "average": true,
+          "why": "A storage credential wraps a cloud credential for reaching cloud object storage; it doesn't hold a database host or a database login."
+        },
+        {
+          "text": "An external location",
+          "why": "An external location pairs a cloud storage path with a storage credential; it governs file access, not database endpoints."
+        },
+        {
+          "text": "A service credential",
+          "why": "A service credential gives access to non-storage cloud services, such as a secrets manager, rather than to an external relational database."
+        }
       ],
       "in_practice": "Keeping the database login in one connection means a password rotation is a single update instead of edits to dozens of notebooks, and access is granted on the connection rather than by passing secrets around.",
       "source": "https://docs.databricks.com/aws/en/connect/",
@@ -162,10 +292,24 @@
       "type": "single",
       "stem": "A data engineer creates a Unity Catalog connection to PostgreSQL with CREATE CONNECTION ... TYPE postgresql so that a foreign catalog and several notebooks can share it. How should the password be supplied in the OPTIONS clause?",
       "options": [
-        { "text": "As a secret reference: password secret('pg_scope', 'pg_password')", "correct": true, "why": "Databricks recommends secrets instead of plaintext strings for sensitive values in a connection; the secret() reference keeps the password out of the SQL text while the connection still authenticates." },
-        { "text": "As a plaintext string, since the connection hides it from querying users", "average": true, "why": "Querying users don't see stored credentials, but a plaintext password still sits in the CREATE CONNECTION statement, the notebook and query history, which is why Databricks recommends secrets." },
-        { "text": "Left out, with each notebook passing its own password read option", "why": "A foreign catalog gets its credentials from the named connection, so leaving them out breaks the catalog and spreads passwords across notebooks." },
-        { "text": "As the path of a workspace file that holds the password", "why": "Connection options take a value or a secret reference; a workspace file holding the password in plain text is no safer than typing it into the statement." }
+        {
+          "text": "As a secret reference: password secret('pg_scope', 'pg_password')",
+          "correct": true,
+          "why": "Databricks recommends secrets instead of plaintext strings for sensitive values in a connection; the secret() reference keeps the password out of the SQL text while the connection still authenticates."
+        },
+        {
+          "text": "As a plaintext string, since the connection hides it from querying users",
+          "average": true,
+          "why": "Querying users don't see stored credentials, but a plaintext password still sits in the CREATE CONNECTION statement, the notebook and query history, which is why Databricks recommends secrets."
+        },
+        {
+          "text": "Left out, with each notebook passing its own password read option",
+          "why": "A foreign catalog gets its credentials from the named connection, so leaving them out breaks the catalog and spreads passwords across notebooks."
+        },
+        {
+          "text": "As the path of a workspace file that holds the password",
+          "why": "Connection options take a value or a secret reference; a workspace file holding the password in plain text is no safer than typing it into the statement."
+        }
       ],
       "in_practice": "With the password in a secret scope, the security team can rotate it on schedule without anyone editing SQL, and the credential never shows up in notebook revisions or query history that many people can read.",
       "source": "https://docs.databricks.com/aws/en/query-federation/database-federation",
@@ -179,10 +323,24 @@
       "type": "single",
       "stem": "A data engineer's nightly Lakeflow Job reads a 200-million-row orders table with spark.read.jdbc(url, 'sales.orders', properties=props). The Spark UI shows the whole read running as a single task while the rest of the cluster sits idle. Which change parallelizes the read itself?",
       "options": [
-        { "text": "Pass column, lowerBound, upperBound and numPartitions to jdbc()", "correct": true, "why": "jdbc() reads partitions in parallel only when column or predicates is set; column requires lowerBound, upperBound and numPartitions, which split the key range into parallel queries." },
-        { "text": "Call .repartition(64) on the DataFrame right after the read", "average": true, "why": "Repartitioning happens after the data is read, so the single JDBC query still pulls every row through one task before the shuffle spreads it out." },
-        { "text": "Raise spark.sql.shuffle.partitions from 200 to 800", "why": "spark.sql.shuffle.partitions sets the partition count for shuffles such as joins and aggregations; it doesn't change how many queries a JDBC read sends." },
-        { "text": "Pass both column and predicates so they split the read together", "why": "When both are given, column takes precedence and predicates is ignored, so this adds nothing beyond setting column correctly." }
+        {
+          "text": "Pass column, lowerBound, upperBound and numPartitions to jdbc()",
+          "correct": true,
+          "why": "jdbc() reads partitions in parallel only when column or predicates is set; column requires lowerBound, upperBound and numPartitions, which split the key range into parallel queries."
+        },
+        {
+          "text": "Call .repartition(64) on the DataFrame right after the read",
+          "average": true,
+          "why": "Repartitioning happens after the data is read, so the single JDBC query still pulls every row through one task before the shuffle spreads it out."
+        },
+        {
+          "text": "Raise spark.sql.shuffle.partitions from 200 to 800",
+          "why": "spark.sql.shuffle.partitions sets the partition count for shuffles such as joins and aggregations; it doesn't change how many queries a JDBC read sends."
+        },
+        {
+          "text": "Pass both column and predicates so they split the read together",
+          "why": "When both are given, column takes precedence and predicates is ignored, so this adds nothing beyond setting column correctly."
+        }
       ],
       "in_practice": "Splitting the read on a numeric key such as order_id into 16 ranges can turn a two-hour single-threaded extract into one that fits the nightly window, as long as the source can serve 16 concurrent queries.",
       "source": "https://docs.databricks.com/aws/en/pyspark/reference/classes/dataframereader/jdbc",
@@ -196,10 +354,24 @@
       "type": "single",
       "stem": "A data engineer writes a notebook, run nightly by a Lakeflow Job, that calls a vendor's REST API and receives a CSV export. A second task in the job loads the file into a bronze table with Spark, and auditors want the raw files kept under Unity Catalog governance. Where should the notebook save the file?",
       "options": [
-        { "text": "In a Unity Catalog volume path, such as /Volumes/raw/vendor/landing/", "correct": true, "why": "Databricks recommends Unity Catalog volumes for all non-tabular data, and a download can target a /Volumes path directly, where the next task's Spark read works under Unity Catalog permissions." },
-        { "text": "On the driver's local disk under /tmp, read by the next task", "average": true, "why": "/tmp is the driver's ephemeral storage, which Spark can't read as a distributed source and which is wiped when the cluster terminates, so the next task may find nothing." },
-        { "text": "Under the DBFS root, for example dbfs:/FileStore/vendor/", "why": "DBFS root and DBFS mounts are deprecated and not recommended; Databricks points to Unity Catalog volumes instead." },
-        { "text": "As a workspace file next to the notebook in the user folder", "why": "Workspace files have size restrictions, and Databricks recommends them only for small data files used in development and testing." }
+        {
+          "text": "In a Unity Catalog volume path, such as /Volumes/raw/vendor/landing/",
+          "correct": true,
+          "why": "Databricks recommends Unity Catalog volumes for all non-tabular data, and a download can target a /Volumes path directly, where the next task's Spark read works under Unity Catalog permissions."
+        },
+        {
+          "text": "On the driver's local disk under /tmp, read by the next task",
+          "average": true,
+          "why": "/tmp is the driver's ephemeral storage, which Spark can't read as a distributed source and which is wiped when the cluster terminates, so the next task may find nothing."
+        },
+        {
+          "text": "Under the DBFS root, for example dbfs:/FileStore/vendor/",
+          "why": "DBFS root and DBFS mounts are deprecated and not recommended; Databricks points to Unity Catalog volumes instead."
+        },
+        {
+          "text": "As a workspace file next to the notebook in the user folder",
+          "why": "Workspace files have size restrictions, and Databricks recommends them only for small data files used in development and testing."
+        }
       ],
       "in_practice": "Landing each export in a dated volume folder gives auditors a trail of the raw files, and Auto Loader or COPY INTO can pick up only the new files on each nightly run.",
       "source": "https://docs.databricks.com/aws/en/volumes/download-internet-files",
@@ -213,10 +385,24 @@
       "type": "single",
       "stem": "A data engineer's notebook, scheduled by a Lakeflow Job, downloads a nightly zip archive of JSON files from a partner's HTTPS endpoint. The extracted JSON files must end up in a Unity Catalog volume, where Auto Loader picks them up. Which sequence follows Databricks guidance?",
       "options": [
-        { "text": "Download and unzip on the driver's ephemeral storage, then move the files to the volume", "correct": true, "why": "Volumes don't support random writes, so Databricks recommends downloading to ephemeral storage, unzipping there, and then moving the extracted files into the volume, for example with dbutils.fs.mv." },
-        { "text": "Download the zip into the volume and unzip it in place there", "average": true, "why": "Writing a plain download straight to a volume is fine, but unzipping needs random writes, which volumes don't support." },
-        { "text": "Download and unzip under /tmp, then point Auto Loader at /tmp", "why": "Driver-local /tmp is ephemeral storage that Spark can't read as a distributed source, and its contents disappear when the cluster terminates." },
-        { "text": "Download and unzip under the DBFS root, then copy to the volume", "why": "DBFS root is deprecated and not recommended; the documented scratch space for unzipping is the driver's ephemeral storage." }
+        {
+          "text": "Download and unzip on the driver's ephemeral storage, then move the files to the volume",
+          "correct": true,
+          "why": "Volumes don't support random writes, so Databricks recommends downloading to ephemeral storage, unzipping there, and then moving the extracted files into the volume, for example with dbutils.fs.mv."
+        },
+        {
+          "text": "Download the zip into the volume and unzip it in place there",
+          "average": true,
+          "why": "Writing a plain download straight to a volume is fine, but unzipping needs random writes, which volumes don't support."
+        },
+        {
+          "text": "Download and unzip under /tmp, then point Auto Loader at /tmp",
+          "why": "Driver-local /tmp is ephemeral storage that Spark can't read as a distributed source, and its contents disappear when the cluster terminates."
+        },
+        {
+          "text": "Download and unzip under the DBFS root, then copy to the volume",
+          "why": "DBFS root is deprecated and not recommended; the documented scratch space for unzipping is the driver's ephemeral storage."
+        }
       ],
       "in_practice": "Extracting on the driver's local disk and moving only finished files into the volume also makes it far less likely that Auto Loader picks up a partially extracted file and writes parse errors into bronze.",
       "source": "https://docs.databricks.com/aws/en/volumes/download-internet-files",
@@ -230,10 +416,24 @@
       "type": "single",
       "stem": "A data engineer's nightly Lakeflow Job reads a 500 GB PostgreSQL table with spark.read.jdbc, using column, lowerBound, upperBound and numPartitions=400 on a large autoscaling cluster. During the read, the production database is flooded with connections and other applications start timing out. Which change addresses the root cause?",
       "options": [
-        { "text": "Lower numPartitions so fewer concurrent queries hit the database", "correct": true, "why": "Each partition sends its own query to the source, and the docs warn that too many parallel partitions on a large cluster can crash external databases; a smaller numPartitions caps the concurrent load." },
-        { "text": "Add more workers so the 400 partitions finish sooner", "average": true, "why": "More workers let more of the 400 partitions run at once, which raises the number of concurrent queries and makes the database overload worse." },
-        { "text": "Replace column with 400 predicates covering the same ranges", "why": "Each predicate also defines one partition and one query, so 400 predicates put the same concurrent load on the database." },
-        { "text": "Raise spark.sql.shuffle.partitions to spread the load", "why": "spark.sql.shuffle.partitions controls partitions after a shuffle; it doesn't change how many JDBC queries the read sends to the database." }
+        {
+          "text": "Lower numPartitions so fewer concurrent queries hit the database",
+          "correct": true,
+          "why": "Each partition sends its own query to the source, and the docs warn that too many parallel partitions on a large cluster can crash external databases; a smaller numPartitions caps the concurrent load."
+        },
+        {
+          "text": "Add more workers so the 400 partitions finish sooner",
+          "average": true,
+          "why": "More workers let more of the 400 partitions run at once, which raises the number of concurrent queries and makes the database overload worse."
+        },
+        {
+          "text": "Replace column with 400 predicates covering the same ranges",
+          "why": "Each predicate also defines one partition and one query, so 400 predicates put the same concurrent load on the database."
+        },
+        {
+          "text": "Raise spark.sql.shuffle.partitions to spread the load",
+          "why": "spark.sql.shuffle.partitions controls partitions after a shuffle; it doesn't change how many JDBC queries the read sends to the database."
+        }
       ],
       "in_practice": "Agree a concurrency budget with the DBA, for example 16 to 32 parallel reads for a nightly extract, and size numPartitions to it; the job may run a bit longer, but the applications sharing the database stay responsive.",
       "source": "https://docs.databricks.com/aws/en/pyspark/reference/classes/dataframereader/jdbc",
@@ -247,10 +447,24 @@
       "type": "single",
       "stem": "Databricks describes three layers of ingestion products: Structured Streaming, Lakeflow Spark Declarative Pipelines and managed connectors. When choosing how to ingest a new source, which layer does Databricks recommend starting with?",
       "options": [
-        { "text": "Managed connectors, dropping a layer only if requirements aren't met", "correct": true, "why": "Databricks recommends starting with the most managed layer and dropping to the next one only when it doesn't meet requirements, for example when no managed connector supports the source." },
-        { "text": "Structured Streaming, so the pipeline never outgrows its tooling", "average": true, "why": "Structured Streaming offers the most customization, but starting there means building authentication, retries and schema handling that a managed connector already provides." },
-        { "text": "Lakeflow Spark Declarative Pipelines, since connectors suit only prototypes", "why": "Managed connectors are built for production, adding source-specific authentication, CDC, retries and schema evolution on top of pipelines; they aren't a prototyping tool." },
-        { "text": "Any of the three, since they offer the same level of automation", "why": "The layers differ in automation: each step up the stack takes on more operational work, which is exactly why the starting point matters." }
+        {
+          "text": "Managed connectors, dropping a layer only if requirements aren't met",
+          "correct": true,
+          "why": "Databricks recommends starting with the most managed layer and dropping to the next one only when it doesn't meet requirements, for example when no managed connector supports the source."
+        },
+        {
+          "text": "Structured Streaming, so the pipeline never outgrows its tooling",
+          "average": true,
+          "why": "Structured Streaming offers the most customization, but starting there means building authentication, retries and schema handling that a managed connector already provides."
+        },
+        {
+          "text": "Lakeflow Spark Declarative Pipelines, since connectors suit only prototypes",
+          "why": "Managed connectors are built for production, adding source-specific authentication, CDC, retries and schema evolution on top of pipelines; they aren't a prototyping tool."
+        },
+        {
+          "text": "Any of the three, since they offer the same level of automation",
+          "why": "The layers differ in automation: each step up the stack takes on more operational work, which is exactly why the starting point matters."
+        }
       ],
       "in_practice": "Starting managed means a Salesforce or SQL Server feed can reach production quickly with API changes and retries handled by Databricks; teams drop down only for sources or logic a connector can't cover.",
       "source": "https://docs.databricks.com/aws/en/ingestion/",
@@ -264,32 +478,33 @@
       "type": "multiple",
       "stem": "Managed connectors in Lakeflow Connect build on Lakeflow Spark Declarative Pipelines. Which two capabilities do they add for the sources they support? (Choose two.)",
       "options": [
-        { "text": "Source-specific authentication and long-term maintenance of the source API", "correct": true, "why": "Managed connectors extend pipelines with source-specific authentication and long-term API maintenance, so keeping up with a SaaS or database API is Databricks' work rather than the team's." },
-        { "text": "Automated retries and automated schema evolution", "correct": true, "why": "Managed connectors also add automated retries and automated schema evolution, along with CDC and edge-case handling, on top of what pipelines provide." },
-        { "text": "Full control to customize the ingestion logic for each table", "average": true, "why": "Customization is what the lower layers offer; managed connectors trade it for automation, and further customization belongs in pipelines or Structured Streaming downstream." },
-        { "text": "Exactly-once processing, which the lower layers can't guarantee", "why": "Exactly-once processing already comes from Structured Streaming, the bottom layer, so it isn't something only managed connectors add." },
-        { "text": "Direct writes to Hive metastore tables outside Unity Catalog", "why": "Managed connectors produce ingestion pipelines governed by Unity Catalog; landing data outside Unity Catalog isn't a capability they add." }
+        {
+          "text": "Source-specific authentication and long-term maintenance of the source API",
+          "correct": true,
+          "why": "Managed connectors extend pipelines with source-specific authentication and long-term API maintenance, so keeping up with a SaaS or database API is Databricks' work rather than the team's."
+        },
+        {
+          "text": "Automated retries and automated schema evolution",
+          "correct": true,
+          "why": "Managed connectors also add automated retries and automated schema evolution, along with CDC and edge-case handling, on top of what pipelines provide."
+        },
+        {
+          "text": "Full control to customize the ingestion logic for each table",
+          "average": true,
+          "why": "Customization is what the lower layers offer; managed connectors trade it for automation, and further customization belongs in pipelines or Structured Streaming downstream."
+        },
+        {
+          "text": "Exactly-once processing, which the lower layers can't guarantee",
+          "why": "Exactly-once processing already comes from Structured Streaming, the bottom layer, so it isn't something only managed connectors add."
+        },
+        {
+          "text": "Direct writes to Hive metastore tables outside Unity Catalog",
+          "why": "Managed connectors produce ingestion pipelines governed by Unity Catalog; landing data outside Unity Catalog isn't a capability they add."
+        }
       ],
       "in_practice": "The trade is control for upkeep: a team that would otherwise spend days each quarter chasing SaaS API changes and expired auth gets that handled by the connector, while custom logic moves to downstream silver pipelines.",
       "source": "https://docs.databricks.com/aws/en/ingestion/",
       "evidence": "Fully-managed connectors build on Lakeflow pipelines ... They extend Lakeflow pipelines functionality to also include source-specific authentication, CDC, edge case handling, long-term API maintenance, automated retries, automated schema evolution, and so on."
-    },
-    {
-      "family": "choosing-cloud-storage-standard-connector",
-      "objective": "ingestion.choosing",
-      "guide": "2.6",
-      "difficulty": 1,
-      "type": "single",
-      "stem": "A data engineer must ingest JSON files that land continuously in an S3 bucket into a Unity Catalog table. In the Lakeflow Connect file connector lineup, which option covers this source?",
-      "options": [
-        { "text": "A standard file connector, such as Auto Loader or COPY INTO", "correct": true, "why": "Cloud object storage such as S3 is covered by the standard file connectors, which use Spark and SQL APIs: Auto Loader or COPY INTO." },
-        { "text": "A managed file connector, like those for SharePoint and Google Drive", "average": true, "why": "Managed file connectors target enterprise file services (Google Drive, OneDrive and SharePoint); they aren't the option for files in your own S3 bucket." },
-        { "text": "A query-based connector with file modification time as the cursor", "why": "Query-based connectors query databases using a cursor column; they don't read files from object storage." },
-        { "text": "A Lakehouse Federation foreign catalog defined over the bucket", "why": "Query federation pushes queries down to external databases over JDBC; it doesn't ingest raw files from a bucket into tables." }
-      ],
-      "in_practice": "For a bucket receiving thousands of JSON files a day, Auto Loader in a pipeline gives incremental, checkpointed ingestion with schema inference; managed file connectors are for services like SharePoint that need source-specific auth.",
-      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/file-connectors-overview",
-      "evidence": "Standard file connectors use Spark and SQL APIs, giving you more control over how files are read and processed: Cloud object storage — Ingest files from S3, ADLS, or GCS using Auto Loader or COPY INTO."
     },
     {
       "family": "choosing-copy-into-reload-subset",
@@ -299,10 +514,24 @@
       "type": "single",
       "stem": "A data engineer runs an Auto Loader stream that ingests a vendor's daily CSV drops into a bronze table. The vendor re-uploads 40 corrected files from last week and asks that only those files be reloaded, without stopping the running stream. Which approach fits best?",
       "options": [
-        { "text": "Run a one-time COPY INTO for the 40 files while the stream keeps running", "correct": true, "why": "Reloading a chosen subset of re-uploaded files is easier with COPY INTO, and it can reload that subset while the Auto Loader stream keeps running at the same time." },
-        { "text": "Delete the stream's checkpoint and restart it to re-read the corrected files", "average": true, "why": "A fresh checkpoint makes Auto Loader treat every file in the folder as new, so the stream reprocesses all history, creating duplicates and interrupting ingestion." },
-        { "text": "Switch the stream to an availableNow trigger so it picks the files up again", "why": "Changing the trigger changes when the stream runs, not which files it considers already processed; reprocessing a select subset is exactly what is harder with Auto Loader." },
-        { "text": "Run REFRESH TABLE on the bronze table to reread the source folder", "why": "REFRESH TABLE refreshes cached metadata for a table; it doesn't reload files from the source location." }
+        {
+          "text": "Run a one-time COPY INTO for the 40 files while the stream keeps running",
+          "correct": true,
+          "why": "Reloading a chosen subset of re-uploaded files is easier with COPY INTO, and it can reload that subset while the Auto Loader stream keeps running at the same time."
+        },
+        {
+          "text": "Delete the stream's checkpoint and restart it to re-read the corrected files",
+          "average": true,
+          "why": "A fresh checkpoint makes Auto Loader treat every file in the folder as new, so the stream reprocesses all history, creating duplicates and interrupting ingestion."
+        },
+        {
+          "text": "Switch the stream to an availableNow trigger so it picks the files up again",
+          "why": "Changing the trigger changes when the stream runs, not which files it considers already processed; reprocessing a select subset is exactly what is harder with Auto Loader."
+        },
+        {
+          "text": "Run REFRESH TABLE on the bronze table to reread the source folder",
+          "why": "REFRESH TABLE refreshes cached metadata for a table; it doesn't reload files from the source location."
+        }
       ],
       "in_practice": "Pair the reload with a dedupe on the record key in silver so the corrected rows supersede the originals, while the stream keeps landing today's files with no gap in freshness.",
       "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/",
@@ -316,10 +545,24 @@
       "type": "single",
       "stem": "A data engineer who is a workspace admin uses Partner Connect to start a trial with a data ingestion partner that loads CRM data into the workspace. Analysts can't query the tables the partner created, although the data engineer can. What should the data engineer do?",
       "options": [
-        { "text": "Grant the analysts access with GRANT, as the partner's service principal owns the tables", "correct": true, "why": "Tables created by a Data Ingestion partner are owned by the partner's service principal and, by default, only it and workspace admins can access them; a GRANT statement opens them to other users." },
-        { "text": "Rerun the Partner Connect setup signed in as an analyst to recreate the tables", "average": true, "why": "Creating a partner connection requires a workspace admin, and recreated tables would still belong to the partner's service principal, so the analysts would still lack access." },
-        { "text": "Share the partner's personal access token with the analysts", "why": "Partner Connect creates that token for the partner's service principal and doesn't reveal its value; sharing tokens would bypass governance rather than grant access." },
-        { "text": "Move the tables into a Unity Catalog volume so analysts can read the files", "why": "Volumes govern non-tabular files; moving tables there doesn't grant query access and would break the partner's loads." }
+        {
+          "text": "Grant the analysts access with GRANT, as the partner's service principal owns the tables",
+          "correct": true,
+          "why": "Tables created by a Data Ingestion partner are owned by the partner's service principal and, by default, only it and workspace admins can access them; a GRANT statement opens them to other users."
+        },
+        {
+          "text": "Rerun the Partner Connect setup signed in as an analyst to recreate the tables",
+          "average": true,
+          "why": "Creating a partner connection requires a workspace admin, and recreated tables would still belong to the partner's service principal, so the analysts would still lack access."
+        },
+        {
+          "text": "Share the partner's personal access token with the analysts",
+          "why": "Partner Connect creates that token for the partner's service principal and doesn't reveal its value; sharing tokens would bypass governance rather than grant access."
+        },
+        {
+          "text": "Move the tables into a Unity Catalog volume so analysts can read the files",
+          "why": "Volumes govern non-tabular files; moving tables there doesn't grant query access and would break the partner's loads."
+        }
       ],
       "in_practice": "Granting SELECT to an analyst group rather than to individuals means new hires get access to partner-loaded tables through group membership, and SHOW GRANTS gives auditors a clear record of who can read the CRM data.",
       "source": "https://docs.databricks.com/aws/en/partner-connect/",
@@ -333,10 +576,24 @@
       "type": "single",
       "stem": "A data engineering team must ingest 30 MySQL tables into Unity Catalog every hour. The DBA won't enable binlog access, the platform team wants no always-on ingestion infrastructure, every table has a reliable last_updated timestamp, and only each row's latest state matters. Which approach meets these requirements?",
       "options": [
-        { "text": "A Lakeflow Connect query-based connector with last_updated as the cursor", "correct": true, "why": "Query-based connectors query the source on a schedule using a cursor column, need no CDC or binlog access, and use no gateway or staging volume, which fits recurring latest-state ingestion." },
-        { "text": "A Lakeflow Connect database (CDC) connector with an ingestion gateway", "average": true, "why": "The CDC connector is the usual choice for database ingestion, but it relies on binlog access and an always-on gateway, which break two of the stated constraints." },
-        { "text": "A Lakehouse Federation foreign catalog that reports query directly", "why": "Federation leaves the data in MySQL and pushes each query to it; it suits ad hoc access, not recurring ingestion into Unity Catalog tables." },
-        { "text": "A notebook job that overwrites every table in full each hour over JDBC", "why": "A full hourly reload re-reads every row whether or not it changed, adding needless source load and cost compared with cursor-based incremental reads." }
+        {
+          "text": "A Lakeflow Connect query-based connector with last_updated as the cursor",
+          "correct": true,
+          "why": "Query-based connectors query the source on a schedule using a cursor column, need no CDC or binlog access, and use no gateway or staging volume, which fits recurring latest-state ingestion."
+        },
+        {
+          "text": "A Lakeflow Connect database (CDC) connector with an ingestion gateway",
+          "average": true,
+          "why": "The CDC connector is the usual choice for database ingestion, but it relies on binlog access and an always-on gateway, which break two of the stated constraints."
+        },
+        {
+          "text": "A Lakehouse Federation foreign catalog that reports query directly",
+          "why": "Federation leaves the data in MySQL and pushes each query to it; it suits ad hoc access, not recurring ingestion into Unity Catalog tables."
+        },
+        {
+          "text": "A notebook job that overwrites every table in full each hour over JDBC",
+          "why": "A full hourly reload re-reads every row whether or not it changed, adding needless source load and cost compared with cursor-based incremental reads."
+        }
       ],
       "in_practice": "The trade-off is source load: query-based reads run directly against the tables, so agree the schedule with the DBA and make sure the cursor column is indexed so each hourly query stays cheap.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/query-based-overview",
@@ -350,10 +607,24 @@
       "type": "single",
       "stem": "An analytics team built hourly dashboards directly on a Lakehouse Federation foreign catalog over a production SQL Server database. Usage has grown to hundreds of queries an hour, dashboards are slow, and the DBA reports heavy load from pushed-down queries. SQL Server is supported by both Lakehouse Federation and Lakeflow Connect. What should a data engineer recommend?",
       "options": [
-        { "text": "Ingest the tables with the Lakeflow Connect SQL Server connector and repoint dashboards", "correct": true, "why": "Databricks recommends Lakeflow Connect managed connectors over query federation when volume and latency matter, because they scale to high data volumes and lower query latency; federation is meant for ad hoc reporting and proof-of-concept work." },
-        { "text": "Keep federation and rely on the warehouse result cache for repeated queries", "average": true, "why": "Result Cache and Disk Cache aren't supported for federated queries, so every dashboard refresh still pushes work down to SQL Server." },
-        { "text": "Create a second foreign catalog over the same database to spread the load", "why": "Another foreign catalog over the same database still sends every query to the same SQL Server, so the source load doesn't drop." },
-        { "text": "Give dashboard users direct JDBC access to SQL Server to skip federation", "why": "Direct JDBC access bypasses Unity Catalog governance on the foreign catalog and still loads the production database with every query." }
+        {
+          "text": "Ingest the tables with the Lakeflow Connect SQL Server connector and repoint dashboards",
+          "correct": true,
+          "why": "Databricks recommends Lakeflow Connect managed connectors over query federation when volume and latency matter, because they scale to high data volumes and lower query latency; federation is meant for ad hoc reporting and proof-of-concept work."
+        },
+        {
+          "text": "Keep federation and rely on the warehouse result cache for repeated queries",
+          "average": true,
+          "why": "Result Cache and Disk Cache aren't supported for federated queries, so every dashboard refresh still pushes work down to SQL Server."
+        },
+        {
+          "text": "Create a second foreign catalog over the same database to spread the load",
+          "why": "Another foreign catalog over the same database still sends every query to the same SQL Server, so the source load doesn't drop."
+        },
+        {
+          "text": "Give dashboard users direct JDBC access to SQL Server to skip federation",
+          "why": "Direct JDBC access bypasses Unity Catalog governance on the foreign catalog and still loads the production database with every query."
+        }
       ],
       "in_practice": "Moving from federation to ingestion shifts hundreds of hourly queries off the OLTP server onto Delta tables in Unity Catalog, where dashboards also benefit from caching and data skipping that federated scans can't use.",
       "source": "https://docs.databricks.com/aws/en/query-federation/database-federation",
@@ -367,10 +638,24 @@
       "type": "single",
       "stem": "Which way of storing nested data in a Delta table gives the best read performance, supports data skipping on nested fields and enforces types on write, when the schema is well known and stable?",
       "options": [
-        { "text": "STRUCT columns", "correct": true, "why": "Structs store each field as its own column, support all data skipping optimizations and enforce each field's type on write, so they read fastest for well-known schemas." },
-        { "text": "A VARIANT column", "average": true, "why": "VARIANT is the recommended choice for flexible semi-structured JSON, but data with a well-known schema that benefits from optimized layout and stats collection is better served by structs." },
-        { "text": "A STRING column holding raw JSON", "why": "JSON strings carry no type information and perform worst on read, because the entire string is parsed for every query." },
-        { "text": "MAP<STRING, STRING> columns", "why": "Maps enforce key and value types, but statistics can't be collected on them, so queries on nested values can't use data skipping." }
+        {
+          "text": "STRUCT columns",
+          "correct": true,
+          "why": "Structs store each field as its own column, support all data skipping optimizations and enforce each field's type on write, so they read fastest for well-known schemas."
+        },
+        {
+          "text": "A VARIANT column",
+          "average": true,
+          "why": "VARIANT is the recommended choice for flexible semi-structured JSON, but data with a well-known schema that benefits from optimized layout and stats collection is better served by structs."
+        },
+        {
+          "text": "A STRING column holding raw JSON",
+          "why": "JSON strings carry no type information and perform worst on read, because the entire string is parsed for every query."
+        },
+        {
+          "text": "MAP<STRING, STRING> columns",
+          "why": "Maps enforce key and value types, but statistics can't be collected on them, so queries on nested values can't use data skipping."
+        }
       ],
       "in_practice": "Structs suit a curated silver table with a few dozen known fields where reads dominate; past hundreds of columns performance starts to suffer, and a fast-changing feed is better kept as VARIANT in bronze.",
       "source": "https://docs.databricks.com/aws/en/semi-structured/",
@@ -384,10 +669,24 @@
       "type": "single",
       "stem": "A data engineer streams Kafka messages, whose binary value field holds JSON, into a bronze Delta table. Ingestion must keep working as producers add or change fields, and the payload should use an encoding optimized for queries. Which expression should the stream select for the payload?",
       "options": [
-        { "text": "parse_json(col(\"value\").cast(\"string\"))", "correct": true, "why": "Casting the Kafka value to a string and wrapping it in parse_json stores the payload as VARIANT, which keeps the stream robust to schema changes with an encoding optimized for reads." },
-        { "text": "from_json(col(\"value\").cast(\"string\"), fixed_schema)", "average": true, "why": "from_json needs a schema up front, so fields missing from it are ignored and values that don't match it come back as nulls, and bronze silently loses data as producers evolve." },
-        { "text": "explode(col(\"value\"))", "why": "explode unpacks ARRAY and MAP columns into rows; the Kafka value is binary, so there is nothing for it to unpack." },
-        { "text": "to_json(col(\"value\"))", "why": "to_json converts a complex type into a JSON string, the opposite direction; it doesn't parse incoming JSON into a queryable value." }
+        {
+          "text": "parse_json(col(\"value\").cast(\"string\"))",
+          "correct": true,
+          "why": "Casting the Kafka value to a string and wrapping it in parse_json stores the payload as VARIANT, which keeps the stream robust to schema changes with an encoding optimized for reads."
+        },
+        {
+          "text": "from_json(col(\"value\").cast(\"string\"), fixed_schema)",
+          "average": true,
+          "why": "from_json needs a schema up front, so fields missing from it are ignored and values that don't match it come back as nulls, and bronze silently loses data as producers evolve."
+        },
+        {
+          "text": "explode(col(\"value\"))",
+          "why": "explode unpacks ARRAY and MAP columns into rows; the Kafka value is binary, so there is nothing for it to unpack."
+        },
+        {
+          "text": "to_json(col(\"value\"))",
+          "why": "to_json converts a complex type into a JSON string, the opposite direction; it doesn't parse incoming JSON into a queryable value."
+        }
       ],
       "in_practice": "Landing the payload as VARIANT keeps bronze complete through producer releases; silver can extract the few fields that matter with typed casts, so a new field never stops the stream overnight.",
       "source": "https://docs.databricks.com/aws/en/ingestion/variant",
@@ -401,10 +700,24 @@
       "type": "single",
       "stem": "A data engineer ingests clickstream JSON from a Unity Catalog volume with Auto Loader. Top-level fields such as event_id, user_id and event_ts are stable and should land as typed columns, but the nested properties object changes shape with every product release. Which Auto Loader configuration fits?",
       "options": [
-        { "text": ".option(\"cloudFiles.schemaHints\", \"properties VARIANT\")", "correct": true, "why": "A schema hint can declare one field as VARIANT while Auto Loader infers the other fields with its standard rules, giving typed top-level columns and a flexible nested object." },
-        { "text": ".option(\"singleVariantColumn\", \"raw\")", "average": true, "why": "singleVariantColumn loads each whole record into one VARIANT column, so event_id, user_id and event_ts would no longer land as typed columns." },
-        { "text": ".option(\"cloudFiles.schemaEvolutionMode\", \"failOnNewColumns\")", "why": "failOnNewColumns fails the stream when new columns appear, which with a constantly changing properties object means frequent failures." },
-        { "text": ".schema(\"event_id STRING, event_ts TIMESTAMP, properties STRUCT<page STRING>\")", "why": "Fixing properties as a STRUCT of today's fields means the fields added in later releases don't fit the declared schema." }
+        {
+          "text": ".option(\"cloudFiles.schemaHints\", \"properties VARIANT\")",
+          "correct": true,
+          "why": "A schema hint can declare one field as VARIANT while Auto Loader infers the other fields with its standard rules, giving typed top-level columns and a flexible nested object."
+        },
+        {
+          "text": ".option(\"singleVariantColumn\", \"raw\")",
+          "average": true,
+          "why": "singleVariantColumn loads each whole record into one VARIANT column, so event_id, user_id and event_ts would no longer land as typed columns."
+        },
+        {
+          "text": ".option(\"cloudFiles.schemaEvolutionMode\", \"failOnNewColumns\")",
+          "why": "failOnNewColumns fails the stream when new columns appear, which with a constantly changing properties object means frequent failures."
+        },
+        {
+          "text": ".schema(\"event_id STRING, event_ts TIMESTAMP, properties STRUCT<page STRING>\")",
+          "why": "Fixing properties as a STRUCT of today's fields means the fields added in later releases don't fit the declared schema."
+        }
       ],
       "in_practice": "Typed top-level columns keep filters on event_ts and user_id fast, while the VARIANT properties column absorbs each release's new fields without a schema change to the table.",
       "source": "https://docs.databricks.com/aws/en/ingestion/variant",
@@ -418,10 +731,24 @@
       "type": "single",
       "stem": "A compliance team asks a data engineer for a governed inventory, built from file metadata, of every file on a SharePoint site, but policy forbids copying file contents into Databricks. The engineer will use the Lakeflow Connect SharePoint connector. How should the ingestion be set up?",
       "options": [
-        { "text": "Capture file metadata only, so file contents are never loaded", "correct": true, "why": "The SharePoint connector can capture file metadata without loading file contents, which produces the inventory while keeping the documents themselves out of Databricks." },
-        { "text": "Ingest the files as binary data, then drop the content column", "average": true, "why": "Binary ingestion copies every file's contents into the table first; dropping the column afterward doesn't undo the copy the policy forbids." },
-        { "text": "Parse the files into Delta tables using the structured formats", "why": "Parsing CSV, JSON or Excel files turns their contents into rows, which copies exactly the data the policy excludes." },
-        { "text": "Query the site through a Lakehouse Federation foreign catalog", "why": "Lakehouse Federation connects to databases and external catalogs; SharePoint files are ingested with the SharePoint connector, not federated." }
+        {
+          "text": "Capture file metadata only, so file contents are never loaded",
+          "correct": true,
+          "why": "The SharePoint connector can capture file metadata without loading file contents, which produces the inventory while keeping the documents themselves out of Databricks."
+        },
+        {
+          "text": "Ingest the files as binary data, then drop the content column",
+          "average": true,
+          "why": "Binary ingestion copies every file's contents into the table first; dropping the column afterward doesn't undo the copy the policy forbids."
+        },
+        {
+          "text": "Parse the files into Delta tables using the structured formats",
+          "why": "Parsing CSV, JSON or Excel files turns their contents into rows, which copies exactly the data the policy excludes."
+        },
+        {
+          "text": "Query the site through a Lakehouse Federation foreign catalog",
+          "why": "Lakehouse Federation connects to databases and external catalogs; SharePoint files are ingested with the SharePoint connector, not federated."
+        }
       ],
       "in_practice": "A metadata-only table covering, say, 200,000 files lets the compliance team track paths, ownership and age with SQL, and storage stays small because no document bytes are copied.",
       "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/sharepoint",
@@ -435,10 +762,24 @@
       "type": "single",
       "stem": "A data engineer loads JSON documents from a Unity Catalog volume with Auto Loader using the singleVariantColumn option. Nearly every record lands correctly, but a handful of documents that are each larger than 20 MB never show up as values in the variant column. What explains this?",
       "options": [
-        { "text": "VARIANT holds records up to 16 MB, so larger ones are handled like corrupt records", "correct": true, "why": "A VARIANT value can hold a record of at most 16 MB; overly large records are treated like corrupt records and, in the default PERMISSIVE mode, are captured in the corrupt record column." },
-        { "text": "Schema evolution paused the stream when the large documents added new fields", "average": true, "why": "With singleVariantColumn the whole record is stored as one VARIANT, so no schema evolution happens during ingestion and new fields can't stop the stream." },
-        { "text": "They went to _rescued_data, which singleVariantColumn turns on automatically", "why": "rescuedDataColumn isn't supported when the entire record is loaded as a single VARIANT column." },
-        { "text": "Auto Loader skips any file larger than 16 MB by default", "why": "The 16 MB limit applies to a single record encoded as VARIANT, not to the size of the files Auto Loader reads." }
+        {
+          "text": "VARIANT holds records up to 16 MB, so larger ones are handled like corrupt records",
+          "correct": true,
+          "why": "A VARIANT value can hold a record of at most 16 MB; overly large records are treated like corrupt records and, in the default PERMISSIVE mode, are captured in the corrupt record column."
+        },
+        {
+          "text": "Schema evolution paused the stream when the large documents added new fields",
+          "average": true,
+          "why": "With singleVariantColumn the whole record is stored as one VARIANT, so no schema evolution happens during ingestion and new fields can't stop the stream."
+        },
+        {
+          "text": "They went to _rescued_data, which singleVariantColumn turns on automatically",
+          "why": "rescuedDataColumn isn't supported when the entire record is loaded as a single VARIANT column."
+        },
+        {
+          "text": "Auto Loader skips any file larger than 16 MB by default",
+          "why": "The 16 MB limit applies to a single record encoded as VARIANT, not to the size of the files Auto Loader reads."
+        }
       ],
       "in_practice": "After switching to single-variant ingestion, monitor the corrupt record column: a few oversized documents, such as 25 MB order exports, may need splitting upstream before they can land as VARIANT.",
       "source": "https://docs.databricks.com/aws/en/ingestion/variant",
@@ -452,10 +793,24 @@
       "type": "single",
       "stem": "A data engineer migrates a bronze column named raw from a JSON STRING to VARIANT with parse_json. A downstream query, SELECT raw:Owner FROM events, returned values before the migration but now returns NULL for every row. The key in the source JSON is owner. What explains the change?",
       "options": [
-        { "text": "Variant field paths are always case sensitive, unlike JSON string paths", "correct": true, "why": "Field names in variant paths are always case sensitive, so raw:Owner finds no key and returns NULL; colon paths on JSON strings match field names case-insensitively unless brackets are used." },
-        { "text": "The colon shorthand doesn't work on VARIANT, so variant_get is required", "average": true, "why": "The same : and . shorthand used for JSON strings also applies to VARIANT; the query runs, it just doesn't find a key named Owner." },
-        { "text": "parse_json drops top-level string fields unless a schema is supplied", "why": "parse_json needs no schema and keeps every field, preserving the case and NULL values present in the source." },
-        { "text": "VARIANT fields stay NULL until schema_of_variant is run on the column", "why": "schema_of_variant only reports a variant's schema; fields can be queried as soon as the value is written." }
+        {
+          "text": "Variant field paths are always case sensitive, unlike JSON string paths",
+          "correct": true,
+          "why": "Field names in variant paths are always case sensitive, so raw:Owner finds no key and returns NULL; colon paths on JSON strings match field names case-insensitively unless brackets are used."
+        },
+        {
+          "text": "The colon shorthand doesn't work on VARIANT, so variant_get is required",
+          "average": true,
+          "why": "The same : and . shorthand used for JSON strings also applies to VARIANT; the query runs, it just doesn't find a key named Owner."
+        },
+        {
+          "text": "parse_json drops top-level string fields unless a schema is supplied",
+          "why": "parse_json needs no schema and keeps every field, preserving the case and NULL values present in the source."
+        },
+        {
+          "text": "VARIANT fields stay NULL until schema_of_variant is run on the column",
+          "why": "schema_of_variant only reports a variant's schema; fields can be queried as soon as the value is written."
+        }
       ],
       "in_practice": "Before switching a busy bronze table to VARIANT, search downstream SQL for mixed-case paths; fixing raw:Owner to raw:owner in a few views is far cheaper than chasing silently NULL columns in reports.",
       "source": "https://docs.databricks.com/aws/en/semi-structured/variant",

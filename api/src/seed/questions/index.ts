@@ -23,6 +23,26 @@ import transformation3 from './transformation-3.json' with { type: 'json' };
 import transformation4 from './transformation-4.json' with { type: 'json' };
 import troubleshooting from './troubleshooting.json' with { type: 'json' };
 import troubleshooting2 from './troubleshooting-2.json' with { type: 'json' };
+import platform3 from './platform-3.json' with { type: 'json' };
+import ingestion5 from './ingestion-5.json' with { type: 'json' };
+import ingestion6 from './ingestion-6.json' with { type: 'json' };
+import ingestion7 from './ingestion-7.json' with { type: 'json' };
+import ingestion8 from './ingestion-8.json' with { type: 'json' };
+import transformation5 from './transformation-5.json' with { type: 'json' };
+import transformation6 from './transformation-6.json' with { type: 'json' };
+import transformation7 from './transformation-7.json' with { type: 'json' };
+import transformation8 from './transformation-8.json' with { type: 'json' };
+import jobs5 from './jobs-5.json' with { type: 'json' };
+import jobs6 from './jobs-6.json' with { type: 'json' };
+import jobs7 from './jobs-7.json' with { type: 'json' };
+import cicd3 from './cicd-3.json' with { type: 'json' };
+import cicd4 from './cicd-4.json' with { type: 'json' };
+import troubleshooting3 from './troubleshooting-3.json' with { type: 'json' };
+import troubleshooting4 from './troubleshooting-4.json' with { type: 'json' };
+import governance5 from './governance-5.json' with { type: 'json' };
+import governance6 from './governance-6.json' with { type: 'json' };
+import governance7 from './governance-7.json' with { type: 'json' };
+import governance8 from './governance-8.json' with { type: 'json' };
 import { arrangeItem, composeRationale, type Item, type ItemFile } from './schema.js';
 import { WITHDRAWN_FAMILIES } from './withdrawn.js';
 
@@ -56,6 +76,27 @@ export const QUESTION_FILES: Record<string, ItemFile> = {
   'troubleshooting-2': troubleshooting2,
   'governance-3': governance3,
   'governance-4': governance4,
+  // Third batch (October 2026), taking the bank from 500 to 1,000.
+  'platform-3': platform3,
+  'ingestion-5': ingestion5,
+  'ingestion-6': ingestion6,
+  'ingestion-7': ingestion7,
+  'ingestion-8': ingestion8,
+  'transformation-5': transformation5,
+  'transformation-6': transformation6,
+  'transformation-7': transformation7,
+  'transformation-8': transformation8,
+  'jobs-5': jobs5,
+  'jobs-6': jobs6,
+  'jobs-7': jobs7,
+  'cicd-3': cicd3,
+  'cicd-4': cicd4,
+  'troubleshooting-3': troubleshooting3,
+  'troubleshooting-4': troubleshooting4,
+  'governance-5': governance5,
+  'governance-6': governance6,
+  'governance-7': governance7,
+  'governance-8': governance8,
 } as Record<string, ItemFile>;
 
 export const BLUEPRINT = blueprintJson as {

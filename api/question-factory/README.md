@@ -24,7 +24,17 @@ When the guide changes, update this file first; everything downstream follows fr
 
 ## 2. Sources: where the facts come from
 
-`sources.json` lists the official documentation pages for each objective. Every URL is checked to load.
+`sources.json` lists the official documentation pages for each objective, plus a few search phrases per objective (`queries`).
+
+To grow the research for a new batch, let Firecrawl find more pages:
+
+```
+npm run factory:scrape -- --discover                      # all objectives
+npm run factory:scrape -- --discover --objective jobs.triggers
+npm run factory:scrape -- --list --objective jobs.triggers   # the objective's pages and cache files
+```
+
+`--discover` runs Firecrawl's map search for each phrase across the AWS documentation. It adds up to six new pages per phrase (no release notes or API reference) to the objective, then scrapes them. It needs `FIRECRAWL_API_KEY`. Each search and each scraped page costs one Firecrawl credit; the third batch's discovery added 597 pages for about 700 credits.
 
 ## 3. Scrape: research
 
@@ -61,7 +71,10 @@ npm run factory:validate                    # the whole bank, with coverage
 npm run factory:validate -- --file jobs-2   # one bank file
 npm run factory:validate -- --drafts drafts/jobs.triggers-123.json
 npm run factory:validate -- --evidence      # also check each evidence quote appears on its source page
+npm run factory:validate -- --overlap       # list items whose evidence quotes nearly match
 ```
+
+`--overlap` lists pairs of items whose evidence quotes nearly match (80% word overlap or more). Two questions resting on the same sentence often test the same fact; compare them, and withdraw or rewrite one if they do. It's a report, not a check, because one sentence can support two different angles.
 
 **Errors** block an item:
 - Schema and field lengths.

@@ -5,4 +5,5 @@
  */
 export const WITHDRAWN_FAMILIES: Record<string, string> = {
   'monitoring-skipped-runs-enable-queueing': 'Tested the same fact as recovery-queue-overrunning-runs (enable queueing so skipped runs execute).',
+  'choosing-cloud-storage-standard-connector': 'Tested the same fact as patterns-standard-vs-managed-file-connectors (Auto Loader on S3 is a standard connector).',
 };
