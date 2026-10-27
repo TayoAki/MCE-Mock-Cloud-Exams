@@ -16,9 +16,9 @@ describe('question factory bank', () => {
 
   it('meets the blueprint: every objective at its target, with the difficulty and format mix', async () => {
     const report = checkBank(await loadBankFiles());
-    for (const o of blueprint.objectives) expect([o.code, report.byObjective[o.code]!.have]).toEqual([o.code, o.new]);
+    for (const o of blueprint.objectives) expect([o.code, report.byObjective[o.code]!.have]).toEqual([o.code, o.target]);
     const items = report.items;
-    expect(items).toHaveLength(222);
+    expect(items).toHaveLength(422);
     const share = (d: number) => items.filter((i) => i.difficulty === d).length / items.length;
     expect(share(1)).toBeGreaterThan(0.3);
     expect(share(3)).toBeGreaterThan(0.15);

@@ -2,16 +2,27 @@ import { ContentAudit, Domain, Objective, QuestionFamily, QuestionKey, QuestionV
 import { REVIEW_NOTE } from '../bank.js';
 import blueprintJson from './blueprint.json' with { type: 'json' };
 import cicd from './cicd.json' with { type: 'json' };
+import cicd2 from './cicd-2.json' with { type: 'json' };
 import governance1 from './governance-1.json' with { type: 'json' };
 import governance2 from './governance-2.json' with { type: 'json' };
+import governance3 from './governance-3.json' with { type: 'json' };
+import governance4 from './governance-4.json' with { type: 'json' };
 import ingestion1 from './ingestion-1.json' with { type: 'json' };
 import ingestion2 from './ingestion-2.json' with { type: 'json' };
+import ingestion3 from './ingestion-3.json' with { type: 'json' };
+import ingestion4 from './ingestion-4.json' with { type: 'json' };
 import jobs1 from './jobs-1.json' with { type: 'json' };
 import jobs2 from './jobs-2.json' with { type: 'json' };
+import jobs3 from './jobs-3.json' with { type: 'json' };
+import jobs4 from './jobs-4.json' with { type: 'json' };
 import platform from './platform.json' with { type: 'json' };
+import platform2 from './platform-2.json' with { type: 'json' };
 import transformation1 from './transformation-1.json' with { type: 'json' };
 import transformation2 from './transformation-2.json' with { type: 'json' };
+import transformation3 from './transformation-3.json' with { type: 'json' };
+import transformation4 from './transformation-4.json' with { type: 'json' };
 import troubleshooting from './troubleshooting.json' with { type: 'json' };
+import troubleshooting2 from './troubleshooting-2.json' with { type: 'json' };
 import { arrangeItem, composeRationale, type Item, type ItemFile } from './schema.js';
 
 /**
@@ -32,10 +43,22 @@ export const QUESTION_FILES: Record<string, ItemFile> = {
   troubleshooting,
   'governance-1': governance1,
   'governance-2': governance2,
+  // Second batch (October 2026), taking the bank from 300 to 500.
+  'platform-2': platform2,
+  'ingestion-3': ingestion3,
+  'ingestion-4': ingestion4,
+  'transformation-3': transformation3,
+  'transformation-4': transformation4,
+  'jobs-3': jobs3,
+  'jobs-4': jobs4,
+  'cicd-2': cicd2,
+  'troubleshooting-2': troubleshooting2,
+  'governance-3': governance3,
+  'governance-4': governance4,
 } as Record<string, ItemFile>;
 
 export const BLUEPRINT = blueprintJson as {
-  objectives: { code: string; domain: string; title: string; guide: string[]; new: number; file: string }[];
+  objectives: { code: string; domain: string; title: string; guide: string[]; target: number; files: string[] }[];
 };
 
 /** Seed titles that the current exam guide renamed. Only an untouched seed title is updated, so staff edits stay. */

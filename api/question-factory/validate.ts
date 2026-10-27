@@ -67,7 +67,7 @@ async function main() {
   if (drafts) {
     const items = (JSON.parse(await readFile(path.resolve(here, drafts), 'utf8')) as { items: unknown[] }).items;
     const objective = (items[0] as { objective?: string })?.objective;
-    const file = blueprint.objectives.find((o) => o.code === objective)?.file ?? 'drafts';
+    const file = blueprint.objectives.find((o) => o.code === objective)?.files.at(-1) ?? 'drafts';
     bank[file] = [...(bank[file] ?? []), ...items];
   }
   const report = checkBank(bank);
@@ -75,11 +75,11 @@ async function main() {
   const findings = report.findings.filter((f) => !relevant || relevant.has(f.family) || f.family === '(bank)');
   for (const f of findings) console.log(`${f.level === 'error' ? 'ERROR' : 'warn '} ${f.family}: ${f.message}`);
 
-  console.log('\nCoverage (new items vs blueprint target; difficulty 1/2/3; "Choose two")');
+  console.log('\nCoverage (factory items vs blueprint target; difficulty 1/2/3; "Choose two")');
   let have = 0;
   let target = 0;
   for (const o of blueprint.objectives) {
-    if (only && o.file !== only) continue;
+    if (only && !o.files.includes(only)) continue;
     const c = report.byObjective[o.code]!;
     have += c.have;
     target += c.target;

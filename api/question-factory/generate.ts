@@ -9,7 +9,7 @@
  *
  * Drafts land in question-factory/drafts (not committed). A person reviews
  * each draft against its source page, then --promote appends the error-free
- * items to the objective's bank file. Needs ANTHROPIC_API_KEY (or an
+ * items to the objective's newest bank file. Needs ANTHROPIC_API_KEY (or an
  * `ant auth login` profile). FACTORY_MODEL overrides the model.
  */
 import Anthropic from '@anthropic-ai/sdk';
@@ -108,7 +108,7 @@ async function generate(objectiveCode: string, count: number) {
   await mkdir(path.join(here, 'drafts'), { recursive: true });
   const file = path.join(here, 'drafts', `${objective.code}-${Date.now()}.json`);
   await writeFile(file, `${JSON.stringify({ items }, null, 2)}\n`);
-  report(objective.file, items);
+  report(objective.files.at(-1)!, items);
   console.log(`\n${items.length} drafts written to ${path.relative(process.cwd(), file)}. Review each against its source, then promote.`);
 }
 
@@ -127,7 +127,7 @@ async function promote(draftsPath: string) {
   const items = (JSON.parse(await readFile(path.resolve(here, draftsPath), 'utf8')) as { items: Item[] }).items;
   const byFile = new Map<string, Item[]>();
   for (const item of items) {
-    const file = blueprint.objectives.find((o) => o.code === item.objective)?.file;
+    const file = blueprint.objectives.find((o) => o.code === item.objective)?.files.at(-1);
     if (!file) throw new Error(`Unknown objective ${item.objective}`);
     byFile.set(file, [...(byFile.get(file) ?? []), item]);
   }

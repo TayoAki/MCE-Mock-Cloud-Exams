@@ -12,8 +12,10 @@ export interface BlueprintObjective {
   domain: string;
   title: string;
   guide: string[];
-  new: number;
-  file: string;
+  /** How many factory items the objective should have, across every batch. */
+  target: number;
+  /** The bank files that hold the objective's items, one per batch; new items go in the last. */
+  files: string[];
   add?: boolean;
 }
 export interface Blueprint {
@@ -148,8 +150,8 @@ export function checkBank(files: Record<string, unknown[]>): BankReport {
       const { item, findings: f } = checkItem(raw);
       findings.push(...f);
       if (!item) continue;
-      const expected = blueprint.objectives.find((o) => o.code === item.objective)?.file;
-      if (expected && expected !== file) findings.push({ family: item.family, level: 'error', message: `objective ${item.objective} belongs in ${expected}.json, not ${file}.json` });
+      const expected = blueprint.objectives.find((o) => o.code === item.objective)?.files;
+      if (expected && !expected.includes(file)) findings.push({ family: item.family, level: 'error', message: `objective ${item.objective} belongs in ${expected.map((f) => `${f}.json`).join(' or ')}, not ${file}.json` });
       if (fileOf.has(item.family)) findings.push({ family: item.family, level: 'error', message: `family is duplicated (also in ${fileOf.get(item.family)}.json)` });
       if (seed.families.has(item.family)) findings.push({ family: item.family, level: 'error', message: 'family collides with an existing seed question' });
       fileOf.set(item.family, file);
@@ -170,7 +172,7 @@ export function checkBank(files: Record<string, unknown[]>): BankReport {
     const mine = items.filter((i) => i.objective === o.code);
     byObjective[o.code] = {
       have: mine.length,
-      target: o.new,
+      target: o.target,
       difficulty: [1, 2, 3].map((d) => mine.filter((i) => i.difficulty === d).length) as [number, number, number],
       multiple: mine.filter((i) => i.type === 'multiple').length,
     };
