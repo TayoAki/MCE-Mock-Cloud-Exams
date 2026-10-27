@@ -1,3 +1,1001 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "cleaning-is-null-predicates",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 1,
+      "type": "multiple",
+      "stem": "A data engineer profiles bronze.customers before building a silver table and runs select count(*) from bronze.customers where email = null. The query returns 0, although many rows have no email. Which two predicates count the rows with a missing email? (Choose two.)",
+      "options": [
+        {
+          "text": "email IS NULL",
+          "correct": true,
+          "why": "IS NULL tests whether a value is missing and returns true for NULL, so it matches every row that has no email."
+        },
+        {
+          "text": "isnull(email)",
+          "correct": true,
+          "why": "The isnull function is built to handle NULL operands: it returns true on NULL input and false otherwise, so it works as a filter."
+        },
+        {
+          "text": "email IN (NULL)",
+          "average": true,
+          "why": "Rewriting the test with IN looks like a fix, but IN is a chain of = comparisons, so a NULL email gives UNKNOWN and the row is filtered out."
+        },
+        {
+          "text": "email == NULL",
+          "why": "The == operator is the same equality comparison as =, and any comparison with NULL returns NULL rather than true, so no rows qualify."
+        },
+        {
+          "text": "isnan(email)",
+          "why": "isnan tests numeric values for NaN and returns false for a NULL input, so it can't flag a missing email."
+        }
+      ],
+      "in_practice": "A profiling query built on = NULL silently reports zero gaps. Checks written with IS NULL catch missing keys before they reach silver, where fixing them later means reprocessing every downstream table.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-null-semantics",
+      "evidence": "The result of these operators is unknown or NULL when one of the operands or both the operands are unknown or NULL. ... function expression isnull returns a true on null input and false on non null input"
+    },
+    {
+      "family": "cleaning-cast-double-to-int-truncates",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer standardizes bronze.reviews for a silver table on a SQL warehouse and converts the DOUBLE column avg_rating to INT with CAST(avg_rating AS INT). What does a bronze value of 4.7 become in silver?",
+      "options": [
+        {
+          "text": "4, because a cast to an integral type truncates the fraction",
+          "correct": true,
+          "why": "When the target is an integral numeric type, cast truncates the source value to a whole number, so 4.7 becomes 4 and -4.7 becomes -4."
+        },
+        {
+          "text": "5, because the cast rounds to the nearest whole number",
+          "average": true,
+          "why": "Rounding is what many people expect, but cast rounds only when the target keeps a scale, such as DECIMAL(2,0); to an integral type it truncates."
+        },
+        {
+          "text": "NULL, because the value has a fractional part",
+          "why": "A value inside the INT range doesn't turn into NULL here; a fractional part is simply dropped by the cast."
+        },
+        {
+          "text": "An error, because ANSI mode rejects lossy casts",
+          "why": "ANSI mode raises CAST_OVERFLOW only when the value is outside the INT range; dropping the fraction is allowed."
+        }
+      ],
+      "in_practice": "Truncation biases every rating downward, which can move a 4.6 product to 4 on a dashboard. When nearest-value semantics matter, cast to DECIMAL(p,0), which rounds, instead of to INT.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/cast",
+      "evidence": "If targetType is an integral numeric, the result is sourceExpr truncated to a whole number. Otherwise, the result is sourceExpr rounded to a fit the available scale of targetType."
+    },
+    {
+      "family": "cleaning-replace-standardize-values",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer cleans a bronze DataFrame whose state column holds 'NY', 'N.Y.' and 'New York' for the same state. The silver table must store 'New York' for all three spellings and leave other columns unchanged. Which PySpark call does this?",
+      "options": [
+        {
+          "text": "df.replace({\"NY\": \"New York\", \"N.Y.\": \"New York\"}, subset=[\"state\"])",
+          "correct": true,
+          "why": "DataFrame.replace swaps matching values for new ones; a dict maps each old value to its replacement, and subset limits the change to the state column."
+        },
+        {
+          "text": "df.na.fill(\"New York\", subset=[\"state\"])",
+          "average": true,
+          "why": "na.fill is the familiar cleaning call, but it replaces only NULL values, so 'NY' and 'N.Y.' stay as they are."
+        },
+        {
+          "text": "df.replace(\"NY\", \"New York\", subset=[\"state\"])",
+          "why": "A single scalar replacement handles only 'NY', so 'N.Y.' remains as a second spelling in silver."
+        },
+        {
+          "text": "df.withColumnRenamed(\"state\", \"standard_state\")",
+          "why": "withColumnRenamed changes the column's name, not its values, so all three spellings remain."
+        }
+      ],
+      "in_practice": "Unstandardized category values split one state into three groups in every gold aggregate. Mapping them once in silver keeps reports consistent and saves each analyst from writing their own CASE expression.",
+      "source": "https://docs.databricks.com/aws/en/pyspark/reference/classes/dataframe/replace",
+      "evidence": "Returns a new DataFrame replacing a value with another value. ... If the value is a dict, then value is ignored or can be omitted, and to_replace must be a mapping between a value and a replacement."
+    },
+    {
+      "family": "cleaning-regexp-replace-digits-only",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer loads phone numbers from a bronze table where the same number arrives as '(555) 123-4567', '555.123.4567' or '555 123 4567'. The silver column must keep only the digits, such as '5551234567'. Which SQL expression does this?",
+      "options": [
+        {
+          "text": "regexp_replace(phone, '[^0-9]', '')",
+          "correct": true,
+          "why": "regexp_replace replaces every substring that matches the pattern; [^0-9] matches any non-digit, so all punctuation and spaces are removed."
+        },
+        {
+          "text": "replace(phone, '-', '')",
+          "average": true,
+          "why": "replace removes one literal string, so the dashes disappear but parentheses, dots and spaces remain in the other formats."
+        },
+        {
+          "text": "regexp_substr(phone, '[0-9]+')",
+          "why": "regexp_substr returns only the first matching substring, so '(555) 123-4567' becomes '555' instead of the full number."
+        },
+        {
+          "text": "trim(phone)",
+          "why": "trim removes only leading and trailing spaces, so the separators inside the number stay."
+        }
+      ],
+      "in_practice": "Normalized phone numbers let joins and deduplication match customers across sources; with several formats in one CRM export, skipping this step leaves duplicate customers that no key comparison can catch.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/regexp_replace",
+      "evidence": "regexp_replace function. Replaces all substrings of str that match regexp with rep. ... SELECT regexp_replace('SSN 123-45-6789', r'\\d', '#'); SSN ###-##-####"
+    },
+    {
+      "family": "cleaning-concat-ws-skips-nulls",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer builds full_name for silver.customers with concat(first_name, ' ', middle_name, ' ', last_name). Customers without a middle name get NULL as their full_name. The name must simply skip any missing part. Which expression should the engineer use?",
+      "options": [
+        {
+          "text": "concat_ws(' ', first_name, middle_name, last_name)",
+          "correct": true,
+          "why": "concat_ws joins its arguments with the separator and ignores arguments that are NULL, so a missing middle name is skipped."
+        },
+        {
+          "text": "first_name || ' ' || middle_name || ' ' || last_name",
+          "average": true,
+          "why": "The || operator is a synonym for concat, which returns NULL as soon as any argument is NULL, so the result is unchanged."
+        },
+        {
+          "text": "coalesce(first_name, middle_name, last_name)",
+          "why": "coalesce returns only the first non-NULL argument, so the result is the first name alone rather than the full name."
+        },
+        {
+          "text": "concat(first_name, ' ', last_name)",
+          "why": "Leaving out middle_name avoids the NULL, but it also drops the middle name for every customer who has one."
+        }
+      ],
+      "in_practice": "NULL names break downstream search, mail merges and matching jobs. concat_ws keeps every row usable without a CASE expression for each optional field.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/concat_ws",
+      "evidence": "Returns the concatenation strings separated by sep. ... If sep is NULL the result is NULL. exprN that are NULL are ignored. If only the separator is provided, or all exprN are NULL, an empty string."
+    },
+    {
+      "family": "cleaning-dropna-thresh-minimum-values",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer cleans bronze survey responses in PySpark. Each row has respondent_id and eight answer columns, and a row is usable only when at least three of its columns hold a value. Which call removes the rows that aren't usable?",
+      "options": [
+        {
+          "text": "df.dropna(thresh=3)",
+          "correct": true,
+          "why": "thresh drops rows that have fewer than the given number of non-null values, so rows with three or more values are kept; it overrides how."
+        },
+        {
+          "text": "df.dropna(how=\"any\")",
+          "average": true,
+          "why": "how=\"any\" drops a row that has even one null, which removes most partially answered surveys that are still usable."
+        },
+        {
+          "text": "df.dropna(how=\"all\")",
+          "why": "how=\"all\" drops only rows in which every value is null, so rows with just one or two values survive."
+        },
+        {
+          "text": "df.dropna(subset=[\"respondent_id\"])",
+          "why": "subset limits the check to respondent_id, so rows with an ID but almost no answers are kept."
+        }
+      ],
+      "in_practice": "A threshold rule keeps partially complete records that still carry signal. Requiring every answer could discard a large share of a survey, while keeping near-empty rows skews response rates.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.dropna.html",
+      "evidence": "thresh: int, optional, default None. If specified, drop rows that have less than thresh non-null values. This overwrites the how parameter."
+    },
+    {
+      "family": "cleaning-cast-string-to-boolean",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer standardizes is_active while building silver.accounts from bronze.accounts on a SQL warehouse. In bronze it is a STRING holding 'Y', 'N', 'yes', 'No', 'TRUE' and '0' in mixed case, plus some NULLs. Silver needs a BOOLEAN that keeps NULL as NULL. Which expression meets this requirement?",
+      "options": [
+        {
+          "text": "CAST(is_active AS BOOLEAN)",
+          "correct": true,
+          "why": "A STRING cast to BOOLEAN accepts 'T', 'TRUE', 'Y', 'YES' and '1' as true and 'F', 'FALSE', 'N', 'NO' and '0' as false, ignoring case, and NULL stays NULL."
+        },
+        {
+          "text": "CASE WHEN is_active = 'Y' THEN true ELSE false END",
+          "average": true,
+          "why": "A hand-written CASE is the usual first attempt, but it matches only uppercase 'Y', so 'yes' and 'TRUE' become false, and NULL becomes false too."
+        },
+        {
+          "text": "is_active = 'true'",
+          "why": "The comparison is case-sensitive and checks one spelling, so 'Y', 'yes' and 'TRUE' all evaluate to false."
+        },
+        {
+          "text": "try_cast(is_active AS INT) = 1",
+          "why": "Strings such as 'Y', 'yes' and 'TRUE' can't become INT, so try_cast returns NULL for them and most active accounts are lost."
+        }
+      ],
+      "in_practice": "Relying on the documented cast removes a fragile CASE expression. If an unexpected value such as 'maybe' appears, the cast fails loudly instead of silently mapping it to false.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/cast",
+      "evidence": "If sourcEexpr is (case insensitive): 'T', 'TRUE', 'Y', 'YES', or '1': The result is true 'F', 'FALSE', 'N', 'NO', or '0': The result is false NULL: The result is NULL Otherwise, Databricks raises CAST_INVALID_INPUT."
+    },
+    {
+      "family": "cleaning-insert-type-error-no-partial-write",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer runs INSERT INTO silver.orders (order_id, quantity) SELECT order_id, quantity FROM bronze.orders on a SQL warehouse. quantity is a STRING in bronze and an INT in silver, and one of the 2 million rows holds 'ten'. The statement fails with CAST_INVALID_INPUT. What does silver.orders contain after the failure?",
+      "options": [
+        {
+          "text": "Only the rows it held before, because the failed insert wrote nothing",
+          "correct": true,
+          "why": "Under the default ANSI store assignment policy, the insert adds casts and rejects invalid values with an exception, and a failed insert leaves no partially written data."
+        },
+        {
+          "text": "Every valid row from the batch, with the bad row skipped",
+          "average": true,
+          "why": "Skipping bad rows is what a permissive loader might do, but the insert raises an error for the whole statement instead of dropping single rows."
+        },
+        {
+          "text": "The rows processed before the bad row was reached",
+          "why": "The write is all or nothing, so rows processed earlier in the same statement aren't committed when it fails."
+        },
+        {
+          "text": "All 2 million rows, with NULL in quantity for the bad row",
+          "why": "Writing NULL for an invalid value is the legacy store assignment behavior; the ANSI default throws an exception instead."
+        }
+      ],
+      "in_practice": "Because the failed insert is atomic, recovery means fixing the value, for example with try_cast and a quarantine table, and rerunning; there are no partial loads to clean up.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-ansi-compliance",
+      "evidence": "During table insertion under this policy, Spark checks for and rejects invalid casts, throwing an exception to ensure data quality. This means if an insertion attempt fails due to a type mismatch, it will not result in any data being partially written to the table."
+    },
+    {
+      "family": "cleaning-insert-by-name-default",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer appends cleaned rows to silver.customers, whose columns are customer_id, email, country and loaded_at, and loaded_at has a DEFAULT. The cleaning query returns email, customer_id and country in that order and has no loaded_at. Columns must be matched by name, with loaded_at taking its default. Which statement does this?",
+      "options": [
+        {
+          "text": "INSERT INTO silver.customers BY NAME SELECT email, customer_id, country FROM cleaned",
+          "correct": true,
+          "why": "BY NAME builds the column list from the query's column names, and any table column left out of that list gets its DEFAULT value."
+        },
+        {
+          "text": "INSERT INTO silver.customers SELECT email, customer_id, country FROM cleaned",
+          "average": true,
+          "why": "Without a column list or BY NAME, values are matched by position in table order, so email lands in customer_id and the column count doesn't match."
+        },
+        {
+          "text": "INSERT OVERWRITE silver.customers BY NAME SELECT email, customer_id, country FROM cleaned",
+          "why": "OVERWRITE truncates the table before inserting, so it replaces the existing customers instead of appending to them."
+        },
+        {
+          "text": "CREATE OR REPLACE TABLE silver.customers AS SELECT email, customer_id, country FROM cleaned",
+          "why": "Replacing the table rebuilds it from the query alone, dropping the existing rows and the loaded_at column with its default."
+        }
+      ],
+      "in_practice": "Name-based inserts keep silver loads correct when an upstream query is refactored and its column order changes, a common cause of silently swapped values in positional INSERT statements.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-dml-insert-into",
+      "evidence": "When this clause is used instead of an explicit column list, the command uses the exposed column names of query to produce the column list in the order of query. ... If a column present in table_name is not part of the implied column list the DEFAULT value is used instead."
+    },
+    {
+      "family": "cleaning-replace-where-reload-day",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer fixes a parsing bug and must reload 2026-10-20 in silver.orders, an unpartitioned Delta table with three years of data. A view, fixed_day, holds the corrected rows for that day. They must replace the day's existing rows in one atomic statement, leaving other days untouched. Which statement meets these requirements?",
+      "options": [
+        {
+          "text": "INSERT INTO silver.orders REPLACE WHERE order_date = '2026-10-20' SELECT * FROM fixed_day",
+          "correct": true,
+          "why": "REPLACE WHERE deletes the rows that match the predicate and inserts the query's rows in the same statement, so only 2026-10-20 is rewritten."
+        },
+        {
+          "text": "INSERT OVERWRITE silver.orders SELECT * FROM fixed_day",
+          "average": true,
+          "why": "INSERT OVERWRITE is the usual reload command, but without a partition spec it truncates the whole table, so three years of data shrink to one day."
+        },
+        {
+          "text": "INSERT INTO silver.orders SELECT * FROM fixed_day",
+          "why": "INSERT INTO only adds rows, so the day's old rows stay and every order for 2026-10-20 appears twice."
+        },
+        {
+          "text": "MERGE INTO silver.orders t USING fixed_day s ON t.order_id = s.order_id WHEN NOT MATCHED THEN INSERT *",
+          "why": "This merge inserts only orders that are new, so the existing rows for the day keep their incorrect values."
+        }
+      ],
+      "in_practice": "Replacing one day rewrites only that day's data, so a fix that would otherwise mean rebuilding a multi-terabyte table finishes in minutes, and the predicate check rejects stray rows from other days.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-dml-insert-into",
+      "evidence": "REPLACE WHERE boolean_expression ... Delete rows matching boolean_expression before inserting the rows returned by query. ... If you specify OVERWRITE the following applies: Without a partition_spec the table is truncated before inserting the first row."
+    },
+    {
+      "family": "cleaning-production-write-only-action",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer schedules a notebook as a Lakeflow Jobs task. It reads bronze.events, applies six cleaning steps and writes silver.events, but each step still ends with display(df) and df.count() from development. The job is slow, and the Spark UI shows many jobs that rescan the source. What should the engineer change?",
+      "options": [
+        {
+          "text": "Remove the display and count calls so the final write is the only action",
+          "correct": true,
+          "why": "Each action triggers its own computation, and Databricks advises that writing should be the only action in a production pipeline, because other actions interrupt query optimization."
+        },
+        {
+          "text": "Cache the bronze DataFrame so the repeated actions read from memory",
+          "average": true,
+          "why": "Caching hides some rescans but keeps the extra jobs and adds memory pressure; removing the debugging actions avoids the work entirely."
+        },
+        {
+          "text": "Replace each count() with collect() to check the rows on the driver",
+          "why": "collect is also an action and pulls every row to the driver, which is slower and risks driver memory errors."
+        },
+        {
+          "text": "Split the six cleaning steps into six tasks in the same job",
+          "why": "Separate tasks have to persist intermediate results and still run the extra actions, which adds overhead rather than removing it."
+        }
+      ],
+      "in_practice": "Debugging actions left in a production notebook can multiply runtime; removing a dozen count() and display() calls from a nightly job often brings it back to a single optimized pass over the source.",
+      "source": "https://docs.databricks.com/aws/en/pyspark/",
+      "evidence": "In production data pipelines, writing data is typically the only action that should be present. All other actions interrupt query optimization and can lead to bottlenecks."
+    },
+    {
+      "family": "cleaning-nan-to-null-before-aggregates",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer sees that a gold report of max(temperature) per sensor shows NaN for some sensors. In silver.readings, temperature is a DOUBLE, and a check with where temperature is null returns zero rows. Failed readings must not affect max or other aggregates. What should the engineer change in the silver cleaning step?",
+      "options": [
+        {
+          "text": "Map NaN to NULL with CASE WHEN isnan(temperature) THEN NULL ELSE temperature END",
+          "correct": true,
+          "why": "NaN is a real DOUBLE value, not NULL, and it sorts larger than any other number, so max returns it; turning it into NULL lets aggregates skip it."
+        },
+        {
+          "text": "Replace missing values with coalesce(temperature, 0) in the silver query",
+          "average": true,
+          "why": "coalesce replaces only NULL values; NaN is a value, so it passes through, and real missing readings would become 0."
+        },
+        {
+          "text": "Re-type the column with try_cast(temperature AS DOUBLE) before the write",
+          "why": "NaN is a valid DOUBLE, so try_cast returns it unchanged and the gold max still shows NaN."
+        },
+        {
+          "text": "Add WHERE temperature IS NOT NULL to the silver query before the write",
+          "why": "The filter keeps every NaN reading, because NaN isn't NULL, so the max is still NaN."
+        }
+      ],
+      "in_practice": "Sensors often emit NaN for failed reads. Normalizing them to NULL in silver fixes every gold aggregate at once, instead of patching each report after one NaN hides a whole day's maximum.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/data-types/special-floating-point-values",
+      "evidence": "NaN semantics ... NaN = NaN returns true. In aggregations, all NaN values are grouped together. NaN is treated as a normal value in join keys. NaN values go last when in ascending order, larger than any other numeric value."
+    },
+    {
+      "family": "cleaning-range-filter-keeps-nulls",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer builds silver.order_lines and must remove rows with a negative quantity, a known bug in one source. Rows whose quantity is unknown (NULL) must be kept for a later backfill. The first version filters with where quantity >= 0, and silver loses far more rows than there are negative quantities. Which filter meets the requirement?",
+      "options": [
+        {
+          "text": "WHERE quantity >= 0 OR quantity IS NULL",
+          "correct": true,
+          "why": "A comparison with NULL returns NULL, and WHERE keeps only rows whose condition is true, so unknown quantities need an explicit IS NULL branch."
+        },
+        {
+          "text": "WHERE NOT (quantity < 0)",
+          "average": true,
+          "why": "Negating the bad-row test looks equivalent, but quantity < 0 is NULL for unknown quantities and NOT NULL is still NULL, so those rows are dropped."
+        },
+        {
+          "text": "WHERE quantity >= 0 AND quantity IS NOT NULL",
+          "why": "This makes the drop explicit: it removes exactly the NULL rows that must be kept."
+        },
+        {
+          "text": "WHERE quantity <=> 0 OR quantity > 0",
+          "why": "The null-safe operator returns false, not true, when quantity is NULL, so those rows still fail the filter."
+        }
+      ],
+      "in_practice": "Silent loss of NULL rows in a cleaning filter is hard to spot, because counts still look plausible. Comparing the number of negative and NULL rows before and after the filter catches it before the backfill finds nothing to fix.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-null-semantics",
+      "evidence": "-- Persons whose age is unknown (NULL) are filtered out from the result set. > SELECT * FROM person WHERE age > 0; ... -- IS NULL expression is used in disjunction to select the persons with unknown (NULL) records. > SELECT * FROM person WHERE age > 0 OR age IS NULL;"
+    },
+    {
+      "family": "cleaning-double-cast-decimal-strings",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer loads silver.inventory on a SQL warehouse. In bronze, units is a STRING that an export tool writes as '12', '3.0' or '1e2', and every value is a whole number. CAST(units AS INT) fails with CAST_INVALID_INPUT on '3.0'. Silver needs an INT column without losing any values. Which expression should the engineer use?",
+      "options": [
+        {
+          "text": "CAST(CAST(units AS DOUBLE) AS INT)",
+          "correct": true,
+          "why": "Strings with a decimal point or an exponent can't be cast straight to an integral type; casting to DOUBLE first parses them, and the second cast yields the whole number."
+        },
+        {
+          "text": "try_cast(units AS INT)",
+          "average": true,
+          "why": "try_cast avoids the error, but it returns NULL for '3.0' and '1e2', so valid quantities are lost."
+        },
+        {
+          "text": "CAST(units AS BIGINT)",
+          "why": "A wider integer type doesn't help, because strings such as '1.0' and '1e1' can't be cast to any integral numeric type."
+        },
+        {
+          "text": "CAST(trim(units) AS INT)",
+          "why": "Trimming removes surrounding spaces, but the decimal point and the exponent remain, so the cast still fails."
+        }
+      ],
+      "in_practice": "Spreadsheet and JSON exports often write whole numbers as 3.0. A double cast keeps those rows instead of turning part of an inventory feed into NULLs and under-reporting stock.",
+      "source": "https://docs.databricks.com/aws/en/error-messages/cast-invalid-input-error-class",
+      "evidence": "expression is formatted in a way the cast operation cannot parse. For example 1.0 and 1e1 cannot be cast to any integral numeric type. ... When casting numeric literals with decimal points (e.g. 1.0 or scientific notation (e.g. 1e0) consider double casting first to DECIMAL or DOUBLE and then to the exact numeric."
+    },
+    {
+      "family": "cleaning-regexp-extract-empty-string",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer adds order_ref to silver.tickets with regexp_extract(note, 'ORD-[0-9]{6}', 0). A data quality check that counts tickets where order_ref is null reports zero, yet many notes contain no order number and show a blank order_ref. Rows without a match must hold NULL. Which expression should the engineer use?",
+      "options": [
+        {
+          "text": "regexp_substr(note, 'ORD-[0-9]{6}')",
+          "correct": true,
+          "why": "regexp_substr returns the first matching substring and NULL when the pattern isn't found, so the null check counts the tickets without an order."
+        },
+        {
+          "text": "regexp_extract(note, '(ORD-[0-9]{6})', 1)",
+          "average": true,
+          "why": "Using a capture group changes which part is returned, but regexp_extract still returns an empty string when nothing matches."
+        },
+        {
+          "text": "trim(regexp_extract(note, 'ORD-[0-9]{6}', 0))",
+          "why": "The blank value is an empty string rather than spaces, so trimming leaves it empty instead of NULL."
+        },
+        {
+          "text": "try_cast(regexp_extract(note, 'ORD-[0-9]{6}', 0) AS STRING)",
+          "why": "Casting a STRING to STRING can't fail, so try_cast returns the same empty string."
+        }
+      ],
+      "in_practice": "Empty strings hide missing values from count(col) and IS NULL checks. A NULL-returning extractor keeps data quality metrics honest, so a feed with many unlinked notes doesn't report full linkage.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/regexp_substr",
+      "evidence": "Unlike regexp_extract, which returns an empty string, regexp_substr returns NULL when the pattern is not found. ... If str or regexp is NULL, or the pattern is not found, the result is NULL."
+    },
+    {
+      "family": "cleaning-least-skips-nulls",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer caps discounts while building silver.orders with least(discount_pct, 0.5). After the change, orders whose discount was unknown (NULL) in bronze show 0.5 in silver, which inflates the discount totals that finance reviews. Unknown discounts must stay NULL. What explains this, and what fixes it?",
+      "options": [
+        {
+          "text": "least skips NULL arguments; use CASE WHEN discount_pct > 0.5 THEN 0.5 ELSE discount_pct END",
+          "correct": true,
+          "why": "least returns the smallest non-NULL argument, so a NULL discount yields 0.5. In the CASE expression, NULL > 0.5 is unknown, so the ELSE branch keeps NULL."
+        },
+        {
+          "text": "least ranks NULL as the largest value; use least(coalesce(discount_pct, 0), 0.5)",
+          "average": true,
+          "why": "least skips NULLs rather than ranking them, and the coalesce fix turns unknown discounts into 0, which is still wrong."
+        },
+        {
+          "text": "A column DEFAULT supplies 0.5; drop the default from silver.orders",
+          "why": "A column default applies only when an insert omits the column; here the value comes from least itself."
+        },
+        {
+          "text": "ANSI mode turns NULL into the other operand; disable spark.sql.ansi.enabled",
+          "why": "ANSI mode governs casts and overflow errors, not how least handles NULL, so turning it off changes nothing here."
+        }
+      ],
+      "in_practice": "Functions that skip NULLs, such as least and greatest, can quietly turn unknowns into real values. Testing a cleaning expression with NULL input before rollout keeps finance totals from being overstated.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/least",
+      "evidence": "least function. Returns the least value of all parameters, skipping null values. ... The result is the least common type of all arguments."
+    },
+    {
+      "family": "joins-pyspark-default-inner",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer writes orders_df.join(customers_df, \"customer_id\") in PySpark without a how argument. Some orders reference customer IDs that are missing from customers_df. How does the join treat those orders?",
+      "options": [
+        {
+          "text": "They are dropped, because the default join type is inner",
+          "correct": true,
+          "why": "When how is omitted, DataFrame.join performs an inner join, which returns only rows that have a matching key on both sides."
+        },
+        {
+          "text": "They are kept with NULL customer columns, as in a left join",
+          "average": true,
+          "why": "Keeping every row from the left DataFrame is left join behavior, which has to be requested with how=\"left\"; it isn't the default."
+        },
+        {
+          "text": "They are kept, along with customers that have no orders",
+          "why": "Keeping unmatched rows from both sides is a full outer join, which needs how=\"outer\" or how=\"full\"."
+        },
+        {
+          "text": "The join fails until the how argument is set",
+          "why": "how is optional; omitting it is valid and simply selects an inner join."
+        }
+      ],
+      "in_practice": "Relying on the default inner join can silently drop fact rows whose dimension hasn't loaded yet. Reconciling row counts before and after the join, or asking for how=\"left\", keeps revenue from disappearing in silver.",
+      "source": "https://docs.databricks.com/aws/en/pyspark/reference/classes/dataframe/join",
+      "evidence": "how: str, optional, default inner. Must be one of: inner, cross, outer, full, fullouter, full_outer, left, leftouter, left_outer, right, rightouter, right_outer, semi, leftsemi, left_semi, anti, leftanti and left_anti."
+    },
+    {
+      "family": "joins-pyspark-union-keeps-duplicates",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer ports a SQL query that combines two sources with UNION to PySpark as df_web.union(df_store). Both DataFrames have the same columns in the same order. How does df_web.union(df_store) treat rows that appear in both DataFrames?",
+      "options": [
+        {
+          "text": "It keeps them, like UNION ALL; call distinct() to remove them",
+          "correct": true,
+          "why": "DataFrame.union performs a set union without automatic deduplication, so it behaves like SQL UNION ALL; adding distinct() matches SQL UNION."
+        },
+        {
+          "text": "It removes them, like SQL UNION",
+          "average": true,
+          "why": "Assuming the method mirrors SQL UNION is the common mistake; union doesn't deduplicate, so the ported query returns extra rows."
+        },
+        {
+          "text": "It removes them only when the column names also match",
+          "why": "union resolves columns by position and never deduplicates, so column names don't affect whether duplicates are kept."
+        },
+        {
+          "text": "It fails, because the duplicates break the union",
+          "why": "union accepts duplicate rows without any error; it simply keeps them in the result."
+        }
+      ],
+      "in_practice": "Porting SQL UNION to DataFrame.union without distinct() double-counts overlapping records; if two channel feeds overlap by about 5%, gold revenue is overstated by roughly that share.",
+      "source": "https://docs.databricks.com/aws/en/pyspark/reference/classes/dataframe/union",
+      "evidence": "This method performs a SQL-style set union of the rows from both DataFrame objects, with no automatic deduplication of elements. Use the distinct() method to perform deduplication of rows. The method resolves columns by position (not by name), following the standard behavior in SQL."
+    },
+    {
+      "family": "joins-stream-static-latest-version",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer joins a streaming DataFrame of bookings to a static Delta table of users with bookings_stream.join(users_df, \"user_id\"). Which statement describes how Databricks processes this stream-static join?",
+      "options": [
+        {
+          "text": "Each micro-batch joins against the latest version of users, without join state or a watermark",
+          "correct": true,
+          "why": "A stream-static join is stateless: each micro-batch is joined with the latest valid version of the static Delta table, so no watermark is needed."
+        },
+        {
+          "text": "Spark keeps users rows in join state and needs a watermark to clear them",
+          "average": true,
+          "why": "Join state and watermarks belong to stream-stream joins; the static side is read at its current version for each micro-batch."
+        },
+        {
+          "text": "Every micro-batch uses the users snapshot taken when the stream started",
+          "why": "The static table isn't frozen at the start; each micro-batch reads its latest valid version, so updates show up in later batches."
+        },
+        {
+          "text": "Earlier bookings are joined again whenever a users row changes",
+          "why": "Only newly received streaming records are joined; results already written aren't recomputed when the static table changes."
+        }
+      ],
+      "in_practice": "Stream-static joins enrich millions of events a day without state, but dimension changes apply only going forward. When history must reflect updates, a materialized view is the better fit.",
+      "source": "https://docs.databricks.com/aws/en/transform/join",
+      "evidence": "A stream-static join joins the latest valid version of a Delta table (the static data) to a data stream using a stateless join. ... Because the join is stateless, you don't need to configure watermarking and can process results with low latency."
+    },
+    {
+      "family": "joins-hint-priority-broadcast-over-merge",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs SELECT /*+ BROADCAST(c), MERGE(o, c) */ * FROM orders o JOIN customers c ON o.customer_id = c.customer_id. The hints were added by different people over time. Which join strategy does Databricks SQL prioritize for this join?",
+      "options": [
+        {
+          "text": "Broadcast, because BROADCAST takes priority over MERGE",
+          "correct": true,
+          "why": "When different strategy hints are given for the sides of a join, Databricks SQL prioritizes BROADCAST over MERGE over SHUFFLE_HASH over SHUFFLE_REPLICATE_NL."
+        },
+        {
+          "text": "Sort merge, because MERGE names both tables",
+          "average": true,
+          "why": "Naming both relations doesn't raise a hint's priority; the overridden MERGE hint is logged as not taking effect."
+        },
+        {
+          "text": "Shuffle hash, as a compromise between the two hints",
+          "why": "Databricks SQL doesn't blend conflicting hints; it applies a fixed priority order in which BROADCAST wins."
+        },
+        {
+          "text": "Whichever hint is written last in the comment",
+          "why": "Priority depends on the hint type, not on the hint's position in the comment."
+        }
+      ],
+      "in_practice": "Hints pile up as queries are copied between notebooks. Knowing that BROADCAST wins explains plans that ignore a MERGE hint; stale hints should be removed when table sizes change.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-hints",
+      "evidence": "When different join strategy hints are specified on both sides of a join, Databricks SQL prioritizes hints in the following order: BROADCAST over MERGE over SHUFFLE_HASH over SHUFFLE_REPLICATE_NL."
+    },
+    {
+      "family": "joins-broadcast-hint-ignores-threshold",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform team sets spark.sql.autoBroadcastJoinThreshold to -1 on a shared job cluster to stop automatic broadcasts. A data engineer adds /*+ BROADCAST(d) */ to a query that joins a large fact table to d, a 30 MB dimension table. What does Spark do with this join?",
+      "options": [
+        {
+          "text": "It broadcasts d, because the hint applies regardless of the threshold",
+          "correct": true,
+          "why": "The side named in a BROADCAST hint is broadcast regardless of autoBroadcastJoinThreshold, so the hint works even when automatic broadcasting is off."
+        },
+        {
+          "text": "It ignores the hint, because the threshold disables all broadcasts",
+          "average": true,
+          "why": "A threshold of -1 turns off broadcasting that is chosen automatically from size estimates; it doesn't cancel an explicit hint."
+        },
+        {
+          "text": "It broadcasts the fact table, the side the hint leaves out",
+          "why": "The hinted relation is the one that is broadcast; the hint names the side to send to every executor."
+        },
+        {
+          "text": "It fails, because the hint conflicts with the session setting",
+          "why": "The hint and the threshold can coexist; the hint simply takes precedence for that join."
+        }
+      ],
+      "in_practice": "A hint lets one known-small dimension be broadcast where auto broadcast is disabled cluster-wide, but a hint on a table that later grows to several GB can cause out-of-memory failures.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-hints",
+      "evidence": "BROADCAST ( table_name ) Use broadcast join. The join side with the hint is broadcast regardless of autoBroadcastJoinThreshold. If both sides of the join have the broadcast hints, the one with the smaller size (based on stats) is broadcast."
+    },
+    {
+      "family": "joins-join-order-smallest-first",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer writes a query over events (4 billion rows), sessions (200 million rows) and campaigns (5,000 rows). campaigns joins to sessions, and sessions joins to events. Which join order follows Databricks guidance for queries with several joins?",
+      "options": [
+        {
+          "text": "Join campaigns with sessions first, then join the result with events",
+          "correct": true,
+          "why": "Join order matters: Databricks recommends joining the smallest tables first and then joining that result with the larger tables."
+        },
+        {
+          "text": "Join events with sessions first, then join the result with campaigns",
+          "average": true,
+          "why": "Starting with the two largest tables is a common habit, but it does the most expensive join before the small table can reduce the rows."
+        },
+        {
+          "text": "Join events with campaigns first, then join the result with sessions",
+          "why": "events and campaigns share no join key, so joining them first is effectively a cross join of 4 billion by 5,000 rows."
+        },
+        {
+          "text": "Use any order, because every order performs the same",
+          "why": "Databricks guidance states that join order matters when a query performs multiple joins."
+        }
+      ],
+      "in_practice": "Joining small, selective tables first shrinks the rows that reach the big join; on a 4-billion-row fact table, that can cut shuffle volume and runtime substantially.",
+      "source": "https://docs.databricks.com/aws/en/transform/optimize-joins",
+      "evidence": "Join order matters. When performing multiple joins, always join your smallest tables first and then join the result with larger tables."
+    },
+    {
+      "family": "joins-pyspark-key-list-single-columns",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer joins the PySpark DataFrames orders and store_days on both store_id and business_date and writes the result to silver. A first attempt with a join expression produced two store_id and two business_date columns, and a later select failed as ambiguous. Each key must appear once. Which call should the engineer use?",
+      "options": [
+        {
+          "text": "orders.join(store_days, [\"store_id\", \"business_date\"], \"left\")",
+          "correct": true,
+          "why": "Passing the key names as a list performs an equi-join on columns that exist on both sides, and each join key appears only once in the result."
+        },
+        {
+          "text": "orders.join(store_days, (orders.store_id == store_days.store_id) & (orders.business_date == store_days.business_date), \"left\")",
+          "average": true,
+          "why": "This is the join expression that caused the problem: it keeps the key columns from both DataFrames, so the names are duplicated."
+        },
+        {
+          "text": "orders.join(store_days, \"store_id\", \"left\")",
+          "why": "Joining on store_id alone drops the date from the condition, so each order matches every day for its store."
+        },
+        {
+          "text": "orders.unionByName(store_days, allowMissingColumns=True)",
+          "why": "unionByName stacks rows instead of combining columns, so orders and store days never line up."
+        }
+      ],
+      "in_practice": "Name-based multi-key joins keep silver schemas clean. Duplicate key columns otherwise need a drop or alias step in every job, and a missed one breaks the write with an ambiguous-column error.",
+      "source": "https://docs.databricks.com/aws/en/pyspark/reference/classes/dataframe/join",
+      "evidence": "a string for the join column name, a list of column names, a join expression (Column), or a list of Columns. If on is a string or a list of strings indicating the name of the join column(s), the column(s) must exist on both sides, and this performs an equi-join."
+    },
+    {
+      "family": "joins-except-all-missing-copies",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer reconciles bronze.payments with silver.payments. Identical rows are legitimate, because a customer can make two equal payments in the same second. One payment appears three times in bronze but only twice in silver. The query must return each missing copy, here one row. Which set operator belongs between the bronze and silver queries?",
+      "options": [
+        {
+          "text": "EXCEPT ALL",
+          "correct": true,
+          "why": "With ALL, each row in the second query removes exactly one matching row from the first, so three bronze copies minus two silver copies leaves one."
+        },
+        {
+          "text": "EXCEPT",
+          "average": true,
+          "why": "Plain EXCEPT defaults to DISTINCT and removes duplicates first, so a row found in both tables disappears entirely and the missing copy isn't reported."
+        },
+        {
+          "text": "INTERSECT ALL",
+          "why": "INTERSECT ALL returns rows that are in both queries, here the two copies that did load, not the one that is missing."
+        },
+        {
+          "text": "UNION ALL",
+          "why": "UNION ALL stacks both inputs and keeps every duplicate, so it returns all five copies rather than the difference."
+        }
+      ],
+      "in_practice": "Multiset reconciliation catches dropped duplicates that a distinct comparison hides. For payments, one lost copy of a legitimate repeat charge is a real revenue gap that a DISTINCT check reports as zero.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-setops",
+      "evidence": "Returns the rows in subquery1 which are not in subquery2. If ALL is specified, each row in subquery2 will remove exactly one of possibly multiple matches from subquery1. If DISTINCT is specified, duplicate rows are removed from subquery1 before applying the operation, so all matches are removed"
+    },
+    {
+      "family": "joins-intersect-shared-rows-once",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A marketing team asks a data engineer for the email addresses that appear in both newsletter_signups and purchasers, two tables with one email column each. An address can appear many times in either table, and each shared address must be listed once. Which query meets the requirement?",
+      "options": [
+        {
+          "text": "SELECT email FROM newsletter_signups INTERSECT SELECT email FROM purchasers",
+          "correct": true,
+          "why": "INTERSECT returns the rows found in both queries and removes duplicates by default, so each shared address appears once."
+        },
+        {
+          "text": "SELECT n.email FROM newsletter_signups n JOIN purchasers p ON n.email = p.email",
+          "average": true,
+          "why": "An inner join finds the shared addresses but returns one row per matching pair, so an address repeated on either side appears many times."
+        },
+        {
+          "text": "SELECT email FROM newsletter_signups UNION SELECT email FROM purchasers",
+          "why": "UNION returns addresses found in either table, not only the ones found in both."
+        },
+        {
+          "text": "SELECT email FROM newsletter_signups INTERSECT ALL SELECT email FROM purchasers",
+          "why": "INTERSECT ALL keeps duplicates, returning an address several times when it repeats in both tables."
+        }
+      ],
+      "in_practice": "Set operators compare whole rows and handle duplicates declaratively; for audience lists of a few million addresses, INTERSECT states the intent directly instead of a join plus a separate DISTINCT.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-setops",
+      "evidence": "INTERSECT [ALL | DISTINCT] Returns the set of rows which are in both subqueries. If ALL is specified a row that appears multiple times in the subquery1 as well as in subquery will be returned multiple times. If DISTINCT is specified the result does not contain duplicate rows. This is the default."
+    },
+    {
+      "family": "joins-stream-stream-watermarks-both-sides",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer joins two Structured Streaming sources, ad_impressions and ad_clicks, on ad_id to attribute clicks to impressions. After two weeks, the job's state keeps growing and each micro-batch takes longer. Which change does Databricks recommend for this stream-stream join?",
+      "options": [
+        {
+          "text": "Define watermarks on both the impressions and the clicks streams",
+          "correct": true,
+          "why": "Stream-stream joins are stateful, and Databricks recommends watermarks on both sides so the engine can tell when old records can no longer match and drop them from state."
+        },
+        {
+          "text": "Define a watermark on the clicks stream only",
+          "average": true,
+          "why": "A one-sided watermark falls short of the recommendation to set watermarks on both sides of every stream-stream join, so state for the other input can keep growing."
+        },
+        {
+          "text": "Run the query with an availableNow trigger instead",
+          "why": "The trigger controls when micro-batches run; join state carries over between runs, so it still grows without watermarks."
+        },
+        {
+          "text": "Increase spark.sql.shuffle.partitions for the query",
+          "why": "More partitions spread the state across more tasks but don't remove any of it, so the growth continues."
+        }
+      ],
+      "in_practice": "Unbounded join state shows up as steadily rising micro-batch latency over days. Watermarks sized to the real click delay, say two hours, keep state proportional to that window instead of the stream's whole history.",
+      "source": "https://docs.databricks.com/aws/en/transform/join",
+      "evidence": "Joins between two streaming data sources are stateful. ... Databricks recommends specifying watermarks for both sides of all stream-stream joins."
+    },
+    {
+      "family": "joins-cross-join-low-latency",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer maintains the query behind a dashboard that refreshes every 5 minutes. It cross joins 40,000 products with 2,000 stores and then keeps only the pairs listed in store_assortment, a table of about 3 million store-product rows. Refreshes are slow and costly. Which change follows Databricks guidance for joins?",
+      "options": [
+        {
+          "text": "Join store_assortment to products and stores with inner joins on their keys",
+          "correct": true,
+          "why": "Databricks advises removing cross joins from low-latency or frequently recomputed queries; equi-joins through store_assortment produce only the 3 million valid pairs instead of 80 million."
+        },
+        {
+          "text": "Add a BROADCAST hint on stores so the cross join runs faster",
+          "average": true,
+          "why": "Broadcasting stores still produces every product-store pair before the filter; the cost comes from the cross join itself, which the guidance says to remove."
+        },
+        {
+          "text": "Move the store_assortment filter from WHERE into a HAVING clause",
+          "why": "HAVING filters groups after aggregation, so it doesn't reduce the pairs that the cross join generates."
+        },
+        {
+          "text": "Increase the warehouse size so the 80 million pairs build faster",
+          "why": "More compute speeds the cross join up a little but still generates 80 million rows on every refresh, and cost rises with the warehouse size."
+        }
+      ],
+      "in_practice": "Replacing a filtered cross join with key-based joins shrinks an 80-million-row intermediate result to the 3 million rows actually needed, cutting both refresh latency and warehouse cost for a dashboard refreshed hundreds of times a day.",
+      "source": "https://docs.databricks.com/aws/en/transform/optimize-joins",
+      "evidence": "Cross joins are expensive. Remove cross joins from workloads and queries that require low latency or frequent recomputation."
+    },
+    {
+      "family": "joins-many-joins-save-intermediate",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer maintains a silver query that joins 14 tables and runs several aggregations in one statement. In the Spark UI, the job spends a long time in query planning before any task starts, and the runtime varies widely between runs. Which change follows Databricks guidance for optimizing joins?",
+      "options": [
+        {
+          "text": "Save intermediate results, such as the first group of joins, to a table",
+          "correct": true,
+          "why": "The optimizer can struggle with many joins and aggregations in one query; saving intermediate results simplifies each plan and can speed up both planning and execution."
+        },
+        {
+          "text": "Add worker nodes so the joins run with more parallel tasks",
+          "average": true,
+          "why": "Planning happens before any task runs, so more workers don't shorten it; the size of the single query is the bottleneck."
+        },
+        {
+          "text": "Add a BROADCAST hint for every table in the query",
+          "why": "Broadcasting large tables can exhaust memory, and hints don't reduce the planning work for a 14-way join."
+        },
+        {
+          "text": "Rewrite the joins as one CROSS JOIN filtered in WHERE",
+          "why": "Cross joins are expensive, and moving the conditions to WHERE doesn't make the query simpler to plan."
+        }
+      ],
+      "in_practice": "Splitting a 14-way join into two or three persisted stages also makes failures cheaper to retry and gives each stage its own row-count checks.",
+      "source": "https://docs.databricks.com/aws/en/transform/optimize-joins",
+      "evidence": "The optimizer can struggle on queries with many joins and aggregations. Saving out intermediate results can accelerate query planning and computing results."
+    },
+    {
+      "family": "joins-natural-join-shared-audit-column",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer builds silver.order_details with select * from orders natural join customers. Both tables have customer_id, and both also have an updated_at audit column. The result holds far fewer rows than orders, although every order has a matching customer. Which change returns one row per order with its customer?",
+      "options": [
+        {
+          "text": "Join with USING (customer_id) instead of NATURAL",
+          "correct": true,
+          "why": "NATURAL matches rows on equality of every column with the same name, so updated_at is compared too; USING limits the match to customer_id."
+        },
+        {
+          "text": "Change NATURAL JOIN to NATURAL LEFT JOIN",
+          "average": true,
+          "why": "A left join keeps every order, but it still compares updated_at, so most orders get NULL customer columns instead of their customer."
+        },
+        {
+          "text": "Add a BROADCAST hint for customers",
+          "why": "A hint changes the join strategy, not which columns are compared, so the same rows are still missing."
+        },
+        {
+          "text": "Replace NATURAL JOIN with CROSS JOIN",
+          "why": "A cross join pairs every order with every customer, multiplying rows instead of matching each order to its customer."
+        }
+      ],
+      "in_practice": "NATURAL joins depend on column names that change over time: adding an audit column to both tables silently changes the join keys. Explicit USING or ON clauses keep silver joins stable as schemas evolve.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-join",
+      "evidence": "NATURAL Specifies that the rows from the two relations will implicitly be matched on equality for all columns with matching names."
+    },
+    {
+      "family": "joins-except-null-safe-change-detection",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer finds changed customer records by comparing today's snapshot with yesterday's using a left anti join on all 12 columns with = in the ON clause. Customers whose fax_number is NULL appear as changed every day, even when nothing changed. The output must list only new or changed rows. Which query should the engineer use?",
+      "options": [
+        {
+          "text": "SELECT * FROM snapshot_today EXCEPT SELECT * FROM snapshot_yesterday",
+          "correct": true,
+          "why": "Set operators compare rows in a null-safe way and treat two NULLs as equal, so an unchanged row with a NULL fax_number matches yesterday's copy and is removed."
+        },
+        {
+          "text": "A left join on the same 12 columns, keeping rows where yesterday's customer_id is NULL",
+          "average": true,
+          "why": "This repeats the same equality matching; NULL = NULL is still unknown, so customers with a NULL fax_number never match and are still reported."
+        },
+        {
+          "text": "SELECT * FROM snapshot_today INTERSECT SELECT * FROM snapshot_yesterday",
+          "why": "INTERSECT returns the rows found in both snapshots, which are the unchanged records rather than the changed ones."
+        },
+        {
+          "text": "The same anti join after filtering both snapshots to fax_number IS NOT NULL",
+          "why": "The filter removes every customer without a fax number from the comparison, so real changes to those customers are missed."
+        }
+      ],
+      "in_practice": "Change detection that mishandles NULLs floods downstream MERGE jobs with false updates; on a wide customer table with sparse columns, a null-safe comparison keeps the daily change set to records that really changed.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-null-semantics",
+      "evidence": "NULL values are compared in a null-safe manner for equality in the context of set operations. That means when comparing rows, two NULL values are considered equal unlike the regular EqualTo(=) operator."
+    },
+    {
+      "family": "joins-union-least-common-type",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer combines store identifiers from two bronze sources with select store_id from pos_a union all select store_code from pos_b. store_id is an INT, and store_code is a STRING with values such as 'S-104'. The query fails with CAST_INVALID_INPUT on 'S-104'. The silver column should hold both kinds of identifier as text. Which change fixes the query?",
+      "options": [
+        {
+          "text": "Cast store_id to STRING in the first query so both columns are STRING",
+          "correct": true,
+          "why": "A set operation's result type is the least common type of its inputs; for INT and STRING that is BIGINT, so 'S-104' fails. An explicit cast makes the common type STRING."
+        },
+        {
+          "text": "Use try_cast(store_code AS INT) in the second query",
+          "average": true,
+          "why": "try_cast avoids the error but turns every code such as 'S-104' into NULL, losing the second source's identifiers."
+        },
+        {
+          "text": "Swap the two queries so that the STRING column comes first",
+          "why": "The result type is derived from both inputs, not from the first query, so the order doesn't change the resolved type."
+        },
+        {
+          "text": "Change union all to union so the rows are compared as text",
+          "why": "UNION only adds duplicate removal; the column type is resolved the same way, so the cast error remains."
+        }
+      ],
+      "in_practice": "Explicit casts in set operations make the silver schema a decision rather than a side effect of type rules; mixed ID types are common when merging point-of-sale systems after an acquisition.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-datatype-rules",
+      "evidence": "STRING can be promoted to BIGINT, BINARY, BOOLEAN, DATE, DOUBLE, INTERVAL, TIME, and TIMESTAMP. If the actual string value cannot be cast to least common type Databricks raises a runtime error. ... Derive the result type of UNION, INTERSECT, or EXCEPT set operators. ... The least common type between an INT and STRING is BIGINT"
+    },
+    {
+      "family": "joins-not-in-broadcast-nested-loop",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's nightly job runs select * from staging_ids where id not in (select id from silver.customer_ids), and neither id column ever holds nulls. The job fails with broadcast errors because the subquery table is large. Setting spark.sql.autoBroadcastJoinThreshold to -1 didn't help: the plan still shows BroadcastNestedLoopJoin. Which change fixes the job?",
+      "options": [
+        {
+          "text": "Rewrite the filter as a correlated NOT EXISTS subquery on id",
+          "correct": true,
+          "why": "NOT IN has to know the whole subquery result to check for NULLs, so it falls back to a broadcast nested loop join; NOT EXISTS plans as a regular anti join."
+        },
+        {
+          "text": "Raise spark.sql.broadcastTimeout so the broadcast can finish",
+          "average": true,
+          "why": "A longer timeout only gives an oversized broadcast more time; the subquery table is still too large to broadcast, so the job keeps failing."
+        },
+        {
+          "text": "Set spark.sql.autoBroadcastJoinThreshold to 0 instead of -1",
+          "why": "The threshold only controls automatic broadcasts; the broadcast nested loop join is the plan's fallback for NOT IN whatever the setting."
+        },
+        {
+          "text": "Increase spark.sql.shuffle.partitions so the join uses more tasks",
+          "why": "A broadcast nested loop join doesn't shuffle the broadcast side, so more shuffle partitions don't shrink what is broadcast."
+        }
+      ],
+      "in_practice": "Because the id columns hold no nulls, the NOT EXISTS rewrite returns the same rows, and an anti join over hundreds of millions of IDs then runs as a shuffle join instead of failing on a multi-gigabyte broadcast.",
+      "source": "https://docs.databricks.com/aws/en/notebooks/source/kb/sql/broadcastnestedloopjoin-example.html",
+      "evidence": "This example notebook explains why a broadcast happens even if you disable the broadcast by setting spark.sql.autoBroadcastJoinThreshold to -1. ... If the data being processed is large enough, this results in broadcast errors when Spark attempts to broadcast the table. You can resolve the issue by rewriting the query with not exists instead of in."
+    }
+  ]
 }

@@ -1,3 +1,934 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "tuning-serverless-unsupported-conf-fails",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer moves a notebook task from a classic job cluster to serverless. The notebook still runs spark.conf.set('spark.sql.autoBroadcastJoinThreshold', '100MB'), a property missing from the short list of Spark properties that users may set on serverless. Which outcome should the engineer expect when the task runs?",
+      "options": [
+        {
+          "text": "The job run fails because it sets a Spark property that serverless doesn't support",
+          "correct": true,
+          "why": "Databricks removed support for manually setting most Spark properties on serverless compute, and a job run on serverless fails when it sets an unsupported configuration. The line has to be removed before the migration."
+        },
+        {
+          "text": "Serverless ignores the setting and runs the join with its own threshold",
+          "average": true,
+          "why": "Silently skipping the line is the common assumption, but serverless job runs fail on an unsupported Spark configuration instead of ignoring it, so the job breaks until the call is removed."
+        },
+        {
+          "text": "The setting applies to the notebook's session, as it would on classic compute",
+          "why": "On classic compute, spark.conf.set changes the notebook's session. Serverless allows only a short list of properties, and the broadcast threshold is not on it."
+        },
+        {
+          "text": "Serverless turns the value into a broadcast hint on every join in the notebook",
+          "why": "Serverless does not translate configuration values into query hints. A BROADCAST hint is something an engineer adds to a specific join in the query."
+        }
+      ],
+      "in_practice": "Scanning migrated notebooks for spark.conf.set calls before the first serverless run prevents a leftover tuning line from failing a nightly job that ran cleanly for years; serverless auto-tunes most of what those lines controlled.",
+      "source": "https://docs.databricks.com/aws/en/compute/serverless/best-practices",
+      "evidence": "To automate the configuration of Spark on serverless compute, Databricks has removed support for manually setting most Spark configurations. ... Job runs on serverless compute will fail if you set an unsupported Spark configuration."
+    },
+    {
+      "family": "tuning-aqe-runtime-broadcast-threshold",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "On Databricks, adaptive query execution (AQE) can switch a sort merge join to a broadcast hash join while a query runs, once it knows the actual size of each side. Which Spark property sets the size threshold for that runtime switch?",
+      "options": [
+        {
+          "text": "spark.databricks.adaptive.autoBroadcastJoinThreshold",
+          "correct": true,
+          "why": "This AQE property sets the size threshold for switching a sort merge join to a broadcast hash join at runtime, after AQE has measured the data each join side actually produced."
+        },
+        {
+          "text": "spark.sql.autoBroadcastJoinThreshold",
+          "average": true,
+          "why": "This is the familiar Spark threshold, but it applies when the optimizer plans the query from estimates before it runs. AQE's runtime switch on Databricks uses its own property and default."
+        },
+        {
+          "text": "spark.sql.adaptive.advisoryPartitionSizeInBytes",
+          "why": "This property sets the target size of post-shuffle partitions when AQE coalesces them. It has no say in which join strategy AQE picks."
+        },
+        {
+          "text": "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes",
+          "why": "This property is one of the two conditions AQE uses to decide that a partition is skewed. It controls skew join handling, not broadcast switching."
+        }
+      ],
+      "in_practice": "Knowing which threshold acts at runtime avoids a common dead end: raising the static threshold to fix a join that AQE converts later, measuring no change, and concluding that broadcasting doesn't help.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/aqe",
+      "evidence": "spark.databricks.adaptive.autoBroadcastJoinThreshold, Byte String, 30MB: The size threshold for switching a sort merge join to a broadcast hash join at runtime."
+    },
+    {
+      "family": "tuning-spark-ui-before-config",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's nightly job has become slower and more expensive over the last month, and nobody knows why. A teammate suggests doubling spark.sql.shuffle.partitions and raising the broadcast threshold to see what helps. What does Databricks recommend doing first?",
+      "options": [
+        {
+          "text": "Use the Spark UI to find the bottleneck before changing any configuration",
+          "correct": true,
+          "why": "When a workload is slower or more expensive than expected and the reason is unknown, Databricks recommends finding the bottleneck in the Spark UI before changing configuration. The evidence then shows which setting, if any, to change and re-measure."
+        },
+        {
+          "text": "Change both settings, run the job, and keep whichever values run fastest",
+          "average": true,
+          "why": "Trial-and-error tuning without a diagnosis can mask the real cause, such as reading too much data or a poor plan, and each experiment costs a full nightly run."
+        },
+        {
+          "text": "Disable adaptive query execution so that every run uses the same plan",
+          "why": "AQE is on by default and fixes slow join strategies, too many small tasks and skew at runtime. Turning it off removes those fixes rather than explaining the slowdown."
+        },
+        {
+          "text": "Move the job to a larger cluster and compare its run time with last month",
+          "why": "More hardware may hide the symptom for a while, but it adds cost without explaining what changed, so the regression can return as the data grows."
+        }
+      ],
+      "in_practice": "A short look at the longest stage often points straight at the cause, such as a full table scan or spill, and saves days of trying settings that each need a full nightly run to evaluate.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/",
+      "evidence": "If a workload is slower or more expensive than expected and you don't know why, use the Spark UI to find the bottleneck before you change configuration."
+    },
+    {
+      "family": "tuning-compute-policy-enforce-conf",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform team wants every new job cluster that data engineers create in a workspace to run with spark.sql.shuffle.partitions set to auto, and cluster creators must not be able to drop the setting. What should a workspace admin use?",
+      "options": [
+        {
+          "text": "A compute policy that sets the Spark configuration property",
+          "correct": true,
+          "why": "Compute policies are how workspace admins enforce Spark configurations on compute, so clusters created under the policy get the tested value instead of relying on each creator."
+        },
+        {
+          "text": "A spark.conf.set call in a shared notebook that every job runs first",
+          "average": true,
+          "why": "A notebook-level setting changes only that notebook's SparkSession, and engineers can skip the notebook or set a different value afterward, so nothing is enforced."
+        },
+        {
+          "text": "A data access configuration in the workspace's SQL admin settings",
+          "why": "Data access configurations in the SQL admin settings apply to Databricks SQL warehouses, not to the job clusters that data engineers create."
+        },
+        {
+          "text": "A table property set on each Delta table that the jobs read",
+          "why": "Table properties control table features such as row tracking or retention. They are not Spark session settings, so they can't set the shuffle partition count."
+        }
+      ],
+      "in_practice": "A policy turns a tuning decision into a guardrail: one admin change covers hundreds of clusters, and new teams inherit the tested value instead of copying old settings from a wiki page.",
+      "source": "https://docs.databricks.com/aws/en/compute/configure",
+      "evidence": "In Spark config, enter the configuration properties as one key-value pair per line. ... To enforce Spark configurations on compute, workspace admins can use compute policies."
+    },
+    {
+      "family": "tuning-conf-ismodifiable-check",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Before adding spark.conf.set calls for several properties to a shared notebook, a data engineer wants to check, one property at a time, whether each one can be changed in the current Spark session. Which PySpark call answers that?",
+      "options": [
+        {
+          "text": "spark.conf.isModifiable('<property>')",
+          "correct": true,
+          "why": "RuntimeConfig.isModifiable returns True when the property for the given key can be modified in the current session, which separates runtime settings from ones that are fixed when the compute starts."
+        },
+        {
+          "text": "spark.conf.get('<property>')",
+          "average": true,
+          "why": "get returns the property's current value, or a default that you supply. Fixed settings return a value too, so the result says nothing about whether the session can change them."
+        },
+        {
+          "text": "spark.conf.getAll",
+          "why": "getAll returns all properties set in this configuration as a dict. It lists values, not whether each one can be changed at runtime."
+        },
+        {
+          "text": "spark.conf.unset('<property>')",
+          "why": "unset resets the property for the given key. It changes the configuration instead of reporting whether the property is modifiable."
+        }
+      ],
+      "in_practice": "A quick check catches settings such as driver or executor memory before they land in a scheduled notebook; those belong in the compute configuration, where they take effect when the compute starts.",
+      "source": "https://docs.databricks.com/aws/en/pyspark/reference/classes/runtimeconfig",
+      "evidence": "isModifiable(key): Returns True if the configuration property for the given key is modifiable in the current session. get(key, default): Returns the value of the configuration property for the given key."
+    },
+    {
+      "family": "tuning-driver-memory-launch-time",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's notebook on a classic all-purpose cluster builds a large Python lookup structure on the driver and fails with driver out-of-memory errors. The engineer adds spark.conf.set('spark.driver.memory', '32g') as the first cell and reruns the notebook. Why can't this raise the driver's memory?",
+      "options": [
+        {
+          "text": "The driver JVM is already running, so its memory must be set before it starts",
+          "correct": true,
+          "why": "spark.driver.memory is a deploy-related property. Apache Spark notes that it must not be set through SparkConf in the application in client mode, because the driver JVM has already started by then."
+        },
+        {
+          "text": "The new value takes effect only after the next Spark action runs on the cluster",
+          "average": true,
+          "why": "Waiting for an action doesn't help: the driver's heap is sized when its JVM launches, and notebook code runs inside that already-started process."
+        },
+        {
+          "text": "spark.driver.memory sizes the executors on the workers, not the driver",
+          "why": "spark.driver.memory is the memory for the driver process, where the SparkContext is initialized. Executor memory is the separate spark.executor.memory property."
+        },
+        {
+          "text": "Memory values need megabytes, so '32g' must be written as '32768m'",
+          "why": "Spark memory properties accept JVM memory strings with a unit suffix such as m, g or t, so '32g' is a valid format."
+        }
+      ],
+      "in_practice": "On Databricks, more driver memory usually means choosing a larger driver node type and restarting the compute; the cheaper fix is often to keep large structures in Spark instead of on the driver.",
+      "source": "https://spark.apache.org/docs/latest/configuration.html",
+      "evidence": "spark.driver.memory: Amount of memory to use for the driver process, i.e. where SparkContext is initialized ... Note: In client mode, this config must not be set through the SparkConf directly in your application, because the driver JVM has already started at that point."
+    },
+    {
+      "family": "tuning-scan-partitions-max-bytes",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's job on a classic cluster reads about 800 GB of Parquet files and then aggregates them. To speed up the first stage, which only scans the files, the engineer raises spark.sql.shuffle.partitions from 200 to 1,000, but the scan stage still runs the same number of tasks. Why didn't the change affect that stage?",
+      "options": [
+        {
+          "text": "Shuffle partitions govern joins and aggregations; maxPartitionBytes sizes file scan partitions",
+          "correct": true,
+          "why": "spark.sql.shuffle.partitions sets the partition count when data is shuffled for joins or aggregations. How a file read is split is governed by spark.sql.files.maxPartitionBytes, the most bytes packed into one partition."
+        },
+        {
+          "text": "A new shuffle partition count takes effect only after the cluster restarts",
+          "average": true,
+          "why": "The setting can be changed in a running session with spark.conf.set or SET, so a restart isn't the issue. The scan stage stays the same because it never shuffles."
+        },
+        {
+          "text": "AQE coalesced the scan stage's partitions back to the original count",
+          "why": "AQE coalesces partitions after a shuffle exchange, using the shuffle's output sizes. A file scan comes before any shuffle, so coalescing doesn't apply to it."
+        },
+        {
+          "text": "Parquet readers always create exactly one task for each file they read",
+          "why": "Spark packs small files together and splits large ones into partitions of up to spark.sql.files.maxPartitionBytes, so tasks don't map one-to-one to files."
+        }
+      ],
+      "in_practice": "Raising shuffle partitions for a slow scan only adds smaller tasks to the later aggregation stage; matching each setting to the stage it controls keeps re-measurement honest and saves a wasted nightly run.",
+      "source": "https://spark.apache.org/docs/latest/sql-performance-tuning.html",
+      "evidence": "spark.sql.files.maxPartitionBytes, 134217728 (128 MB): The maximum number of bytes to pack into a single partition when reading files. ... spark.sql.shuffle.partitions, 200: Configures the number of partitions to use when shuffling data for joins or aggregations."
+    },
+    {
+      "family": "tuning-pipeline-dataset-spark-conf",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer maintains a Lakeflow Spark Declarative Pipelines pipeline written in Python. The pipeline's configuration object sets spark.sql.shuffle.partitions for every dataset, but one large materialized view that aggregates a year of clickstream data needs a different value. The other datasets must keep the pipeline-wide value. How should the engineer set it?",
+      "options": [
+        {
+          "text": "Pass spark_conf with the new value in that dataset's decorator",
+          "correct": true,
+          "why": "A Spark property set with the spark_conf argument of a dataset decorator applies to that dataset only, and the dataset-level value overrides the pipeline-level value from the configuration object."
+        },
+        {
+          "text": "Change the value in the configuration object for the whole pipeline",
+          "average": true,
+          "why": "The configuration object applies to every dataset in the pipeline, so changing it there would also move the datasets that must keep the current value."
+        },
+        {
+          "text": "Add the shuffle setting to the view's TBLPROPERTIES clause",
+          "why": "Table properties configure the table itself, such as Delta features. A Spark session setting such as the shuffle partition count is passed with spark_conf instead."
+        },
+        {
+          "text": "Set the value on the SQL warehouse that analysts use to query the view",
+          "why": "The warehouse that reads the view doesn't run the pipeline's update, so its settings don't change how the materialized view is computed."
+        }
+      ],
+      "in_practice": "Per-dataset overrides let one heavy aggregation run with, say, 2,000 shuffle partitions while dozens of small datasets keep a lower value, so tuning one table never slows the rest of the pipeline.",
+      "source": "https://docs.databricks.com/aws/en/ldp/properties",
+      "evidence": "Python: In a Python source file, set a Spark configuration property on an individual dataset with the spark_conf argument of the dataset decorator. Setting a property in SQL or Python applies it at the dataset level, which overrides the pipeline-level value from the configuration object."
+    },
+    {
+      "family": "tuning-remeasure-representative-data",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer tunes spark.sql.shuffle.partitions and the broadcast threshold for a nightly orders job using a 1% random sample in a development workspace, and measures a 40% speedup. In production, where the full table is heavily skewed toward a few large merchants and is stored in many small files, the job runs no faster. How should the engineer re-measure the tuning?",
+      "options": [
+        {
+          "text": "Test on production data read-only, or on data with similar volume, file layout and skew",
+          "correct": true,
+          "why": "Databricks recommends performance testing on production data (read-only) or similar data, because volume, file layout and data skew have a significant impact on performance. A small uniform sample hides all three."
+        },
+        {
+          "text": "Rerun the sample test several times and average the timings for stability",
+          "average": true,
+          "why": "Repeating the test reduces noise but still measures the wrong data. The sample lacks production's volume, small files and skew, so the averaged result misleads in the same way."
+        },
+        {
+          "text": "Multiply the sample's run time by 100 to predict the production run",
+          "why": "Spark jobs don't scale linearly from a sample once skew, small files and shuffles appear, which is why the projected gain never showed up in production."
+        },
+        {
+          "text": "Shrink the dev cluster until the sample takes as long as production does",
+          "why": "A smaller cluster changes parallelism and memory per task, so the test then measures a different setup instead of how the production data behaves."
+        }
+      ],
+      "in_practice": "Benchmarking against a read-only view of production data costs one extra run but avoids promoting settings that only help a sample; skew and small-file problems rarely show up in a 1% random draw.",
+      "source": "https://docs.databricks.com/aws/en/lakehouse-architecture/performance-efficiency/best-practices",
+      "evidence": "Run performance testing on production data (read-only) or similar data. When using similar data, characteristics like volume, file layout, and data skew should be similar to the production data, since this has a significant impact on performance."
+    },
+    {
+      "family": "tuning-stateful-stream-state-partitions",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer runs a Structured Streaming job on Databricks Runtime 18 LTS that counts events per device in 5-minute windows with a watermark, using the default RocksDB state store. Its checkpoint was created months ago with 200 shuffle partitions, and input volume has since tripled. The engineer sets spark.sql.shuffle.partitions to 600 and restarts the query, but each micro-batch still runs 200 state tasks. The aggregation state must be kept. What should the engineer do?",
+      "options": [
+        {
+          "text": "Set spark.sql.streaming.stateStore.partitions to 600 and restart the query",
+          "correct": true,
+          "why": "Queries with an existing checkpoint ignore a new spark.sql.shuffle.partitions value. On Databricks Runtime 18 LTS and above with RocksDB, spark.sql.streaming.stateStore.partitions takes precedence for stateful queries and repartitions the state after the restart."
+        },
+        {
+          "text": "Delete the checkpoint and restart so the query starts with 600 partitions",
+          "average": true,
+          "why": "A new checkpoint does pick up the new count, but it throws away the window state and the stream's progress, which breaks the requirement to keep the aggregation state."
+        },
+        {
+          "text": "Set spark.default.parallelism to 600 so the state operator runs more tasks",
+          "why": "spark.default.parallelism sets default partitions for RDD operations. A stateful query's partition count comes from its checkpoint unless state repartitioning is used."
+        },
+        {
+          "text": "Enable AQE partition coalescing so Spark resizes the state partitions",
+          "why": "AQE applies to non-streaming queries, and coalescing only merges small partitions. Neither changes the state partition count recorded in the checkpoint."
+        }
+      ],
+      "in_practice": "Repartitioning state in place keeps months of window state and avoids replaying the source; the repartition step takes longer as state grows, so the restart is best planned for a quiet period.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/state-repartitioning",
+      "evidence": "If you change spark.sql.shuffle.partitions, queries with existing checkpoints ignore the new value. Applying a new partition count requires you to restart the query with a new checkpoint. ... For stateful queries, spark.sql.streaming.stateStore.partitions takes precedence over spark.sql.shuffle.partitions."
+    },
+    {
+      "family": "tuning-remeasure-prewarm-first-run",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer compares two Spark configurations for a reporting notebook on a classic all-purpose cluster. Configuration A was measured right after a cluster restart. Configuration B was measured an hour later, after other queries had read the same Delta tables. B ran 35% faster, and the engineer plans to make it the default. What should the engineer do before deciding?",
+      "options": [
+        {
+          "text": "Measure each configuration's first run, with and without prewarming, and its later runs",
+          "correct": true,
+          "why": "The first query on a cluster is always slower while subsystems start and read the data they need. Databricks recommends testing the first execution with and without prewarming and the subsequent executions, so A and B are compared under the same conditions."
+        },
+        {
+          "text": "Adopt B, since both tests used the same cluster, notebook and data",
+          "average": true,
+          "why": "The same hardware is not the same conditions: B ran on a warm cluster with cached data while A paid the startup cost, so the 35% may come from warm-up rather than from the configuration."
+        },
+        {
+          "text": "Rerun only B on a larger cluster to confirm that the gain scales",
+          "why": "A larger cluster changes another variable and keeps A's cold-start run as the baseline, so it can't separate the configuration's effect from warm-up."
+        },
+        {
+          "text": "Edit the query's LIMIT to bypass the result cache, then rerun only B",
+          "why": "A SQL warehouse result cache isn't what differs here. The gap comes from cluster startup and data caching on the classic cluster, so A also needs comparable runs."
+        }
+      ],
+      "in_practice": "Cold and warm runs can differ by more than most tuning changes, so a fair comparison runs each candidate both ways; otherwise a team can lock in a setting that only looked faster because it ran second.",
+      "source": "https://docs.databricks.com/aws/en/lakehouse-architecture/performance-efficiency/best-practices",
+      "evidence": "Regardless of the query and data format, the first query on a cluster is always slower than subsequent queries. ... So, to understand the behavior for the different scenarios, test the performance of the first execution with and without prewarming and of subsequent executions."
+    },
+    {
+      "family": "tuning-aqe-left-outer-no-broadcast",
+      "objective": "transformation.tuning",
+      "guide": "3.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer runs SELECT ... FROM regions r LEFT OUTER JOIN sales s ON r.region_id = s.region_id, where regions is a 2 MB dimension and sales holds 4 TB. AQE is enabled and regions is far below spark.databricks.adaptive.autoBroadcastJoinThreshold, yet the final plan in the Spark UI still shows a sort merge join. The engineer is about to raise the threshold. What explains the plan?",
+      "options": [
+        {
+          "text": "AQE can't broadcast the left side of a LEFT OUTER JOIN, whatever the threshold",
+          "correct": true,
+          "why": "Some join types can't broadcast one side, and AQE can't broadcast the left side of a LEFT OUTER JOIN. Here regions is that left side, so the sort merge join stays and a higher threshold changes nothing."
+        },
+        {
+          "text": "AQE also needs the table to be below spark.sql.autoBroadcastJoinThreshold",
+          "average": true,
+          "why": "The static threshold matters when the optimizer plans the query before it runs. AQE's runtime switch uses its own threshold, which regions already meets; the join type is what blocks it."
+        },
+        {
+          "text": "AQE skips the switch because regions has no table statistics",
+          "why": "AQE relies on runtime statistics gathered at the end of each shuffle, not on catalog statistics, so missing table statistics don't stop it from measuring regions."
+        },
+        {
+          "text": "The Spark UI shows only the initial plan, from before AQE's changes",
+          "why": "The Spark UI plan diagram shows the most current plan and updates as the query runs. It is SQL EXPLAIN that shows only the initial plan."
+        }
+      ],
+      "in_practice": "Checking the join type before touching thresholds avoids a global change that could make other joins broadcast tables that are too large; when the small table must be preserved, reducing the large side first is the usual lever.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/aqe",
+      "evidence": "If the table is smaller than spark.databricks.adaptive.autoBroadcastJoinThreshold but AQE doesn't broadcast it, check these causes: The join type doesn't support broadcast. Some join types can't broadcast one side. For example, AQE can't broadcast the left side of a LEFT OUTER JOIN."
+    },
+    {
+      "family": "gold-metric-view-measure-query",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer publishes the metric view main.gold.orders_metrics, which defines the field `Order Month` and the measure `Total Revenue`. An analyst needs total revenue for each month. Which query returns it?",
+      "options": [
+        {
+          "text": "SELECT `Order Month`, MEASURE(`Total Revenue`) FROM main.gold.orders_metrics GROUP BY ALL",
+          "correct": true,
+          "why": "Every measure in a metric view query must be evaluated with the MEASURE aggregate function. The engine then computes the measure for whichever fields the query groups by."
+        },
+        {
+          "text": "SELECT `Order Month`, SUM(`Total Revenue`) FROM main.gold.orders_metrics GROUP BY ALL",
+          "average": true,
+          "why": "Wrapping a measure in SUM treats it like a plain numeric column. A measure already carries its aggregation logic and has to be evaluated with MEASURE()."
+        },
+        {
+          "text": "SELECT * FROM main.gold.orders_metrics ORDER BY `Order Month`",
+          "why": "SELECT * doesn't work for measures, because each one needs MEASURE() to evaluate; list the fields and wrap each measure instead."
+        },
+        {
+          "text": "SELECT `Order Month`, `Total Revenue` FROM main.gold.orders_metrics",
+          "why": "Selecting the measure as an ordinary column skips both the MEASURE function and the grouping, so the query can't evaluate revenue per month."
+        }
+      ],
+      "in_practice": "Because the aggregation lives in the metric view, a dashboard and a notebook asking for monthly revenue get the same number, instead of two teams writing slightly different SUMs over the same table.",
+      "source": "https://docs.databricks.com/aws/en/uc-semantics/metric-views/query",
+      "evidence": "All measure evaluations in a metric view query must use the MEASURE aggregate function. ... Because measures require the MEASURE() function to evaluate properly, you must specify individual columns rather than using SELECT *."
+    },
+    {
+      "family": "gold-mv-aggregate-alias",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs CREATE MATERIALIZED VIEW main.gold.daily_sales AS SELECT order_date, sum(amount) FROM main.silver.orders GROUP BY order_date from a SQL warehouse, and the statement fails. Which change lets it succeed?",
+      "options": [
+        {
+          "text": "Give the aggregate an alias, such as sum(amount) AS total_amount",
+          "correct": true,
+          "why": "In a materialized view definition, expressions and aggregates in the SELECT clause must have aliases. Plain column references, such as order_date, don't need one."
+        },
+        {
+          "text": "Add amount to the GROUP BY clause next to order_date",
+          "average": true,
+          "why": "Grouping by amount would change the result to one row per amount value and still leave the aggregate unnamed, which is what the definition is missing."
+        },
+        {
+          "text": "Add a SCHEDULE clause so the view has a refresh plan",
+          "why": "A schedule is optional. A materialized view can be created without one and refreshed manually or by a job."
+        },
+        {
+          "text": "Alias the grouping column, such as order_date AS sales_date",
+          "why": "Column references don't require aliases, and order_date is a plain column. The unnamed sum(amount) expression is what needs one."
+        }
+      ],
+      "in_practice": "Named aggregates also give BI tools stable column names, so a dashboard doesn't break when someone later rewrites the expression behind a measure.",
+      "source": "https://docs.databricks.com/aws/en/views/materialized",
+      "evidence": "Expressions and aggregates in the SELECT clause must use aliases. GROUP BY column references don't require aliases."
+    },
+    {
+      "family": "gold-pipeline-mv-not-streaming-source",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's pipeline publishes the materialized view main.gold.daily_orders. A colleague's separate pipeline must process it further, and the colleague plans to define a new streaming table that reads SELECT * FROM STREAM(main.gold.daily_orders). What should the colleague expect?",
+      "options": [
+        {
+          "text": "It fails, because a pipeline's materialized view can't be a streaming source outside that pipeline",
+          "correct": true,
+          "why": "A materialized view created in a pipeline cannot be used as a streaming source outside of that pipeline, whether in another pipeline or a downstream notebook. The colleague needs a batch read or a change in the owning pipeline."
+        },
+        {
+          "text": "It works, because the materialized view is a Delta table that any stream can read",
+          "average": true,
+          "why": "Materialized views are stored as Delta tables, but that doesn't make them streaming sources. A pipeline's materialized view can't be streamed from another pipeline or a notebook."
+        },
+        {
+          "text": "It works once the colleague is granted REFRESH on the materialized view",
+          "why": "REFRESH lets a principal refresh the view. Privileges don't change the rule that it can't be a streaming source outside the pipeline that defines it."
+        },
+        {
+          "text": "It works if both pipelines run on the same serverless compute",
+          "why": "Compute doesn't matter here. The limitation applies to any other pipeline or downstream notebook, wherever it runs."
+        }
+      ],
+      "in_practice": "Downstream teams usually read another pipeline's materialized view in batch, for example through their own materialized view that can refresh incrementally, or ask the owning team to add the logic to the pipeline that defines it.",
+      "source": "https://docs.databricks.com/aws/en/ldp/unity-catalog",
+      "evidence": "A materialized view created in a pipeline cannot be used as a streaming source outside of that pipeline, for example, in another pipeline or a downstream notebook."
+    },
+    {
+      "family": "gold-mv-no-optimize-vacuum",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's nightly maintenance script runs OPTIMIZE and VACUUM on every table in the main.gold schema. The team then adds several materialized views to that schema, maintained by a Lakeflow Spark Declarative Pipelines pipeline. How should the script treat the materialized views?",
+      "options": [
+        {
+          "text": "Leave them out; the commands aren't supported and maintenance runs automatically",
+          "correct": true,
+          "why": "Materialized views do not support the OPTIMIZE and VACUUM commands. Their maintenance happens automatically, so the script should cover only the tables the team writes itself."
+        },
+        {
+          "text": "Run both commands as usual, because materialized views are Delta tables",
+          "average": true,
+          "why": "Materialized views are stored as Delta tables, but they don't accept OPTIMIZE or VACUUM. Their maintenance is handled for them, so the script should skip them."
+        },
+        {
+          "text": "Run VACUUM only, with a zero-hour retention to reclaim space faster",
+          "why": "VACUUM isn't supported on materialized views, and a zero-hour retention is risky on any table because it removes files that readers might still need."
+        },
+        {
+          "text": "Run OPTIMIZE only, right after each refresh to compact the new files",
+          "why": "OPTIMIZE isn't supported on materialized views either. Compaction is part of the automatic maintenance that runs for them."
+        }
+      ],
+      "in_practice": "Letting pipelines maintain their own tables keeps the maintenance script focused on the tables the team writes directly, and avoids job failures every time a new materialized view lands in the schema.",
+      "source": "https://docs.databricks.com/aws/en/ldp/developer/ldp-sql-ref-create-materialized-view",
+      "evidence": "Materialized views do not support OPTIMIZE and VACUUM commands. Maintenance happens automatically."
+    },
+    {
+      "family": "gold-view-create-needs-create-table",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer has USE CATALOG on main, USE SCHEMA on main.silver and main.gold, and SELECT on main.silver.orders. Running CREATE VIEW main.gold.order_summary AS SELECT ... FROM main.silver.orders fails with a permission error. Which additional privilege does the engineer need?",
+      "options": [
+        {
+          "text": "CREATE TABLE on the main.gold schema",
+          "correct": true,
+          "why": "Creating a view requires USE CATALOG on the parent catalog, USE SCHEMA and CREATE TABLE on the parent schema, and read access to the referenced tables. CREATE TABLE is the only one missing."
+        },
+        {
+          "text": "CREATE VIEW on the main.gold schema",
+          "average": true,
+          "why": "Unity Catalog has no separate CREATE VIEW privilege to grant. The documented requirement for creating a view is CREATE TABLE on the parent schema."
+        },
+        {
+          "text": "MODIFY on the main.gold schema",
+          "why": "MODIFY lets a principal add, update and delete data in tables. It doesn't grant the right to create new objects in the schema."
+        },
+        {
+          "text": "SELECT on the main.gold schema",
+          "why": "SELECT on the schema grants read access to the objects in it. Creating an object in the schema needs CREATE TABLE."
+        }
+      ],
+      "in_practice": "Granting CREATE TABLE on a gold schema to an engineering group, rather than to individuals, lets the team publish views for BI while analysts keep read-only SELECT on the same schema.",
+      "source": "https://docs.databricks.com/aws/en/views/create-views",
+      "evidence": "You must have the USE CATALOG permission on the parent catalog and the USE SCHEMA and CREATE TABLE permissions on the parent schema. ... You must be able to read the tables and views referenced in the view (SELECT on the table or view, and USE CATALOG on the catalog and USE SCHEMA on the schema)."
+    },
+    {
+      "family": "gold-mv-compatibility-mode",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A partner team reads data with an external Apache Iceberg client that doesn't support open APIs. It needs read access to the gold materialized view main.gold.daily_sales. Which Databricks feature gives that client access to the view's data?",
+      "options": [
+        {
+          "text": "Compatibility Mode, which creates a read-only version of the view for Delta and Iceberg clients",
+          "correct": true,
+          "why": "For external Delta Lake or Iceberg clients that don't support open APIs, Compatibility Mode creates a read-only version of a materialized view that any Delta Lake or Iceberg client can read."
+        },
+        {
+          "text": "The storage path of the view's underlying files, shared with the client",
+          "average": true,
+          "why": "Reading a materialized view's files directly bypasses Unity Catalog, and those files can hold upstream data that isn't in the view, which Databricks advises against sharing."
+        },
+        {
+          "text": "A shallow clone of the view into an external table the client can read",
+          "why": "Materialized views can't be the source or target of a shallow or deep clone, so cloning isn't a way to expose one."
+        },
+        {
+          "text": "An ALTER statement that converts the view into an external table",
+          "why": "There is no conversion from a materialized view to an external table. Its schema and properties change only through its CREATE OR REFRESH definition."
+        }
+      ],
+      "in_practice": "Compatibility Mode keeps Unity Catalog as the source of truth while a partner's tools read a read-only copy, which avoids a nightly export job and the drift that hand-copied extracts bring.",
+      "source": "https://docs.databricks.com/aws/en/views/materialized",
+      "evidence": "To access materialized views from external Delta Lake or Iceberg clients that don't support open APIs, you can use Compatibility Mode. Compatibility Mode creates a read-only version of your materialized view that can be accessed by any Delta Lake or Iceberg client."
+    },
+    {
+      "family": "gold-st-single-owning-pipeline",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Team A's Lakeflow Spark Declarative Pipelines pipeline defines the streaming table main.gold.web_events from a Kafka topic. Team B, which runs its own pipeline, wants events from a second topic to land in the same streaming table. Which approach works?",
+      "options": [
+        {
+          "text": "Add the second topic as another flow in Team A's pipeline",
+          "correct": true,
+          "why": "A streaming table is owned and updated by a single pipeline, and no other pipeline can change or update it. That pipeline can define several flows that append to the table, so the new source belongs there."
+        },
+        {
+          "text": "Have Team B's pipeline append to it after Team A grants MODIFY",
+          "average": true,
+          "why": "Privileges don't change pipeline ownership: tables defined by one pipeline can't be updated by any other pipeline, whatever grants Team B holds."
+        },
+        {
+          "text": "Have Team B's pipeline redefine it with CREATE OR REFRESH",
+          "why": "Team B's pipeline can't take over a streaming table that Team A's pipeline defines; the table stays owned and updated by Team A's pipeline."
+        },
+        {
+          "text": "Let both pipelines write to it, as long as they run at different times",
+          "why": "Scheduling doesn't matter. Only the defining pipeline can update a streaming table, so Team B's pipeline can't write to it at any time."
+        }
+      ],
+      "in_practice": "Single ownership keeps one checkpoint history and one update schedule per table; teams that contribute sources add flows through the owning pipeline's code review instead of writing to the table independently.",
+      "source": "https://docs.databricks.com/aws/en/ldp/concepts/streaming-tables",
+      "evidence": "Streaming tables are owned and updated by a single pipeline. You explicitly define streaming tables in the source code of the pipeline. Tables defined by a pipeline can't be changed or updated by any other pipeline. You can define multiple flows to append to a single streaming table."
+    },
+    {
+      "family": "gold-view-alter-needs-ownership",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A colleague owns the Unity Catalog view main.gold.churn_kpis, and a data engineer has been granted MANAGE on it. Before a dashboard release, the engineer must change the view's definition to add a column, but the change fails with a permission error. What does the engineer need?",
+      "options": [
+        {
+          "text": "Ownership of the view, for example through a group that owns it",
+          "correct": true,
+          "why": "Only the owner of a view can update its definition or description, and the MANAGE privilege is not enough. Transferring ownership, often to a group, lets the engineer change it."
+        },
+        {
+          "text": "MODIFY on the view, in addition to the MANAGE privilege",
+          "average": true,
+          "why": "MODIFY covers writing table data, and a view holds no data. Changing a view's definition is reserved for its owner, whatever other privileges the engineer holds."
+        },
+        {
+          "text": "CREATE TABLE on the main.gold schema",
+          "why": "CREATE TABLE lets the engineer create new views in the schema. It doesn't allow changing a view that a colleague owns."
+        },
+        {
+          "text": "SELECT on every table that the view references",
+          "why": "Read access to the referenced tables is needed to create a view, but it doesn't grant the right to change someone else's view definition."
+        }
+      ],
+      "in_practice": "Making a group the owner of shared gold views keeps a release from waiting on one person's vacation; MANAGE covers grants and drops, but definition changes need ownership.",
+      "source": "https://docs.databricks.com/aws/en/views/create-views",
+      "evidence": "To update a view definition or description, you must be the owner of the view. Having the MANAGE privilege is insufficient. ... You must be the view's owner or have the MANAGE privilege on the view to drop a view."
+    },
+    {
+      "family": "gold-metric-view-flexible-grouping",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A BI team reports revenue per customer: total revenue divided by the number of distinct customers. A data engineer built a standard view that computes it grouped by region, but analysts who average the regional values to get a country figure report wrong numbers, and they also need the KPI by product line and by month. Which gold object should the engineer build so the KPI is defined once and correct for any grouping?",
+      "options": [
+        {
+          "text": "A metric view that defines revenue per customer as a measure",
+          "correct": true,
+          "why": "Standard views lock in aggregations and groupings when they are created. A metric view defines the measure once, users group by any available field at query time, and the engine generates the correct computation."
+        },
+        {
+          "text": "A materialized view that precomputes the ratio for every region",
+          "average": true,
+          "why": "A materialized view speeds up the same fixed grouping, but it still stores region-level ratios that can't be re-aggregated correctly to countries or other groupings."
+        },
+        {
+          "text": "One standard view for each combination of grouping fields",
+          "why": "Separate views multiply definitions that can drift apart, and they still can't cover groupings that nobody built in advance."
+        },
+        {
+          "text": "A streaming table that recomputes the ratio as new orders arrive",
+          "why": "A streaming table processes each new row once and doesn't recompute earlier results, so it doesn't solve regrouping a ratio."
+        }
+      ],
+      "in_practice": "Ratios are where copied SQL goes wrong most often; one governed measure gives dashboards, notebooks and AI tools the same answer, and the next grouping request doesn't need a new view.",
+      "source": "https://docs.databricks.com/aws/en/uc-semantics/metric-views",
+      "evidence": "Standard views lock in aggregations and groupings at creation time. With a metric view, you define the metric once, for example sum of revenue divided by distinct customer count, and users can group by any available field. The query engine generates the correct computation."
+    },
+    {
+      "family": "gold-mv-identity-unsupported",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer wants BI users to join on a surrogate key, so the engineer defines the gold dimension as CREATE MATERIALIZED VIEW main.gold.dim_customer (customer_sk BIGINT GENERATED ALWAYS AS IDENTITY, customer_id STRING, ...) AS SELECT ... and runs it. The statement fails. What is the cause?",
+      "options": [
+        {
+          "text": "Materialized views don't support identity columns or surrogate keys",
+          "correct": true,
+          "why": "Identity columns and surrogate keys are a documented limitation of materialized views, so the definition can't include one. A dimension that needs one has to be built as another table type."
+        },
+        {
+          "text": "Identity columns must use the INT type rather than BIGINT",
+          "average": true,
+          "why": "Identity columns are defined on BIGINT, so the type is right. The problem is the object type: materialized views don't support identity columns at all."
+        },
+        {
+          "text": "The SELECT list must also return a customer_sk column",
+          "why": "An identity column's values are generated, not supplied by the query, and materialized views don't support the clause in the first place."
+        },
+        {
+          "text": "Identity columns require a SCHEDULE clause on the view",
+          "why": "A schedule controls when a materialized view refreshes and has nothing to do with identity columns, which materialized views don't support."
+        }
+      ],
+      "in_practice": "Dimensions that need surrogate keys are usually built as Delta tables or streaming tables, which support identity columns, while materialized views serve the aggregates that join to them.",
+      "source": "https://docs.databricks.com/aws/en/views/materialized",
+      "evidence": "Limitations: ... Materialized views do not support identity columns or surrogate keys."
+    },
+    {
+      "family": "gold-mv-explain-incremental-check",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer plans a materialized view of the top 100 customers by lifetime spend, written with ORDER BY total_spend DESC LIMIT 100 over a Delta table that has row tracking enabled. Finance wants cheap hourly refreshes, so before deploying, the engineer wants to know whether refreshes of this query can be incremental. What should the engineer do?",
+      "options": [
+        {
+          "text": "Prepend EXPLAIN to the CREATE MATERIALIZED VIEW statement and read its eligibility",
+          "correct": true,
+          "why": "EXPLAIN CREATE MATERIALIZED VIEW reports whether the query is structurally eligible for incremental refresh before anything is created, and lists what blocks it. A LIMIT, for example, can't be maintained incrementally."
+        },
+        {
+          "text": "Create the view and judge from the duration of its first refresh",
+          "average": true,
+          "why": "Timing one refresh after deployment doesn't show whether the query can ever refresh incrementally, and the eligibility check is available before creating anything."
+        },
+        {
+          "text": "Run EXPLAIN on the SELECT alone and look for a broadcast join",
+          "why": "A plain EXPLAIN shows the physical query plan, not incremental refresh eligibility. The join strategy says nothing about whether a LIMIT can be maintained incrementally."
+        },
+        {
+          "text": "Enable change data feed on the source so that any query becomes incremental",
+          "why": "Change data feed is recommended for better incremental refresh performance, but it can't make an ineligible operator such as LIMIT incremental."
+        }
+      ],
+      "in_practice": "Checking eligibility before deploying lets the engineer redesign early, for example keeping the ranking in the dashboard and the aggregate in the view, before hourly full recomputes show up on the bill.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-explain-materialized-view",
+      "evidence": "Reports whether the query for a materialized view can be incrementally refreshed. Prepend EXPLAIN to a CREATE MATERIALIZED VIEW statement to check incrementalization eligibility before you create the materialized view or run an expensive refresh. ... A query that uses LIMIT is not incrementalizable."
+    },
+    {
+      "family": "gold-mv-drop-pipeline-defined",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer wants to retire main.gold.legacy_kpis, a materialized view defined in a Lakeflow Spark Declarative Pipelines pipeline that still runs every night. Running DROP MATERIALIZED VIEW main.gold.legacy_kpis from a SQL warehouse fails. What should the engineer do?",
+      "options": [
+        {
+          "text": "Remove the view's definition from the pipeline source code and run the pipeline",
+          "correct": true,
+          "why": "A materialized view created by a pipeline can't be dropped directly. Databricks directs you to remove it from the pipeline definition and run the pipeline again, so the pipeline stops managing it."
+        },
+        {
+          "text": "Take ownership of the view and then run the DROP statement again",
+          "average": true,
+          "why": "Ownership isn't the blocker: the pipeline manages the view, and changing a materialized view's owner isn't allowed anyway. The definition has to leave the pipeline first."
+        },
+        {
+          "text": "Use DROP TABLE, because materialized views are stored as Delta tables",
+          "why": "Changing the statement type doesn't get around the rule. The pipeline still defines and refreshes the view, so it must be removed there."
+        },
+        {
+          "text": "Run the DROP from a notebook on an all-purpose cluster instead",
+          "why": "Where the command runs doesn't matter. A pipeline-defined materialized view is changed through the pipeline definition, not dropped from other compute."
+        }
+      ],
+      "in_practice": "Retiring datasets through the pipeline code keeps the repository, the pipeline and the catalog in agreement, and the change goes through the same review as any other edit to the gold layer.",
+      "source": "https://docs.databricks.com/aws/en/error-messages/materialized-view-operation-not-allowed-error-class",
+      "evidence": "Cannot DROP a materialized view created from Spark Declarative Pipelines on Lakeflow, instead remove the materialized view from the pipeline definition in Spark Declarative Pipelines on Lakeflow and retry the pipeline again."
+    },
+    {
+      "family": "gold-mv-sync-refresh-job",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A Lakeflow Job runs two SQL tasks on a SQL warehouse: the first runs REFRESH MATERIALIZED VIEW main.gold.sales_mv ASYNC, and the second exports the view to a partner. A data engineer added ASYNC to save warehouse cost, but some exports now contain the previous day's data. Which change fixes this?",
+      "options": [
+        {
+          "text": "Remove ASYNC so that the refresh task waits until the refresh completes",
+          "correct": true,
+          "why": "A synchronous refresh blocks until it finishes, which Databricks recommends when the next step needs the result, such as when sequencing refreshes in Lakeflow Jobs. ASYNC returns before the data load completes."
+        },
+        {
+          "text": "Add a task that sleeps 30 minutes between the refresh and the export",
+          "average": true,
+          "why": "A fixed wait guesses at the refresh duration: a slow day still exports stale data and a fast day wastes time, while a synchronous refresh waits exactly as long as needed."
+        },
+        {
+          "text": "Use a larger SQL warehouse so that the background refresh ends sooner",
+          "why": "The refresh runs on a serverless pipeline that is independent of the warehouse, so warehouse size doesn't speed it up, and the export still starts before it ends."
+        },
+        {
+          "text": "Add SCHEDULE EVERY 1 HOUR to the view so that it is never stale",
+          "why": "A schedule refreshes on the clock, not in step with the export, so an export can still run before the latest data is loaded."
+        }
+      ],
+      "in_practice": "Asynchronous refreshes suit fire-and-forget updates and parallel refreshes of independent views; when a downstream task reads the result, a synchronous refresh is the simple guarantee.",
+      "source": "https://docs.databricks.com/aws/en/sql/mv-st/materialized",
+      "evidence": "Synchronous: A synchronous refresh prevents other operations from proceeding until the refresh is complete. If the result is needed for the next step, such as when sequencing refresh operations in orchestration tools like Lakeflow Jobs, use a synchronous refresh. To orchestrate materialized views with a job, use the SQL task type."
+    },
+    {
+      "family": "gold-mv-expectations-full-refresh",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's pipeline defines the gold materialized view main.gold.daily_revenue over a 3-billion-row silver table with row tracking enabled. To protect finance dashboards, the engineer added CONSTRAINT valid_amount EXPECT (amount >= 0) ON VIOLATION DROP ROW to the view's definition. Since then, every update recomputes the whole view and refresh cost has grown fivefold. Which change restores incremental refreshes while keeping the check?",
+      "options": [
+        {
+          "text": "Move the expectation out of the view's definition, for example onto the silver dataset",
+          "correct": true,
+          "why": "A materialized view whose definition includes expectations is fully refreshed on every update. Applying the expectation outside the view's definition, such as upstream, keeps the check and lets the view refresh incrementally."
+        },
+        {
+          "text": "Set REFRESH POLICY INCREMENTAL on the view to force incremental refreshes",
+          "average": true,
+          "why": "A refresh policy can't make an ineligible definition incremental. With an expectation in the definition every update is a full refresh, and an incremental policy on an ineligible definition makes the create fail."
+        },
+        {
+          "text": "Enable change data feed on the silver table to speed up change detection",
+          "why": "Change data feed can improve incremental refresh performance, but it doesn't lift the rule that a materialized view with expectations is fully refreshed."
+        },
+        {
+          "text": "Change the expectation's action from DROP ROW to a warning only",
+          "why": "The violation action doesn't matter: any expectation in the materialized view's definition makes each update a full refresh."
+        }
+      ],
+      "in_practice": "Validating rows once in silver usually costs far less than recomputing a 3-billion-row gold aggregation on every update, and the same clean silver data then feeds every gold view built on it.",
+      "source": "https://docs.databricks.com/aws/en/ldp/developer/ldp-sql-ref-create-materialized-view",
+      "evidence": "A materialized view whose definition includes expectations is fully refreshed on each update and does not support incremental refresh. To use incremental refresh, remove the expectations or apply them outside the materialized view definition."
+    },
+    {
+      "family": "gold-mv-storage-exposes-upstream",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer builds the materialized view main.gold.region_buyers, which returns only region and COUNT(DISTINCT customer_email) from silver orders. To cut query costs, a partner analytics firm asks for direct read access to the view's underlying storage files instead of querying it through Unity Catalog. Governance requires customer emails to stay private. What is the concern?",
+      "options": [
+        {
+          "text": "The files can hold upstream values, such as the emails, kept to support incremental refresh",
+          "correct": true,
+          "why": "The underlying files of a materialized view might include upstream data that isn't in its definition, added automatically for incremental refresh. With COUNT(DISTINCT), the files can contain the actual values, so Databricks advises against sharing the storage with untrusted consumers."
+        },
+        {
+          "text": "There is none, since the files store only the region and count columns",
+          "average": true,
+          "why": "That describes the query result, not the storage. To refresh incrementally, the view keeps extra upstream data in its files that the definition never returns."
+        },
+        {
+          "text": "The partner would read stale data until the next VACUUM of the view",
+          "why": "Freshness isn't the issue, and VACUUM isn't run on materialized views. The risk is the extra upstream data stored in the files."
+        },
+        {
+          "text": "Reading the files directly would force a full recompute of the view",
+          "why": "Reading storage doesn't trigger refreshes, which run on the view's pipeline. The issue is what the files contain beyond the view's columns."
+        }
+      ],
+      "in_practice": "Sharing through Unity Catalog grants or OpenSharing keeps access at the view's columns; handing out storage paths can leak exactly the PII that the aggregate was meant to hide.",
+      "source": "https://docs.databricks.com/aws/en/views/materialized",
+      "evidence": "The underlying files supporting materialized views might include data from upstream tables (including possible personally identifiable information) that do not appear in the materialized view definition. ... Databricks recommends not sharing the underlying storage with untrusted downstream consumers."
+    },
+    {
+      "family": "gold-mv-udf-library-full-refresh",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's gold materialized view in a pipeline calls a Python UDF that uses a third-party library to normalize product names. The platform team upgrades that library in the pipeline's environment, and the business wants the new normalization rules everywhere. After the next update, rows recomputed in that update use the new rules while older rows keep the old ones. What should the engineer do?",
+      "options": [
+        {
+          "text": "Run a full refresh of the view so every row is recomputed with the new library",
+          "correct": true,
+          "why": "Databricks tries to detect UDF behavior changes and fully refresh, but a change in a called library, such as an upgrade, may go unnoticed. When a UDF's behavior changes, you are responsible for running a full refresh."
+        },
+        {
+          "text": "Wait, because Databricks detects UDF changes and fully refreshes on its own",
+          "average": true,
+          "why": "Detection covers changes Databricks can recognize. A library upgrade under an unchanged UDF is the documented case it may miss, so waiting leaves mixed results in the view."
+        },
+        {
+          "text": "Pin the old library version so that new rows match the old ones again",
+          "why": "Pinning reverses the change the business asked for, and rows already computed with the new version keep their new values, so the view stays inconsistent."
+        },
+        {
+          "text": "Redefine the view as a streaming table so that old rows stay untouched",
+          "why": "A streaming table processes each row once and never revisits earlier rows, which makes the mixed results permanent instead of fixing them."
+        }
+      ],
+      "in_practice": "Adding a full-refresh step to the release checklist for UDF or library upgrades costs one larger update and avoids weeks of dashboards that mix two versions of the same business rule.",
+      "source": "https://docs.databricks.com/aws/en/ldp/concepts/materialized-views",
+      "evidence": "Databricks attempts to detect when a UDF used in a materialized view changes behavior and perform a full refresh to apply the updated UDF. However, UDFs that call other functions or libraries may change behavior in ways that Databricks does not recognize. One example of this is when a called library is upgraded."
+    },
+    {
+      "family": "gold-st-updated-source-use-mv",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's pipeline defines the gold streaming table main.gold.customer_status, which reads STREAM(main.silver.customers). The silver team has switched to daily MERGE statements that update and delete customer rows, and the gold table's updates now fail. BI dashboards need gold to reflect each customer's current status, including deletions. Which change meets the requirement?",
+      "options": [
+        {
+          "text": "Redefine the gold dataset as a materialized view over main.silver.customers",
+          "correct": true,
+          "why": "When source data changes through updates and deletes rather than only growing, a materialized view keeps its results consistent with the source's current state. A streaming table is designed for append-only sources and processes each record once."
+        },
+        {
+          "text": "Add the skipChangeCommits option so the stream ignores updates and deletes",
+          "average": true,
+          "why": "skipChangeCommits stops the failures by skipping change commits, so the updates and deletions never reach gold and the dashboards show outdated statuses."
+        },
+        {
+          "text": "Run a full refresh of the streaming table after every silver MERGE",
+          "why": "A daily full refresh reprocesses the whole source each time, which costs far more than a materialized view refresh, and the stream still fails on change commits between refreshes."
+        },
+        {
+          "text": "Ask the silver team to turn off deletion vectors on the silver table",
+          "why": "Deletion vectors change how deletes are stored, not whether the table's history contains updates and deletes, so the stream still meets change commits."
+        }
+      ],
+      "in_practice": "A source maintained with MERGE is the usual signal to build gold as a materialized view; it can often refresh incrementally from the changes instead of fighting the stream with skip options and full refreshes.",
+      "source": "https://docs.databricks.com/aws/en/ldp/concepts",
+      "evidence": "Your query performs aggregations or joins, or the source data can change due to updates and deletes rather than only growing. A materialized view keeps its results consistent with the current state of the source data, whereas a streaming table is designed for append-only sources and processes each record a single time."
+    },
+    {
+      "family": "gold-private-mv-intermediate",
+      "objective": "transformation.gold",
+      "guide": "3.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "In a Lakeflow Spark Declarative Pipelines pipeline, a data engineer computes an expensive join of silver orders and customers that three gold materialized views in the same pipeline reuse. Governance doesn't want this intermediate dataset to appear in the catalog for analysts, and recomputing the join separately for each gold view is too costly. How should the engineer define the join?",
+      "options": [
+        {
+          "text": "CREATE PRIVATE MATERIALIZED VIEW, which stores results but stays out of the catalog",
+          "correct": true,
+          "why": "A private materialized view is an intermediate table that isn't published to the catalog and is accessible only within the defining pipeline. As a materialized view it stores results that the three gold views can read."
+        },
+        {
+          "text": "CREATE TEMPORARY VIEW, which stays private to the pipeline",
+          "average": true,
+          "why": "A temporary view is also kept out of the catalog, but pipeline views are evaluated on demand rather than persisted, so each gold view that reads it repeats the join."
+        },
+        {
+          "text": "CREATE MATERIALIZED VIEW in a schema where analysts lack USE SCHEMA",
+          "why": "This stores the join once, but it still publishes the dataset to the catalog, which governance ruled out; hiding it with grants is a workaround, not the requirement."
+        },
+        {
+          "text": "CREATE STREAMING TABLE that joins the two silver tables as a stream",
+          "why": "A streaming table is published to the catalog, and its joins don't recompute when customer rows change, so the shared join could drift out of date."
+        }
+      ],
+      "in_practice": "A private materialized view lets a pipeline compute a costly step once per update instead of three times, without adding intermediate tables to the catalog that analysts browse.",
+      "source": "https://docs.databricks.com/aws/en/ldp/developer/ldp-sql-ref-create-materialized-view",
+      "evidence": "PRIVATE: Creates a private materialized view. A private materialized view can be useful as an intermediate table within a pipeline that you do not want published to the catalog. They are not added to the catalog and are only accessible within the defining pipeline."
+    }
+  ]
 }

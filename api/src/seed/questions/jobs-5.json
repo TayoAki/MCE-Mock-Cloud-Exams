@@ -1,3 +1,465 @@
 {
-  "items": []
+  "items": [
+    {
+      "family": "control-flow-run-if-at-least-one-succeeded",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's job pulls the same daily exchange rates from a primary vendor and a backup vendor in two parallel tasks, fetch_primary and fetch_backup. A task named build_rates depends on both and must run when either fetch succeeds, because one good copy is enough. Which Run if condition should build_rates use?",
+      "options": [
+        { "text": "At least one succeeded", "correct": true, "why": "At least one succeeded runs the task when any one of its dependencies succeeded, so a single good vendor feed is enough. If both fetches fail, build_rates is marked Upstream failed instead of running on no data." },
+        { "text": "None failed", "average": true, "why": "None failed sounds permissive, but it requires that no dependency failed, so a failed primary fetch would block build_rates even when the backup fetch succeeded." },
+        { "text": "All done", "why": "All done runs build_rates even when both fetches fail, so it would try to build the rates table with no fresh input at all." },
+        { "text": "All succeeded", "why": "All succeeded, the default, needs both fetches to succeed, which defeats the purpose of paying for a backup vendor." }
+      ],
+      "in_practice": "Redundant feeds only pay off if the downstream task tolerates one of them failing; with this condition, an outage at one vendor no longer delays the 7 AM rates refresh.",
+      "source": "https://docs.databricks.com/aws/en/jobs/run-if",
+      "evidence": "At least one succeeded: At least one dependency has succeeded. The task is marked as Upstream failed if the condition is unmet."
+    },
+    {
+      "family": "control-flow-if-else-runs-without-cluster",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer plans to add four If/else condition tasks to a nightly job whose other tasks run on classic job clusters. The platform lead worries that every branch point will add cluster startup time and cost. What compute does an If/else condition task need to evaluate its condition?",
+      "options": [
+        { "text": "None, because the condition task runs without a cluster", "correct": true, "why": "The If/else condition task (condition_task) only compares two operands, and it does not require a cluster to execute, so adding branch points adds no cluster startup or compute cost." },
+        { "text": "Its own job cluster, started before each evaluation", "average": true, "why": "Assuming every task needs compute is the common mental model, but the condition is evaluated by Lakeflow Jobs itself, so no job cluster is created for it." },
+        { "text": "A SQL warehouse, because it evaluates a SQL expression", "why": "The condition is an operator and two operands, not a SQL query, so no SQL warehouse is involved." },
+        { "text": "The cluster of the upstream task that supplies its value", "why": "The condition doesn't borrow the upstream task's compute; it needs no cluster at all to compare its operands." }
+      ],
+      "in_practice": "Because branching costs no compute, teams can add guard conditions, such as skipping a reload when no new rows arrived, without lengthening runs or adding DBUs.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/job-task-types",
+      "evidence": "The condition_task enables you to add a task with if/else conditional logic to your job. The task evaluates a condition that can be used to control the execution of other tasks. The condition task does not require a cluster to execute"
+    },
+    {
+      "family": "control-flow-run-if-excluded-when-unmet",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "multiple",
+      "stem": "A data engineer is choosing Run if conditions for several tasks and needs to know which unmet conditions leave a task Excluded, a skipped state that isn't counted as a failure, rather than Upstream failed. Which two Run if conditions mark the task Excluded when the condition is not met? (Choose two.)",
+      "options": [
+        { "text": "At least one failed", "correct": true, "why": "At least one failed is a failure-handling condition, so when no dependency failed, the task is marked Excluded and skipped rather than counted as a failure." },
+        { "text": "All failed", "correct": true, "why": "All failed is also a failure-handling condition; when not every dependency failed, the task is marked Excluded and skipped." },
+        { "text": "None failed", "average": true, "why": "None failed sounds like a failure-handling option, but when it isn't met the task is marked Upstream failed, the same as All succeeded." },
+        { "text": "All succeeded", "why": "All succeeded is the default condition, and when it isn't met the task is marked Upstream failed." },
+        { "text": "At least one succeeded", "why": "When no dependency succeeded, a task using At least one succeeded is marked Upstream failed, not Excluded." }
+      ],
+      "in_practice": "The state matters when alerts or dashboards key off Upstream failed: a failure handler that sits idle on a healthy night shows as Excluded, so it doesn't look like a broken pipeline.",
+      "source": "https://docs.databricks.com/aws/en/jobs/run-if",
+      "evidence": "At least one failed: At least one dependency failed. The task is marked as Excluded if the condition is unmet. All failed: All dependencies have failed. The task is marked as Excluded if the condition is unmet."
+    },
+    {
+      "family": "control-flow-partial-run-disabled-task",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Last month a data engineer disabled a task named score_stores, which calls a vendor scoring service, after the vendor changed its contract. A fix is ready, and the engineer wants one test execution of score_stores today while it stays disabled for tonight's scheduled run. How can the engineer do this?",
+      "options": [
+        { "text": "Select score_stores explicitly in Run now with different settings", "correct": true, "why": "Disabled tasks aren't selected by default when a partial run starts, but selecting one explicitly runs it once without re-enabling it in the job settings." },
+        { "text": "Select its upstream task and use the downstream button to add score_stores", "average": true, "why": "Upstream and downstream expansion skips disabled tasks, so score_stores stays unselected unless it is picked on its own." },
+        { "text": "Re-enable score_stores, run the job, then disable it again before tonight", "why": "This works, but it changes the job settings, and any scheduled run in between would include the untested task." },
+        { "text": "Clone the job, enable score_stores in the clone, and run the clone once", "why": "A clone also works, but it leaves a second job definition to clean up, while a partial run can include the disabled task directly." }
+      ],
+      "in_practice": "Testing a disabled task in a one-off partial run keeps the nightly schedule untouched, so an unverified fix can't break tonight's production run.",
+      "source": "https://docs.databricks.com/aws/en/jobs/disabled-tasks",
+      "evidence": "Partial runs: Disabled tasks aren't selected by default when you start a partial run, but you can select them to run once without re-enabling them in the job settings. When you use + modifiers in the only field to include upstream or downstream tasks, the expansion does not include disabled tasks."
+    },
+    {
+      "family": "control-flow-aggregated-reference-limit",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's summary task builds one parameter, report_input, from the iteration values of several For each loops, such as {{tasks.load_orders.values.rows}} and {{tasks.load_refunds.values.rows}}, each read as one list across all iterations (Beta). How many of these aggregated task-value references can a single parameter value contain?",
+      "keep_order": true,
+      "options": [
+        { "text": "One", "why": "A single parameter value can combine more than one aggregated reference; the documented maximum is three." },
+        { "text": "Three", "correct": true, "why": "Aggregated references have two limits: a single parameter value can contain at most three aggregated task-value references, and the assembled array can't exceed about 48 KB." },
+        { "text": "Ten", "why": "Ten is above the documented maximum; a single parameter value can hold at most three aggregated task-value references." },
+        { "text": "Any number, as long as the value stays under 48 KB", "average": true, "why": "The 48 KB ceiling is real, but it is only one of two limits; a parameter value also can't hold more than three aggregated references, however short the lists are." }
+      ],
+      "in_practice": "A summary over five loops needs its references spread across at least two parameters, which also makes it easier to see which loop's list broke a run.",
+      "source": "https://docs.databricks.com/aws/en/jobs/task-values",
+      "evidence": "Aggregated references have two limits: an assembled array cannot exceed approximately 48 KB (49,344 characters) for a single parameter value, and a single parameter value can contain at most three aggregated task-value references."
+    },
+    {
+      "family": "control-flow-if-else-weekday-gate",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's daily job runs at 14:00 UTC. Most of its tasks must run every day, but a regulatory_export task must run only Monday through Friday, and the team doesn't want a second job or extra notebook code. How should the engineer gate regulatory_export?",
+      "options": [
+        { "text": "An If/else task testing {{job.start_time.is_weekday}} == true, with the export on the true branch", "correct": true, "why": "{{job.start_time.is_weekday}} returns true when the run's start time, in UTC, falls on a weekday. An If/else condition can compare it, so the export runs only on weekday runs of the same job." },
+        { "text": "A second job with a Monday to Friday schedule that runs only regulatory_export", "average": true, "why": "A separate weekday job works, but it duplicates scheduling and dependencies that the team wants to keep in one job, and the date check can live in the job itself." },
+        { "text": "An If/else task testing {{job.start_time.day}} <= 5, with the export on the true branch", "why": "day returns the day of the month, not the day of the week, so this condition would run the export only on the first five days of each month." },
+        { "text": "A Run if condition on regulatory_export plus a weekday schedule on that task", "why": "Run if conditions only look at upstream task outcomes, and schedules belong to the job, not to individual tasks." }
+      ],
+      "in_practice": "Because the reference uses UTC, a 14:00 UTC run is the same calendar day in Europe and the Americas; a job scheduled near local midnight would need the weekday worked out in local time instead.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "All return values are based on a timestamp in the UTC timezone. is_weekday Returns true if the timestamp is on a weekday."
+    },
+    {
+      "family": "control-flow-cancel-runs-failure-handlers",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's job has a load task that sometimes runs for hours when a source is slow. Downstream of load, release_lock uses the Run if condition All done to free a table lock, and publish uses the default All succeeded. Tonight an operator cancels the load task run to stop a runaway query. What happens to the two downstream tasks?",
+      "options": [
+        { "text": "release_lock runs, while the cancellation propagates to publish so it doesn't run", "correct": true, "why": "Canceling a task run propagates the cancellation to downstream tasks, but tasks whose Run if condition handles failure, such as All done, still run. That is how a cleanup task like release_lock still runs after a manual cancel." },
+        { "text": "Neither runs, because canceling a task cancels every task that comes after it", "average": true, "why": "Cancellation does propagate downstream, but Lakeflow Jobs still runs tasks whose Run if condition handles failure, so the cleanup isn't lost when someone cancels a task." },
+        { "text": "Both run, because a canceled task counts as having completed successfully", "why": "A canceled upstream task isn't treated as a success, so publish with All succeeded doesn't run after load is canceled." },
+        { "text": "Both wait until the operator resumes the run or starts a repair", "why": "Canceling doesn't pause the run; the cancellation flows downstream right away, and failure-handling tasks such as release_lock run." }
+      ],
+      "in_practice": "Putting lock releases and temp-table cleanup behind All done means an operator can kill a runaway task at 2 a.m. without leaving locks that block the morning loads.",
+      "source": "https://docs.databricks.com/aws/en/jobs/run-if",
+      "evidence": "If you cancel a task run, the cancellation propagates through downstream tasks, and tasks with a Run if condition that handles failure are run, for example, to verify a cleanup task runs when a task run is canceled."
+    },
+    {
+      "family": "control-flow-for-each-control-table-active-flag",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team drives a For each task from a control table, config.markets, which a SQL task reads with SELECT market, currency FROM config.markets. Operations wants to pause one market during a migration without deleting its row, which holds settings they will need again, and without changing the job's configuration. What should the team do?",
+      "options": [
+        { "text": "Add an active flag column, set it to false for that market, and filter on it in the lookup query", "correct": true, "why": "The For each task has no built-in way to skip an input; it runs once per row it receives. An ordinary flag column filtered in the SQL lookup removes the market from the loop while its row and settings stay in the table." },
+        { "text": "Disable that market's iteration in the For each task's settings until the migration ends", "average": true, "why": "There is no per-iteration disable switch: the For each task runs its nested task for every element of its Inputs, so skipping one must happen in the data that feeds it." },
+        { "text": "Delete the market's row now and insert it again once the migration is complete", "why": "Deleting the row stops its iterations, but it also discards the settings stored in that row, which the team wants to keep." },
+        { "text": "Set the For each task's Concurrency to one less than the number of markets", "why": "Concurrency only limits how many iterations run at the same time; every row still gets its own iteration." }
+      ],
+      "in_practice": "With a flag in the control table, pausing or resuming a market is a one-row UPDATE that operations can run themselves, with no job deployment or change ticket.",
+      "source": "https://docs.databricks.com/aws/en/jobs/how-to/foreach-sql-lookup-tutorial",
+      "evidence": "To stop processing a row without deleting it, add your own column to the control table (such as an active flag) and filter on it in the SQL lookup task. This is an ordinary column that you define and populate; the For each task has no built-in concept of it."
+    },
+    {
+      "family": "control-flow-task-value-json-date",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's notebook task named find_cutoff computes the latest complete business day as a Python datetime.date object. Downstream SQL and notebook tasks need that date through {{tasks.find_cutoff.values.cutoff}}. Which value should find_cutoff pass to dbutils.jobs.taskValues.set(key=\"cutoff\", value=...)?",
+      "options": [
+        { "text": "cutoff.isoformat(), a string such as \"2026-10-26\"", "correct": true, "why": "Task values accept only values that can be expressed as valid JSON, up to 48 KiB. An ISO date string is valid JSON, and a downstream SQL task can turn it back into a date with to_date." },
+        { "text": "The datetime.date object, which Lakeflow Jobs serializes as a date", "average": true, "why": "Booleans and numbers serialize cleanly, but a Python date object isn't a JSON value, so it isn't permitted as a task value until it is converted to a string." },
+        { "text": "A one-row Spark DataFrame that holds the date in a column", "why": "A DataFrame isn't a JSON value either; task values carry small JSON-serializable results, not Spark objects." },
+        { "text": "pickle.dumps(cutoff), so that the exact Python type survives", "why": "Pickled bytes aren't valid JSON, and downstream SQL tasks couldn't read a Python pickle anyway." }
+      ],
+      "in_practice": "ISO 8601 strings parse in every task type, which keeps the contract simple when SQL, Python and condition tasks all consume the same cutoff value.",
+      "source": "https://docs.databricks.com/aws/en/jobs/task-values",
+      "evidence": "Only values that can be expressed as valid JSON are permitted. The size of the JSON representation of the value cannot exceed 48 KiB."
+    },
+    {
+      "family": "control-flow-for-each-iteration-null-slot",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer runs a For each task over four tables. Its nested notebook task, load_one, sets a task value named rows_loaded, but it exits early without setting it when a table has no new data. A downstream audit task reads {{tasks.load_one.values.rows_loaded}}, an aggregated read that is in Beta. Last night only the third table had no new data. What does the audit task receive?",
+      "options": [
+        { "text": "[120, 340, null, 95], with null in the third iteration's position", "correct": true, "why": "Iteration values come back as one list ordered by iteration index. An iteration that didn't set the key keeps its position as null, so the audit can tell which table produced nothing." },
+        { "text": "[120, 340, 95], because iterations that set no value are left out", "average": true, "why": "Dropping the empty iteration would shift later values onto the wrong tables; the list keeps one slot per iteration and fills the gap with null." },
+        { "text": "An error, because every iteration must set the key before it can be read", "why": "A missing key in one iteration doesn't make the reference fail; that iteration's slot is simply null." },
+        { "text": "95, the value set by the last iteration that finished", "why": "A reference to a nested task's value returns every iteration's value as a list, not only the last one." }
+      ],
+      "in_practice": "Positional nulls let a downstream check name exactly which tables were empty, for example by pairing the list with the For each inputs, instead of assuming every table loaded.",
+      "source": "https://docs.databricks.com/aws/en/jobs/task-values",
+      "evidence": "An iteration that did not set the key keeps its position in the result: it appears as None (JSON null) from dbutils.jobs.taskValues.get, and as a null in a dynamic value reference."
+    },
+    {
+      "family": "control-flow-for-each-lookup-key-config",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer must run the same filter-and-copy notebook for 400 tables, each with its own catalog, schema, filter column and filter value. Serialized as one JSON array, these per-table arguments come to about 200 KB. How should the engineer feed the For each task?",
+      "options": [
+        { "text": "Keep the arguments in a JSON config file, loop over table keys, and look up each key's arguments in the notebook", "correct": true, "why": "Inputs are capped at 5,000 characters typed directly or 48 KB through task value references. Passing only lookup keys keeps Inputs small, and each iteration reads its own arguments from the config file by key." },
+        { "text": "Set the full argument array as a task value upstream and reference that task value in Inputs", "average": true, "why": "Task value references raise the ceiling from 5,000 characters to 48 KB, but 200 KB is still far over that limit, so the array can't be passed whole." },
+        { "text": "Store the full array in a job parameter and reference {{job.parameters.args}} in Inputs", "why": "Job parameter values are limited to 10,000 characters, so a 200 KB array doesn't fit." },
+        { "text": "Paste the full array into the Inputs box and raise the For each task's Concurrency", "why": "The Inputs box holds at most 5,000 characters, and Concurrency changes how many iterations run at once, not how much input fits." }
+      ],
+      "in_practice": "The keys-plus-config pattern also reviews well: the config file sits in Git next to the notebook, so adding a table is a one-line reviewed change rather than a job edit.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/for-each-lookup-example",
+      "evidence": "One alternative to passing the complete data is to store the task data as a JSON file, and pass in a lookup key (into the JSON data) through the task input instead of the complete data. Nested tasks can use the key to retrieve the specific data needed for each iteration."
+    },
+    {
+      "family": "control-flow-none-failed-disabled-parent",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's job has a publish task that depends on load_sales, load_returns and add_weather, with the default Run if condition. The engineer disables add_weather for a week while the weather service it calls is being migrated, and publish stops running. Publish must keep running during that week, but never on a night when either load task fails. Which Run if condition should publish use?",
+      "options": [
+        { "text": "None failed", "correct": true, "why": "With None failed, publish runs when no parent failed and at least one completed, so the disabled add_weather doesn't block it, while a failed load task still does." },
+        { "text": "All done", "average": true, "why": "All done treats the disabled parent as done, so publish would run, but it would also run on nights when a load task failed, which the requirement forbids." },
+        { "text": "At least one succeeded", "why": "At least one succeeded would run publish when one load succeeded and the other failed, publishing incomplete data." },
+        { "text": "All succeeded, since a disabled parent counts as succeeded", "why": "A disabled parent doesn't satisfy the succeeded requirement, which is why publish stopped running; Lakeflow Jobs marks it disabled for those runs." }
+      ],
+      "in_practice": "Choosing the narrowest condition that tolerates the disabled task keeps the safety net in place, so a week without weather data doesn't turn into publishing half-loaded sales data.",
+      "source": "https://docs.databricks.com/aws/en/jobs/disabled-tasks",
+      "evidence": "All succeeded (default): The downstream task does not run. A disabled parent task does not satisfy the succeeded requirement. None failed: The downstream task runs if at least one parent task completed without failure."
+    },
+    {
+      "family": "control-flow-for-each-values-serverless-env",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's For each task runs a nested task named score_region once per region, and each iteration sets the task value score. A downstream notebook task on serverless compute with environment version 3 calls dbutils.jobs.taskValues.get(taskKey=\"score_region\", key=\"score\") to read all the scores, a Beta feature. It gets back a single number instead of a list. Which change returns every iteration's score?",
+      "options": [
+        { "text": "Pass {{tasks.score_region.values.score}} to the notebook as a task parameter", "correct": true, "why": "On serverless environment versions 1 through 4, taskValues.get returns only the first iteration's value, while dynamic value references return the full list on any compute. Moving the notebook to environment version 5 or above would also fix the get call." },
+        { "text": "Call taskValues.get with the For each task's key instead of score_region", "average": true, "why": "On both read surfaces the right key is the nested task's, not the For each task's; the single value comes from the environment version, not from the key." },
+        { "text": "Add a debugValue to the get call so that job runs return the full list", "why": "debugValue is used only when the notebook runs interactively outside a job, so it doesn't change what a job run returns." },
+        { "text": "Raise the For each Concurrency so every iteration ends before the read", "why": "The downstream task already waits for the whole For each task to finish; concurrency changes how many iterations run at once, not what the read returns." }
+      ],
+      "in_practice": "Dynamic value references behave the same on classic and serverless compute, so a job that moves between them, or across environment versions, keeps passing the full list.",
+      "source": "https://docs.databricks.com/aws/en/jobs/task-values",
+      "evidence": "On serverless compute, dbutils.jobs.taskValues.get requires environment version 5 or above. On environment versions 1 through 4, it returns only the first iteration's value instead of the list, and can raise a TypeError. Dynamic value references return the full list on any compute."
+    },
+    {
+      "family": "control-flow-if-else-alert-state-triggered",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's job evaluates a Databricks SQL alert on late shipments with a SQL Alert task (Public Preview) named check_late. After it, a quarantine task must run only when the alert is triggered, and a publish task must run otherwise. How should the engineer wire these tasks?",
+      "options": [
+        { "text": "An If/else task on {{tasks.check_late.output.alert_state}} == TRIGGERED, quarantine on true, publish on false", "correct": true, "why": "The alert's outcome is exposed as {{tasks.check_late.output.alert_state}}, which is UNKNOWN, OK or TRIGGERED. An If/else task can compare that reference and send each branch to the right task." },
+        { "text": "An If/else task on {{tasks.check_late.result_state}} == triggered, quarantine on true, publish on false", "average": true, "why": "result_state reports how the task run ended, such as success or failed, and triggered isn't one of its values, so the condition would never be true." },
+        { "text": "quarantine with Run if At least one failed on check_late, and publish with All succeeded", "why": "A SQL alert task reports Succeeded whenever the alert is evaluated, triggered or not, so quarantine would never run and publish would run every day." },
+        { "text": "An If/else task on {{tasks.check_late.output.first_row.triggered}} == true, quarantine on true", "why": "first_row reads the result of an upstream SQL query task; an alert task exposes its outcome as output.alert_state instead." }
+      ],
+      "in_practice": "Routing on the alert state keeps quarantine off the critical path on normal days, while a genuine evaluation error, such as a warehouse outage, still shows up as a failed task.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "{{tasks.<task_name>.output.alert_state}} The state of an upstream SQL alert task. The value is one of UNKNOWN, OK, or TRIGGERED."
+    },
+    {
+      "family": "control-flow-for-each-sql-output-row-cap",
+      "objective": "jobs.control-flow",
+      "guide": "4.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer is building a metadata-driven job: a SQL task named list_tables returns one row per source table from a control table, and a For each task uses {{tasks.list_tables.output.rows}} as its Inputs. It works in testing with 40 tables, but production will list about 1,800 tables. In design review, a teammate says this design can't cover all 1,800. Why?",
+      "options": [
+        { "text": "SQL task output read through a reference is limited to 1,000 rows and 48 KB", "correct": true, "why": "Output from an upstream SQL task, read through output.rows, is limited to 1,000 rows and 48 KB, so a list of 1,800 tables can't flow into the For each task through that reference." },
+        { "text": "The Inputs text box holds only 5,000 characters of row data", "average": true, "why": "The 5,000-character limit applies to what is typed into the Inputs box. The reference itself is short; the binding limit is on the SQL output it resolves to." },
+        { "text": "SQL task output is kept for only 7 days, so later rows expire first", "why": "The 7-day retention matters only when a paused run resumes much later; it doesn't cap how many rows feed a single run." },
+        { "text": "The nested task can read only one column from each row", "why": "Nested tasks can read several fields from each row with {{input.<column_alias>}}, so the number of columns isn't the issue." }
+      ],
+      "in_practice": "Common workarounds keep the loop input small while the work list grows, such as returning 30 batch IDs that each cover 60 tables, or passing lookup keys into a config file.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "SQL output is limited to 1,000 rows, and 48 KB in size. See SQL output options."
+    },
+    {
+      "family": "recovery-retry-on-timeout-default",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer defines a job in a Declarative Automation Bundle. Its call_partner_api task sets max_retries: 3 and timeout_seconds: 1800 to ride out a partner API that sometimes hangs. Last night one attempt hung, hit the 30-minute limit and ended Timed Out, and the task wasn't retried at all. What should the engineer change?",
+      "options": [
+        { "text": "Add retry_on_timeout: true, because timed-out attempts aren't retried by default", "correct": true, "why": "retry_on_timeout defaults to false, so max_retries covers failed attempts but not timed-out ones. Setting it to true makes an attempt that hits timeout_seconds count toward the task's retries." },
+        { "text": "Set timeout_seconds: 0 and let the three retries handle any hang", "average": true, "why": "A value of 0 means no timeout, so a hung call would never end and never reach a retry; the missing piece is retry_on_timeout." },
+        { "text": "Add min_retry_interval_millis: 60000 so that retries can start after a timeout", "why": "min_retry_interval_millis only spaces out retries; without retry_on_timeout, a timed-out attempt isn't retried whatever the interval." },
+        { "text": "Raise max_retries to 5, since the timeout used up the retry budget", "why": "The timed-out attempt wasn't retried even once, so no budget was used; timeouts are left out of retries unless retry_on_timeout is true." }
+      ],
+      "in_practice": "With retry_on_timeout on, a 30-minute hang costs one attempt instead of the night's load, and the per-attempt timeout still caps the worst case at four attempts of 30 minutes.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/job-task-types",
+      "evidence": "retry_on_timeout: Boolean. An optional policy to specify whether to retry the task when it times out. If not specified, defaults to false."
+    },
+    {
+      "family": "recovery-retry-interval-from-attempt-start",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's notebook task loads data for about 25 minutes and then posts a summary to a partner API. When that post fails, the partner locks the client out for 10 minutes. The engineer sets 2 retries with a 10-minute retry interval, yet each retry starts almost as soon as the failure happens and hits the lockout. What explains this, and what should change?",
+      "options": [
+        { "text": "The interval counts from the failed attempt's start, so set it to about 35 minutes or more", "correct": true, "why": "The retry interval is measured from the start of the failed run to the start of the retry. An attempt that ran 25 minutes has already used up a 10-minute interval, so the interval has to cover the attempt's runtime plus the cooldown." },
+        { "text": "The interval must exceed the lockout with a margin, so raise it to 20 minutes", "average": true, "why": "A 20-minute interval is still shorter than the 25 minutes the attempt ran before failing, so, measured from the attempt's start, it is already satisfied and the retry starts right away." },
+        { "text": "Retry intervals apply only to job-level retries, so set the interval on the job", "why": "Retry policies and their intervals are configured on tasks; the problem is where the interval is measured from, not where it is set." },
+        { "text": "The lockout resets the timer, so add more retries until one lands after it ends", "why": "More retries that start right away would keep hitting the lockout; the interval needs to cover the runtime, not be repeated." }
+      ],
+      "in_practice": "Splitting slow work from fragile side effects helps too: a separate post task that runs in seconds makes a 10-minute interval mean roughly 10 minutes, and a retry never reruns the 25-minute load.",
+      "source": "https://docs.databricks.com/aws/en/jobs/configure-task",
+      "evidence": "The retry interval is calculated in milliseconds between the start of the failed run and the subsequent retry run."
+    },
+    {
+      "family": "recovery-task-notification-every-failed-attempt",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team tracks how flaky a partner API is. Its ingest_api task has 3 retries, and the team added a Failure notification to the job. On nights when an attempt fails but a retry then succeeds, no email arrives, yet the team wants one for every failed attempt. Which change meets this requirement?",
+      "options": [
+        { "text": "A Failure notification on the ingest_api task, with Mute notifications until the last retry cleared", "correct": true, "why": "Job-level notifications aren't sent when failed tasks are retried. A Failure notification on the task itself fires for each failed attempt, as long as Mute notifications until the last retry isn't selected." },
+        { "text": "Clearing Mute notifications until the last retry on the job-level Failure notification", "average": true, "why": "Mute until the last retry is a task notification option; job-level notifications aren't sent for failed attempts that get retried, whatever is selected on the job." },
+        { "text": "A Success notification on the job, since retried runs end as successful", "why": "A Success notification fires once per successful run, so it can't show how many attempts failed along the way." },
+        { "text": "A Duration warning on the job, since every retry makes the run longer", "why": "A duration warning fires on slow runs, not on failed attempts, and a quick retry may never cross the threshold." }
+      ],
+      "in_practice": "Per-attempt alerts give the team a flakiness count, such as 9 failed attempts in a month, to take to the partner, even though retries hid every one of them from the job's status.",
+      "source": "https://docs.databricks.com/aws/en/jobs/notifications",
+      "evidence": "Job-level notifications aren't sent when failed tasks are retried. To receive a failure notification after every failed task, use task notifications instead."
+    },
+    {
+      "family": "recovery-await-termination-blocks-backlog-alerts",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's continuous job runs a Kafka-to-bronze stream in a notebook task, with a streaming backlog threshold (Public Preview) and a Streaming backlog notification. Last night the backlog grew for hours, yet no notification arrived and the task shows no backlog metrics. The notebook ends with query.awaitTermination(), copied from a tutorial. What should the engineer change?",
+      "options": [
+        { "text": "Remove the awaitTermination() call, since it keeps the Jobs service from tracking the query", "correct": true, "why": "Backlog notifications need the Jobs service to track the active streaming query. awaitTermination() blocks the cell and prevents that tracking, which disrupts backlog metrics and job notifications; jobs don't need it, because a run stays active while a query runs." },
+        { "text": "Replace it with spark.streams.awaitAnyTermination() so that every query is tracked", "average": true, "why": "awaitAnyTermination blocks the cell in the same way and has the same effect on tracking; Databricks recommends using neither of them in Lakeflow Jobs." },
+        { "text": "Add a Duration warning threshold, which backlog notifications also depend on", "why": "Duration warnings and backlog thresholds are separate settings; adding one doesn't let the Jobs service see the stream's backlog." },
+        { "text": "Lower the threshold, since only a 10-minute average above it sends a notification", "why": "The backlog stayed high for hours, so its 10-minute average was far above the threshold; the missing query tracking is the problem, not the threshold." }
+      ],
+      "in_practice": "Backlog alerts are often the only early warning that a stream is falling behind; losing them to one leftover line can turn a 10-minute lag into a morning of stale dashboards.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/production",
+      "evidence": "For Lakeflow Jobs, do not use streamingQuery.awaitTermination() or spark.streams.awaitAnyTermination(). Both functions block notebook cells from completing and prevent the Jobs service from tracking the streaming query, which disrupts backlog metrics and job notifications."
+    },
+    {
+      "family": "recovery-backlog-notification-cadence",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer sets a streaming backlog threshold (Public Preview) of 10,000 records on a Kafka ingestion task and adds a Streaming backlog notification. During a traffic spike the backlog stays above the threshold for two hours. How are notifications sent during that time?",
+      "options": [
+        { "text": "Once the 10-minute average backlog passes the threshold, then every 30 minutes while it stays high", "correct": true, "why": "Backlog notifications fire when the average backlog over a 10-minute period exceeds the threshold. Databricks then waits 30 minutes before deciding whether to send another, so a long spike produces updates at 30-minute intervals." },
+        { "text": "Once for every micro-batch whose backlog is above the threshold", "average": true, "why": "Alerting per micro-batch would flood on-call during a spike; notifications use a 10-minute average and then a 30-minute wait between messages." },
+        { "text": "Only once, with nothing more until the backlog drops below the threshold", "why": "While the backlog remains high, updates keep arriving at 30-minute intervals rather than stopping after the first message." },
+        { "text": "Every 10 minutes for as long as the backlog stays above the threshold", "why": "Ten minutes is the averaging window for the first alert; after that, Databricks waits 30 minutes before deciding whether to send another." }
+      ],
+      "in_practice": "The 10-minute average absorbs short bursts, such as a 2-minute spike after a deploy, so on-call is paged for sustained lag rather than noise.",
+      "source": "https://docs.databricks.com/aws/en/jobs/notifications",
+      "evidence": "Notifications are sent when the average backlog over a 10-minute period exceeds the defined threshold. To prevent excessive messages, Databricks waits 30 minutes before determining whether to send another message. While the backlog remains high, you'll receive updates at 30-minute intervals."
+    },
+    {
+      "family": "recovery-concurrent-runs-per-region",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's job loads one region's data into that region's own partition. Analysts start it with Run now with different parameters for us, eu and apac at the same moment. Queueing is on and maximum concurrent runs is 1, so the eu and apac runs wait for the us run to finish. How can all three runs execute at the same time?",
+      "options": [
+        { "text": "Set the job's maximum concurrent runs to 3", "correct": true, "why": "Maximum concurrent runs defaults to 1. Raising it lets several runs of the same job overlap, which suits runs that differ only by their input parameters and write separate partitions." },
+        { "text": "Turn off queueing so the extra runs start right away", "average": true, "why": "Without queueing, a run that would exceed the concurrency limit is skipped rather than started, so the eu and apac runs wouldn't happen at all." },
+        { "text": "Set the Concurrency of the job's tasks to 3", "why": "Concurrency is a setting of For each tasks and controls iterations inside one run; it doesn't let separate runs of the job overlap." },
+        { "text": "Clone the job twice so each region has its own job", "why": "Clones would run in parallel, but they triple the job definitions to maintain, while one job with a higher concurrency limit does the same." }
+      ],
+      "in_practice": "Overlap is safe here because each run writes only its own partition; a job whose runs rewrite the same tables should stay at 1 and queue instead.",
+      "source": "https://docs.databricks.com/aws/en/jobs/configure-job",
+      "evidence": "Set this value higher than 1 to allow multiple concurrent runs of the same job. This is useful, for example, if you trigger your job on a frequent schedule and want to enable consecutive runs to overlap or trigger multiple runs that differ by their input parameters."
+    },
+    {
+      "family": "recovery-cli-repair-run-failed-tasks",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Run 8812 of a six-task job failed in two of its tasks. An on-call data engineer works from a terminal and wants to rerun just the failed tasks as part of run 8812, using the current job settings. Which Databricks CLI command does this?",
+      "options": [
+        { "text": "databricks jobs repair-run 8812 --rerun-all-failed-tasks", "correct": true, "why": "repair-run reruns tasks as part of the original job run, using the current job and task settings, and --rerun-all-failed-tasks selects every failed task. The run must not still be in progress." },
+        { "text": "databricks jobs run-now with the job's ID", "average": true, "why": "run-now starts a new run of the whole job, so the four tasks that already succeeded run again instead of run 8812 being repaired." },
+        { "text": "databricks jobs submit --json @failed_tasks.json", "why": "submit creates a one-time run that isn't part of run 8812 and isn't tied to the saved job's settings." },
+        { "text": "databricks jobs reset --json @job.json", "why": "reset overwrites all of the job's settings; it doesn't run or repair anything." }
+      ],
+      "in_practice": "Scripted repairs fit runbooks: after an upstream outage clears, on-call can repair every affected run from a shell loop instead of clicking through each one.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/reference/jobs-commands",
+      "evidence": "Re-run one or more job tasks. Tasks are re-run as part of the original job run. They use the current job and task settings, and can be viewed in the history for the original job run. --rerun-all-failed-tasks If true, repair all failed tasks."
+    },
+    {
+      "family": "recovery-for-each-rerun-failed-iterations",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly job has a For each task that refreshes 60 tables, one iteration per table. Last night 58 iterations succeeded and 2 failed because maintenance had locked their source tables. The locks are gone, and the engineer wants to rerun only those 2 tables without reprocessing the other 58. What should the engineer do?",
+      "options": [
+        { "text": "Rerun only the two failed iterations from the job run page", "correct": true, "why": "Each iteration of a For each task has its own result, and a failed iteration can be rerun on its own from the job run page without rerunning the whole job." },
+        { "text": "Click Run now so that the For each task processes all 60 tables", "average": true, "why": "Run now starts a fresh run in which all 60 iterations run again, repeating the whole night's work to fix two tables." },
+        { "text": "Lower the For each task's Concurrency to 1 and start the job again", "why": "Concurrency only controls how many iterations run at once; a new run would still process all 60 tables." },
+        { "text": "Change the Inputs to the two tables, run the job, then restore them", "why": "Editing Inputs works, but it changes the production job definition twice and risks someone forgetting to restore it." }
+      ],
+      "in_practice": "Iteration-level reruns keep recovery proportional to the failure: two 5-minute table refreshes instead of a 3-hour loop, with the history still in one run.",
+      "source": "https://docs.databricks.com/aws/en/jobs/how-to/foreach-sql-lookup-tutorial",
+      "evidence": "You can see the results of each iteration independently. If a specific iteration fails, you can rerun only that iteration from the job run page without rerunning the whole job."
+    },
+    {
+      "family": "recovery-continuous-multitask-stream-down",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team runs three Structured Streaming tasks, orders, payments and clicks, in one continuous job with Task retry mode set to Never. Six hours ago the orders stream failed on a transient error. The job still shows an active run because payments and clicks are healthy, and no new run has started. Which change lets the orders stream recover by itself next time?",
+      "options": [
+        { "text": "Set the job's Task retry mode to On failure", "correct": true, "why": "In a multi-task continuous job, a failed task triggers a new run only when the other tasks have also failed or stopped. With Task retry mode set to On failure, the failed task retries on its own while the other streams keep running." },
+        { "text": "Add a retry policy with unlimited retries to the orders task", "average": true, "why": "Continuous jobs don't accept retry policies; they retry through exponential backoff and the Task retry mode setting, so this option isn't available." },
+        { "text": "Raise the job's maximum concurrent runs to 2 so a new run can start", "why": "A continuous job has only one running instance, so a second concurrent run can't take over the failed stream." },
+        { "text": "Wait for exponential backoff to restart the failed task after its retry period", "why": "Backoff handles consecutive failed runs; while payments and clicks keep running, the run hasn't failed, so backoff never begins." }
+      ],
+      "in_practice": "Pair On failure with a task-level failure notification, or give each critical stream its own job, so a dead stream can't hide behind two healthy ones for a whole shift.",
+      "source": "https://docs.databricks.com/aws/en/structured-streaming/production",
+      "evidence": "If one streaming task in a multi-task continuous job fails while other tasks keep running, the job doesn't start a new run until all other tasks also fail. The failed stream can stay down while the job appears healthy. To reduce this risk, set Task retry mode to On failure"
+    },
+    {
+      "family": "recovery-repair-count-audit-column",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's notebook task writes an audit row for every job run. Auditors want a column showing how many times on-call engineers manually repaired that run, and automatic task retries must not be counted. Which dynamic value reference should the task pass to the notebook for this column?",
+      "options": [
+        { "text": "{{job.repair_count}}", "correct": true, "why": "{{job.repair_count}} is the number of repair attempts on the current job run, so it counts manual repairs and ignores automatic retries of individual tasks." },
+        { "text": "{{task.execution_count}}", "average": true, "why": "execution_count counts every time the task ran, including both retries and repairs, so an automatic retry would inflate the audit column." },
+        { "text": "{{job.run_id}}", "why": "The run ID identifies the run and stays the same across its repairs, so it can't show how many repairs happened." },
+        { "text": "{{task.run_id}}", "why": "A task run ID identifies one task run; it isn't a count of repairs or of anything else." }
+      ],
+      "in_practice": "Separating repairs from retries shows where people step in: a job that needs a manual repair every week is a reliability problem worth fixing, while occasional retries may be routine.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "{{job.repair_count}} The number of repair attempts on the current job run."
+    },
+    {
+      "family": "recovery-backfill-missed-hours",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "An hourly job processes one hour of events, taking the hour from a job parameter named run_hour. During a source outage on 9 and 10 August, its 48 runs succeeded but found no data. A data engineer wants to rerun the job once for each of those hours with the right run_hour, reusing the job as it is. Which feature fits?",
+      "options": [
+        { "text": "Run backfill with a 1-hour interval and run_hour set to {{backfill.iso_datetime}}", "correct": true, "why": "A backfill runs the job once per time interval across a chosen date range and can override parameters with backfill references, such as {{backfill.iso_datetime}}, the start of each run's range." },
+        { "text": "Repair run on each of the 48 runs from the outage window", "average": true, "why": "Repair reruns unsuccessful tasks of a failed or canceled run; these runs succeeded with no data, and repairing 48 runs one by one would be slow anyway." },
+        { "text": "Run now with different parameters, once for each missed hour", "why": "This works, but it means 48 manual runs with hand-typed hours, which a backfill generates in one step." },
+        { "text": "Change the schedule's cron expression to fire every minute for an hour", "why": "A faster schedule creates runs for the current time, not for the past hours, so the missing data stays missing." }
+      ],
+      "in_practice": "Backfills reuse the production job, so recovered hours go through the same code and checks as normal runs; raising maximum concurrent runs lets several hours process in parallel.",
+      "source": "https://docs.databricks.com/aws/en/jobs/backfill-jobs",
+      "evidence": "A backfill runs your job multiple times with different parameters to recreate the job runs from an earlier date range. To create a backfill, you select the date range that you want to backfill for and the time interval that is used to split the range into job runs."
+    },
+    {
+      "family": "recovery-schema-evolution-needs-retries",
+      "objective": "jobs.recovery",
+      "guide": "4.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's scheduled job runs an Auto Loader stream with the schema evolution mode addNewColumns. Whenever the source adds a column, the stream stops with an error after recording the new schema, and someone has to start the job again by hand. What should the engineer configure so the job proceeds on its own?",
+      "options": [
+        { "text": "Retries on the task, so it restarts and picks up the new schema", "correct": true, "why": "Schema evolution in Structured Streaming expects the job to retry: the stream stops on the new column, and a retry restarts it with the updated schema. Databricks recommends configuring streaming jobs to restart automatically on failure." },
+        { "text": "The rescue schema evolution mode, so the stream never stops", "average": true, "why": "rescue keeps the stream running, but new columns land in the rescued data column instead of being added to the table, which isn't the result the team wants." },
+        { "text": "A Run if condition of All done on the stream task", "why": "Run if decides whether a task starts based on its upstream tasks; it doesn't restart a task that has failed." },
+        { "text": "A Duration warning so on-call notices the stop sooner", "why": "A warning shortens the time to notice the stop, but someone still has to restart the job by hand." }
+      ],
+      "in_practice": "With retries or a continuous trigger, a new source column costs one automatic restart measured in minutes instead of a missed SLA while someone notices.",
+      "source": "https://docs.databricks.com/aws/en/jobs/control-flow",
+      "evidence": "Some features on Databricks, such as schema evolution with Structured Streaming, assume that you run jobs with retries to reset the environment and allow a workflow to proceed."
+    }
+  ]
 }
