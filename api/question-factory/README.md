@@ -94,7 +94,7 @@ This appends the error-free items to the objective's bank file. Family keys are 
 `src/seed/questions/index.ts` imports the bank files at startup (`SEED_ON_START`).
 - It creates any missing objectives from the blueprint.
 - It adds new families idempotently, shuffling options per family so the key's letter carries no signal.
-- It composes the explanation: the key's why, then the tempting answer's why, then the other options' whys, then "In practice".
+- It composes the explanation as three paragraphs: the key's why; the tempting answer's why and the other options' whys; then "In practice".
 - It stores the evidence in the question's reviewer notes.
 
 Existing questions are never changed by the seed; revise them in the backoffice.

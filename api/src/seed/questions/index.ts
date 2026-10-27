@@ -72,6 +72,20 @@ async function ensureObjectives(examVersionId: string) {
   }
 }
 
+const words = (s: string) => s.replace(/\s+/g, ' ').trim();
+
+/**
+ * Brings an untouched factory explanation up to the current layout (paragraph
+ * breaks). Only whitespace may differ, so a reviewer's edits are never overwritten.
+ */
+async function refreshLayout(familyId: string, rationale: string) {
+  const versions = await QuestionVersion.find({ familyId }).select({ _id: 1 }).lean();
+  const keys = await QuestionKey.find({ _id: { $in: versions.map((v) => v._id) } }).select({ rationale: 1 }).lean();
+  for (const key of keys) {
+    if (key.rationale !== rationale && words(key.rationale) === words(rationale)) await QuestionKey.updateOne({ _id: key._id }, { $set: { rationale } });
+  }
+}
+
 /**
  * Adds the factory's questions. Additive and idempotent by family key, so an
  * existing database picks up new items on the next start without changing
@@ -81,13 +95,17 @@ export async function addQuestionBank(examVersionId: string, opts: { publish: bo
   const now = opts.now ?? new Date();
   await ensureObjectives(examVersionId);
   const objectives = new Map((await Objective.find({ examVersionId }).lean()).map((o) => [o.code, o]));
-  const existing = new Set((await QuestionFamily.find({ examVersionId }).select({ familyKey: 1 }).lean()).map((f) => f.familyKey));
+  const existing = new Map((await QuestionFamily.find({ examVersionId }).select({ familyKey: 1, createdBy: 1 }).lean()).map((f) => [f.familyKey, f]));
   let added = 0;
   for (const item of bankItems()) {
-    if (existing.has(item.family)) continue;
+    const family = existing.get(item.family);
+    if (family) {
+      if (family.createdBy === opts.reviewerId) await refreshLayout(family._id, composeRationale(item));
+      continue;
+    }
     const objective = objectives.get(item.objective);
     if (!objective) throw new Error(`Unknown objective ${item.objective}`);
-    const family = await QuestionFamily.create({
+    const created = await QuestionFamily.create({
       examVersionId,
       objectiveId: objective._id,
       familyKey: item.family,
@@ -96,7 +114,7 @@ export async function addQuestionBank(examVersionId: string, opts: { publish: bo
     });
     const { options, correct } = arrangeItem(item);
     const qv = await QuestionVersion.create({
-      familyId: family._id,
+      familyId: created._id,
       examVersionId,
       objectiveId: objective._id,
       domainId: objective.domainId,

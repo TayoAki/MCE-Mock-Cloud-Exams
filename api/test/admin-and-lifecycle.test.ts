@@ -117,7 +117,8 @@ describe('content backoffice', () => {
     expect((await as(token).delete(`/admin/exam-versions/${await pilotVersionId()}/domains/${pilotDomain}`).expect(409)).body.code).toBe('version_locked');
     const pilot = await as(token).get(`/admin/exam-versions/${await pilotVersionId()}`).expect(200);
     expect(pilot.body.readiness.ready).toBe(true);
-    expect(pilot.body.readiness.checks.find((c: { key: string }) => c.key === 'full_mock_inventory').ok).toBe(false);
+    // The question factory's bank fills a full mock in every domain.
+    expect(pilot.body.readiness.checks.find((c: { key: string }) => c.key === 'full_mock_inventory').ok).toBe(true);
   });
 });
 

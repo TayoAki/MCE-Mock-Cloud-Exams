@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { config } from '../src/config.js';
-import { Entitlement, PracticeSession, RewardLedger } from '../src/models/index.js';
+import { Domain, Entitlement, PracticeSession, QuestionVersion, RewardLedger } from '../src/models/index.js';
 import { expireOverdueSessions } from '../src/services/completion.js';
-import { as, enroll, guest, id, registered } from './helpers.js';
+import { as, enroll, guest, id, pilotVersionId, registered } from './helpers.js';
 
 async function startSample(token: string, enrollmentId: string) {
   return (await as(token).post('/sessions', { enrollment_id: enrollmentId, client_session_id: id(), mode: 'mock', question_count: 10 }).expect(201)).body;
@@ -80,9 +80,23 @@ describe('mock exams', () => {
     expect(full.body.details.feature).toBe('mocks');
 
     await as(token).post('/me/preview', { accept_terms: true, client_request_id: id() }).expect(201);
-    const thin = await as(token).post('/sessions', { enrollment_id: enrollmentId, client_session_id: id(), mode: 'mock' }).expect(409);
-    expect(thin.body.code).toBe('insufficient_inventory');
-    expect(thin.body.details.shortfall).toEqual([expect.objectContaining({ title: 'Working with Lakeflow Jobs', required: 7, available: 5 })]);
+    // With the full bank, a 45-question form fills from every domain.
+    const form = await as(token).post('/sessions', { enrollment_id: enrollmentId, client_session_id: id(), mode: 'mock' }).expect(201);
+    expect(form.body.items).toHaveLength(45);
+    await as(token).post(`/sessions/${form.body.id}/complete`).expect(200);
+
+    // Thin inventory (here: only 5 Jobs questions left published) fails cleanly with the shortfall.
+    const jobs = (await Domain.findOne({ examVersionId: await pilotVersionId(), code: 'jobs' }).lean())!;
+    const jobsQuestions = (await QuestionVersion.find({ domainId: jobs._id, status: 'published', storyId: null }).select({ _id: 1 }).lean()).map((q) => q._id);
+    const hidden = jobsQuestions.slice(5);
+    await QuestionVersion.updateMany({ _id: { $in: hidden } }, { $set: { status: 'retired' } });
+    try {
+      const thin = await as(token).post('/sessions', { enrollment_id: enrollmentId, client_session_id: id(), mode: 'mock' }).expect(409);
+      expect(thin.body.code).toBe('insufficient_inventory');
+      expect(thin.body.details.shortfall).toEqual([expect.objectContaining({ title: 'Working with Lakeflow Jobs', required: 7, available: 5 })]);
+    } finally {
+      await QuestionVersion.updateMany({ _id: { $in: hidden } }, { $set: { status: 'published' } });
+    }
     await as(token).post('/sessions', { enrollment_id: enrollmentId, client_session_id: id(), mode: 'mock', question_count: 10 }).expect(201);
     await as(token).post('/sessions', { enrollment_id: enrollmentId, client_session_id: id(), mode: 'mock', question_count: 20 }).expect(400);
     expect(await Entitlement.countDocuments({ userId })).toBe(4);

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { canonicalAnswer, gradeAnswer, keyMatchPairs, keyOrderSteps, seededRandom, typedMatches } from '../src/lib/answers.js';
 import { GemLedger, Objective, QuestionFamily, QuestionKey, QuestionVersion, Story } from '../src/models/index.js';
 import { latestPublishedByFamily } from '../src/services/content.js';
+import { bankItems } from '../src/seed/questions/index.js';
 import { mockInventory } from '../src/services/selection.js';
 import { admin, as, correctBody, enroll, guest, id, pilotVersionId } from './helpers.js';
 
@@ -100,8 +101,8 @@ describe('stories', () => {
     expect(storyFamilies).toHaveLength(8);
     expect((await latestPublishedByFamily(versionId, storyFamilies)).size).toBe(0);
     expect((await latestPublishedByFamily(versionId, storyFamilies, { stories: true })).size).toBe(8);
-    // 60 multiple-choice items plus the one listening item in single-answer form.
-    expect((await mockInventory(versionId)).published_questions).toBe(61);
+    // 60 multiple-choice items, the one listening item in single-answer form, and the factory bank (all multiple choice).
+    expect((await mockInventory(versionId)).published_questions).toBe(61 + bankItems().length);
   });
 });
 

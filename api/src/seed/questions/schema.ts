@@ -48,7 +48,8 @@ export function composeRationale(item: Item): string {
   const right = item.options.filter((o) => o.correct).map((o) => o.why);
   const tempting = item.options.filter((o) => !o.correct && o.average).map((o) => o.why);
   const others = item.options.filter((o) => !o.correct && !o.average).map((o) => o.why);
-  return [...right, ...tempting, ...others, `In practice: ${item.in_practice}`].join(' ');
+  // Three short paragraphs read better on a phone than one block.
+  return [right.join(' '), [...tempting, ...others].join(' '), `In practice: ${item.in_practice}`].join('\n\n');
 }
 
 /** A deterministic shuffle per family, so the key's letter carries no signal and reseeding never reorders. */

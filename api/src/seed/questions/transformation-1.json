@@ -1,1 +1,660 @@
-{"items": []}
+{
+  "items": [
+    {
+      "family": "cleaning-na-drop-how-all",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is cleaning a bronze table of sensor readings in PySpark. An upstream export sometimes emits rows in which every column is null, while many valid rows have nulls in a few optional fields. Which call removes only the completely empty rows?",
+      "options": [
+        {
+          "text": "df.na.drop(how=\"all\")",
+          "correct": true,
+          "why": "With how='all', na.drop removes a row only when all of its values are null, so valid readings that are missing a few optional fields are kept."
+        },
+        {
+          "text": "df.na.drop()",
+          "average": true,
+          "why": "The default is how='any', which drops a row if it contains any null. That would also delete the valid readings that are missing only optional fields."
+        },
+        {
+          "text": "df.na.fill(\"\")",
+          "why": "na.fill replaces nulls with a value instead of removing rows, and an empty string applies only to string columns, so the empty rows would remain in silver."
+        },
+        {
+          "text": "df.dropDuplicates()",
+          "why": "dropDuplicates removes repeated rows, so it would collapse the identical empty rows into one copy instead of removing them, and it leaves partial-null rows alone."
+        }
+      ],
+      "in_practice": "Choosing how='all' over the default protects good data: on a feed of ~50 million readings where 30% of rows lack an optional humidity value, a bare na.drop() would silently discard almost a third of the silver table.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.dropna.html",
+      "evidence": "how: 'any' or 'all', default 'any'. If 'any', drop a row if it contains any nulls. If 'all', drop a row only if all its values are null. DataFrame.dropna() and DataFrameNaFunctions.drop() are aliases of each other."
+    },
+    {
+      "family": "cleaning-try-cast-invalid-strings",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer loads the bronze column qty, a STRING, into an INT column of a silver table from a SQL warehouse, where ANSI mode is on by default. A few rows hold values such as 'N/A'. Which expression converts the valid values and returns NULL for the rest instead of failing the query?",
+      "options": [
+        {
+          "text": "try_cast(qty AS INT)",
+          "correct": true,
+          "why": "try_cast works like cast but returns NULL when a value is not well formed for the target type, so 'N/A' becomes NULL and the load completes."
+        },
+        {
+          "text": "CAST(qty AS INT)",
+          "average": true,
+          "why": "With ANSI mode on, cast raises CAST_INVALID_INPUT when a string doesn't match the target type's literal format, so a single 'N/A' fails the whole statement."
+        },
+        {
+          "text": "qty::INT",
+          "why": "The :: operator is a synonym for the cast function, so it fails on 'N/A' in exactly the same way as CAST."
+        },
+        {
+          "text": "nullif(qty, 'N/A')",
+          "why": "nullif turns only the exact string 'N/A' into NULL and still returns a STRING; other malformed values remain and nothing is converted to INT."
+        }
+      ],
+      "in_practice": "try_cast keeps a nightly load from failing on a handful of bad rows. Pair it with a count of rows where the source was non-null but the result is NULL, so a sudden spike in bad values is noticed instead of hidden.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/try_cast",
+      "evidence": "try_cast differs from cast function by tolerating the following conditions...: If a sourceExpr value is not well formed or contains invalid characters the result is NULL instead of an invalid data error."
+    },
+    {
+      "family": "cleaning-save-mode-overwrite",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's notebook cleans a bronze DataFrame and writes it with df.write.saveAsTable(\"main.silver.customers\"). The first scheduled run creates the table, but the next day's run fails because the table already exists. The table should be fully rebuilt on every run. Which write call meets this requirement?",
+      "options": [
+        {
+          "text": "df.write.mode(\"overwrite\").saveAsTable(\"main.silver.customers\")",
+          "correct": true,
+          "why": "Overwrite mode replaces the existing data in the table, so each run rebuilds silver from the current bronze data instead of failing."
+        },
+        {
+          "text": "df.write.mode(\"append\").saveAsTable(\"main.silver.customers\")",
+          "average": true,
+          "why": "Append adds the new rows to what is already there, so the job stops failing but every run duplicates the customers loaded the day before."
+        },
+        {
+          "text": "df.write.mode(\"ignore\").saveAsTable(\"main.silver.customers\")",
+          "why": "Ignore silently skips the write when the table exists, so the job succeeds but silver never changes after the first run."
+        },
+        {
+          "text": "df.write.mode(\"errorifexists\").saveAsTable(\"main.silver.customers\")",
+          "why": "errorifexists is the default save mode, and it is exactly what makes the second run throw an exception when the table already exists."
+        }
+      ],
+      "in_practice": "An overwrite of a Delta table is a single commit, so readers see either the previous or the new silver data, never a half-written table, and the prior version stays in table history if a bad load needs rolling back.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameWriter.saveAsTable.html",
+      "evidence": "In the case the table already exists, behavior of this function depends on the save mode, specified by the mode function (default to throwing an exception)... overwrite: Overwrite existing data."
+    },
+    {
+      "family": "cleaning-to-date-custom-format",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer is building silver.orders from bronze.orders, where order_date is a STRING in day/month/year form such as '27/10/2026'. On a SQL warehouse, CAST(order_date AS DATE) fails with CAST_INVALID_INPUT. The silver column must be a DATE holding the correct dates. Which expression should the engineer use?",
+      "options": [
+        {
+          "text": "to_date(order_date, 'dd/MM/yyyy')",
+          "correct": true,
+          "why": "Passing a format tells to_date how to parse the string, so '27/10/2026' becomes the DATE 2026-10-27 instead of being rejected."
+        },
+        {
+          "text": "try_cast(order_date AS DATE)",
+          "average": true,
+          "why": "try_cast suppresses the error, but a string-to-DATE cast still expects the yyyy-MM-dd form, so every one of these values would quietly become NULL."
+        },
+        {
+          "text": "to_date(order_date)",
+          "why": "Without a format, to_date is a synonym for cast(expr AS DATE), so it fails on '27/10/2026' just like the original CAST."
+        },
+        {
+          "text": "date_format(order_date, 'yyyy-MM-dd')",
+          "why": "date_format renders a date or timestamp as a STRING; it doesn't parse day/month/year text, and its result isn't a DATE column."
+        }
+      ],
+      "in_practice": "An explicit format also documents the source contract in code. Values that don't fit it, such as a day of 32, raise CANNOT_PARSE_TIMESTAMP and stop the load instead of quietly writing NULL or wrong dates into silver.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/to_date",
+      "evidence": "If fmt is not supplied, the function is a synonym for cast(expr AS DATE)... When fmt is not specified, the input must be in yyyy-MM-dd or yyyy-MM-dd HH:mm:ss format. If your data uses a different format, such as dd/MM/yyyy or MM-dd-yyyy, specify the matching fmt argument."
+    },
+    {
+      "family": "cleaning-placeholder-to-null",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer loads silver_shipments from bronze_shipments. The upstream system can't encode missing values, so it writes -1 in the weight column whenever a parcel wasn't weighed. Analysts need those rows kept, with weight treated as missing so averages ignore it. Which approach should the engineer use in the INSERT ... SELECT?",
+      "options": [
+        {
+          "text": "Select weight as CASE WHEN weight = -1 THEN NULL ELSE weight END",
+          "correct": true,
+          "why": "The CASE expression rewrites the placeholder to a real NULL once, during the silver load, so every row is kept and aggregates such as avg skip the missing weights."
+        },
+        {
+          "text": "Add a CHECK (weight >= 0) constraint to silver_shipments",
+          "average": true,
+          "why": "A CHECK constraint makes the write fail when a row violates it; it doesn't convert -1 into NULL, so the load errors out instead of keeping the rows."
+        },
+        {
+          "text": "Filter the load with WHERE weight <> -1",
+          "why": "Filtering removes the unweighed parcels entirely, but the requirement is to keep those rows and mark only their weight as missing."
+        },
+        {
+          "text": "Select weight as coalesce(weight, -1)",
+          "why": "coalesce replaces NULL with -1, which goes the wrong direction: the placeholder stays, and any genuine NULLs become -1 as well."
+        }
+      ],
+      "in_practice": "Fixing a sentinel value once in silver beats asking every consumer to remember it: one forgotten filter on -1 can drag an average parcel weight down noticeably in a gold dashboard that nobody thinks to question.",
+      "source": "https://docs.databricks.com/aws/en/transform/validate",
+      "evidence": "you might have an upstream system that isn't capable of encoding NULL values, and so the placeholder value -1 is used to represent missing data. Rather than writing custom logic for all downstream queries in Databricks to ignore records containing -1, you could use a case when statement to dynamically replace these records as a transformation."
+    },
+    {
+      "family": "cleaning-unassigned-transformation",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer creates a new silver table with this PySpark code: df = spark.read.table(\"main.bronze.payments\"); df.withColumn(\"amount\", col(\"amount\").cast(\"decimal(12,2)\")); df.write.saveAsTable(\"main.silver.payments\"). The job succeeds, but DESCRIBE TABLE shows that amount is still a STRING in silver. What explains this?",
+      "options": [
+        {
+          "text": "withColumn returned a new DataFrame that was never assigned, so df kept the STRING column",
+          "correct": true,
+          "why": "DataFrames are immutable: a transformation returns a new DataFrame, and it must be saved to a variable (df = df.withColumn(...)) for later steps to see the change."
+        },
+        {
+          "text": "The cast met malformed amounts, so Spark kept the column as STRING to avoid losing data",
+          "average": true,
+          "why": "A cast never falls back to the original type. Malformed values either raise an error under ANSI mode or become NULL, and the column would still be DECIMAL."
+        },
+        {
+          "text": "Lazy evaluation skipped the cast because no action ran between withColumn and the write",
+          "why": "The write is an action that runs the full plan of the DataFrame it is called on. The cast wasn't skipped; it was never part of df's plan."
+        },
+        {
+          "text": "saveAsTable takes column types from the bronze source table rather than from the DataFrame",
+          "why": "saveAsTable writes the schema of the DataFrame it is called on; it has no separate link to the bronze table's column types."
+        }
+      ],
+      "in_practice": "Reassigning each step, or chaining the steps into one expression, avoids this class of bug. A schema assertion before the write would have stopped a STRING amount before it reached finance's gold aggregates.",
+      "source": "https://docs.databricks.com/aws/en/pyspark/",
+      "evidence": "DataFrames are immutable. Because of this, after performing transformations, a new DataFrame is returned that has to be saved to a variable in order to access it in subsequent operations."
+    },
+    {
+      "family": "cleaning-fill-type-mismatch",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer cleans bronze orders, where quantity (INT) and country (STRING) both contain nulls. Silver must show 0 for a missing quantity and 'unknown' for a missing country. A first attempt, df.na.fill(0), filled quantity but left country null. Which call fills both columns as required?",
+      "options": [
+        {
+          "text": "df.na.fill({\"quantity\": 0, \"country\": \"unknown\"})",
+          "correct": true,
+          "why": "A dict maps each column to its own replacement value, so quantity gets 0 and country gets 'unknown' in one pass, each with a value of the matching type."
+        },
+        {
+          "text": "df.na.fill(0, subset=[\"quantity\", \"country\"])",
+          "average": true,
+          "why": "Listing country in subset doesn't help: columns whose type doesn't match the fill value are ignored, so the STRING country column stays null."
+        },
+        {
+          "text": "df.na.fill(\"unknown\")",
+          "why": "A string fill value applies only to string columns, so country is filled but the INT quantity column keeps its nulls."
+        },
+        {
+          "text": "df.na.drop(subset=[\"quantity\", \"country\"])",
+          "why": "na.drop removes the rows that have nulls in those columns instead of filling them, which loses orders that silver must keep."
+        }
+      ],
+      "in_practice": "Type-matched fills are a quiet trap: a fill that works on numeric columns can leave string columns null, and those rows then vanish from downstream filters such as WHERE country IN (...). A dict makes every default explicit and easy to review.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.fillna.html",
+      "evidence": "If the value is a dict, then subset is ignored and value must be a mapping from column name (string) to replacement value... Columns specified in subset that do not have matching data types are ignored. For example, if value is a string, and subset contains a non-string column, then the non-string column is simply ignored."
+    },
+    {
+      "family": "joins-left-join-unmatched-rows",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs SELECT o.order_id, c.segment FROM orders o LEFT JOIN customers c ON o.customer_id = c.customer_id. Some orders reference customer IDs that haven't been loaded into customers yet. How do those orders appear in the result?",
+      "options": [
+        {
+          "text": "Once each, with NULL in the segment column",
+          "correct": true,
+          "why": "A left join returns every row from the left table plus the matching values from the right table, and appends NULL when there is no match."
+        },
+        {
+          "text": "They are dropped because no customer row matches",
+          "average": true,
+          "why": "Dropping unmatched rows is inner join behavior. A LEFT JOIN keeps every order whether or not a customer matches."
+        },
+        {
+          "text": "The query fails with a foreign key violation",
+          "why": "Joins don't check referential integrity, and primary and foreign key constraints on Databricks are informational rather than enforced."
+        },
+        {
+          "text": "Once for every row in customers, as in a cross join",
+          "why": "Rows pair with every right-side row only in a cross join or when the join condition is omitted; here the ON clause limits the matches."
+        }
+      ],
+      "in_practice": "Left joins are the safe default when enriching facts with late-arriving dimensions: revenue totals stay complete, and a count of NULL segments gives a simple metric for how many orders are still waiting on customer data.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-join",
+      "evidence": "LEFT [ OUTER ] Returns all values from the left table reference and the matched values from the right table reference, or appends NULL if there is no match. It is also referred to as a left outer join."
+    },
+    {
+      "family": "joins-union-all-keeps-duplicates",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer combines two daily point-of-sale extracts, store_a_sales and store_b_sales, into one silver table. Identical rows are legitimate, because two customers can buy the same item at the same price in the same minute, so every row must be kept. Which set operator should the query use?",
+      "options": [
+        {
+          "text": "UNION ALL",
+          "correct": true,
+          "why": "UNION ALL returns the rows of the first query plus the rows of the second and preserves duplicates, so every legitimate sale is kept."
+        },
+        {
+          "text": "UNION",
+          "average": true,
+          "why": "Plain UNION defaults to DISTINCT, so identical sales rows would be collapsed into one and revenue would be understated."
+        },
+        {
+          "text": "INTERSECT ALL",
+          "why": "INTERSECT ALL returns only rows that appear in both extracts, which would discard most sales instead of combining them."
+        },
+        {
+          "text": "EXCEPT ALL",
+          "why": "EXCEPT ALL returns rows of the first extract that have no remaining match in the second, so it subtracts rather than combines."
+        }
+      ],
+      "in_practice": "UNION ALL is also cheaper because it skips the comparison step that removing duplicates requires, which matters when stacking tens of millions of rows a day. Deduplicate deliberately on a business key when needed, never as a side effect.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-setops",
+      "evidence": "UNION [ALL | DISTINCT] Returns the result of subquery1 plus the rows of subquery2. If ALL is specified duplicate rows are preserved. If DISTINCT is specified the result does not contain any duplicate rows. This is the default."
+    },
+    {
+      "family": "joins-cross-join-scaffold",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer needs a reporting scaffold with one row for every combination of the 12 rows in fiscal_months and the 50 rows in stores, so that a store with no sales in a month still gets a row. Which join produces this scaffold?",
+      "options": [
+        {
+          "text": "CROSS JOIN, which returns all 600 month-store pairs",
+          "correct": true,
+          "why": "A cross join returns the Cartesian product of the two relations: 12 x 50 = 600 rows, one for each month and store."
+        },
+        {
+          "text": "FULL OUTER JOIN, which keeps every row from both tables",
+          "average": true,
+          "why": "A full outer join keeps unmatched rows from both sides, but it still pairs rows only where the join condition matches, so it doesn't generate every combination."
+        },
+        {
+          "text": "UNION ALL, which stacks the two tables into 62 rows",
+          "why": "UNION ALL appends rows instead of pairing them, and it requires both inputs to have the same number of compatible columns."
+        },
+        {
+          "text": "LEFT SEMI JOIN, which returns months that match a store",
+          "why": "A left semi join returns only left-side rows that have a match and never adds columns from the right side."
+        }
+      ],
+      "in_practice": "Cross joins grow multiplicatively, so keep them to small dimensions like these. Databricks advises removing cross joins from low-latency or frequently recomputed queries, where two 1-million-row inputs would produce a trillion rows.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-join",
+      "evidence": "CROSS JOIN Returns the Cartesian product of two relations. ... If you omit the join_criteria the semantic of any join_type becomes that of a CROSS JOIN."
+    },
+    {
+      "family": "joins-union-by-name",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer combines two PySpark DataFrames read from regional bronze tables. Both contain the STRING columns country, city and postal_code, but the second DataFrame lists them as city, postal_code, country. After df_eu.union(df_us), city names appear in the country column for the second region's rows. Which change fixes the result?",
+      "options": [
+        {
+          "text": "df_eu.unionByName(df_us)",
+          "correct": true,
+          "why": "unionByName resolves columns by name rather than by position, so each value lands in the matching column regardless of column order."
+        },
+        {
+          "text": "df_eu.unionAll(df_us)",
+          "average": true,
+          "why": "unionAll is an alias of union. It also matches columns by position, so the values stay misaligned."
+        },
+        {
+          "text": "df_eu.union(df_us).distinct()",
+          "why": "distinct only removes duplicate rows after the union; by then the values are already in the wrong columns."
+        },
+        {
+          "text": "df_eu.join(df_us, \"country\", \"outer\")",
+          "why": "A join pairs rows side by side on a key instead of stacking them, so it produces wider rows rather than one combined set of addresses."
+        }
+      ],
+      "in_practice": "Column order drifts as upstream teams add or reorder fields, and a position-based union fails silently whenever the types line up. unionByName, with allowMissingColumns=True when a source adds a column, is the safer default in shared pipelines.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.unionByName.html",
+      "evidence": "This method performs a union operation on both input DataFrames, resolving columns by name (rather than position). When allowMissingColumns is True, missing columns will be filled with null."
+    },
+    {
+      "family": "joins-broadcast-small-dimension",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 2,
+      "type": "multiple",
+      "stem": "A data engineer's nightly job joins a sales fact table with billions of rows to a stores dimension of about 40 MB on store_id. The query plan shows a sort-merge join that shuffles both sides. The engineer wants Spark to send the small stores table to every executor instead of shuffling sales. Which two approaches request a broadcast join? (Choose two.)",
+      "options": [
+        {
+          "text": "sales.join(stores.hint(\"broadcast\"), \"store_id\")",
+          "correct": true,
+          "why": "A broadcast hint on the stores DataFrame makes it the build side, and Spark prioritizes a broadcast join even when its size is above spark.sql.autoBroadcastJoinThreshold. functions.broadcast(stores) has the same effect."
+        },
+        {
+          "text": "SELECT /*+ BROADCAST(st) */ * FROM sales s JOIN stores st ON s.store_id = st.store_id",
+          "correct": true,
+          "why": "The SQL BROADCAST hint names the alias of the small table, so stores is copied to every executor and the large sales table is joined without being shuffled."
+        },
+        {
+          "text": "Run stores.cache() before the join",
+          "average": true,
+          "why": "Caching keeps stores in memory but doesn't change the join strategy, so Spark still plans a shuffled sort-merge join."
+        },
+        {
+          "text": "SELECT /*+ BROADCAST(s) */ * FROM sales s JOIN stores st ON s.store_id = st.store_id",
+          "why": "This hint names the sales alias, which asks Spark to broadcast billions of rows and risks out-of-memory errors and broadcast timeouts."
+        },
+        {
+          "text": "sales.repartition(\"store_id\").join(stores, \"store_id\")",
+          "why": "Repartitioning sales by store_id is itself a shuffle, and the join still runs as a shuffled join rather than a broadcast."
+        }
+      ],
+      "in_practice": "Broadcasting a ~40 MB dimension removes the shuffle of the multi-terabyte side, which can cut such a join from tens of minutes to a few. Revisit the hint as the dimension grows, because it keeps requesting a broadcast after the table is too large to ship cheaply.",
+      "source": "https://spark.apache.org/docs/latest/sql-performance-tuning.html",
+      "evidence": "when the BROADCAST hint is used on table 't1', broadcast join (either broadcast hash join or broadcast nested loop join depending on whether there is any equi-join key) with 't1' as the build side will be prioritized by Spark even if the size of table 't1' suggested by the statistics is above the configuration spark.sql.autoBroadcastJoinThreshold."
+    },
+    {
+      "family": "joins-missing-key-row-explosion",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer joins daily_sales s to daily_targets t for the last 30 days. Both tables hold one row per store per day, keyed by store_id and sale_date. The query joins ON s.store_id = t.store_id, and each store now returns 900 rows instead of 30, with targets paired to the wrong days. Which change produces correct results?",
+      "options": [
+        {
+          "text": "Join USING (store_id, sale_date) so rows match on both keys",
+          "correct": true,
+          "why": "Matching on both store_id and sale_date pairs each sales row with exactly one target row, giving 30 rows per store. USING compares equality on every listed column."
+        },
+        {
+          "text": "Add SELECT DISTINCT to remove the repeated rows",
+          "average": true,
+          "why": "The 900 rows aren't duplicates: each pairs a sales day with a different target day, so DISTINCT keeps them all and the attainment math stays wrong."
+        },
+        {
+          "text": "Change the inner join to a LEFT JOIN on store_id",
+          "why": "A left join only adds unmatched left rows; matching on store_id alone still pairs every sales day with all 30 target days."
+        },
+        {
+          "text": "Add a BROADCAST hint on daily_targets",
+          "why": "A join hint changes how the join executes, not which rows match, so the result is identical and still wrong."
+        }
+      ],
+      "in_practice": "Fan-out from an incomplete join key is a costly silent bug: a 30x row explosion inflates totals and compute alike. A cheap guard is to assert that a many-to-one join returns the same row count as its fact table.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-join",
+      "evidence": "USING ( column_name [, ...] ) Matches the rows by comparing equality for list of columns column_name which must exist in both relations."
+    },
+    {
+      "family": "joins-left-join-where-filter",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer must list every order with its approved refund amount, showing NULL when an order has no approved refund. The query is SELECT o.order_id, r.amount FROM orders o LEFT JOIN refunds r ON o.order_id = r.order_id WHERE r.status = 'approved'. Orders with no refunds, or with only rejected ones, are missing. Which change meets the requirement?",
+      "options": [
+        {
+          "text": "Move r.status = 'approved' from WHERE into the ON clause",
+          "correct": true,
+          "why": "In the ON clause, the status test only limits which refunds match. The left join then keeps every order and appends NULL where no approved refund exists."
+        },
+        {
+          "text": "Change the LEFT JOIN to a FULL OUTER JOIN",
+          "average": true,
+          "why": "A full outer join still applies the WHERE filter afterward, and NULL = 'approved' is never true, so the orders without approved refunds are still removed."
+        },
+        {
+          "text": "Add OR r.status IS NULL to the WHERE clause",
+          "why": "This restores orders with no refunds at all, but an order whose only refund was rejected has status 'rejected' and is still filtered out."
+        },
+        {
+          "text": "Compare the order IDs with the null-safe <=> operator",
+          "why": "The <=> operator changes how NULL keys compare, but the order IDs aren't the problem; the WHERE filter on a right-table column is."
+        }
+      ],
+      "in_practice": "This bug survives review because the query still says LEFT JOIN. In a refunds report it can silently drop the large majority of orders that never had a refund, so test outer-join queries against the row count of the left table.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-null-semantics",
+      "evidence": "WHERE, HAVING operators filter rows based on the user specified condition. A JOIN operator is used to combine rows from two tables based on a join condition. For all the three operators, a condition expression is a boolean expression and can return True, False or Unknown (NULL). They are “satisfied” if the result of the condition is True."
+    },
+    {
+      "family": "reshaping-drop-columns",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer prepares a bronze DataFrame for a silver table and must leave out the raw_payload and ingest_file columns while keeping every row. Which PySpark call does this?",
+      "options": [
+        {
+          "text": "df.drop(\"raw_payload\", \"ingest_file\")",
+          "correct": true,
+          "why": "DataFrame.drop returns a new DataFrame without the named columns and leaves every row in place."
+        },
+        {
+          "text": "df.na.drop(subset=[\"raw_payload\", \"ingest_file\"])",
+          "average": true,
+          "why": "na.drop works on rows: it removes rows that have nulls in those columns, and both columns stay in the output."
+        },
+        {
+          "text": "df.select(\"raw_payload\", \"ingest_file\")",
+          "why": "select keeps only the listed columns, which is the opposite of what the silver table needs."
+        },
+        {
+          "text": "df.dropDuplicates([\"raw_payload\", \"ingest_file\"])",
+          "why": "dropDuplicates removes rows that repeat the same values in those columns; the columns themselves remain."
+        }
+      ],
+      "in_practice": "Dropping bulky audit columns such as a raw JSON payload before writing silver can shrink the table considerably, while the raw data stays in bronze where it remains available for replay.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.drop.html",
+      "evidence": "Returns a new DataFrame without specified columns. This is a no-op if the schema doesn't contain the given column name(s)."
+    },
+    {
+      "family": "reshaping-split-string-to-array",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A bronze table stores product tags as one STRING, such as 'sale,clearance,summer'. A data engineer needs the tags as an ARRAY<STRING> in silver so they can be exploded later. Which SQL expression produces the array?",
+      "options": [
+        {
+          "text": "split(tags, ',')",
+          "correct": true,
+          "why": "split breaks a string around matches of a regular expression and returns an ARRAY<STRING>, here ['sale', 'clearance', 'summer']."
+        },
+        {
+          "text": "explode(tags)",
+          "average": true,
+          "why": "explode un-nests an ARRAY or MAP into rows. It can't take a plain STRING, so the string has to be split into an array first."
+        },
+        {
+          "text": "concat_ws(',', tags)",
+          "why": "concat_ws joins values into one delimited string, which is the reverse of what is needed here."
+        },
+        {
+          "text": "substring_index(tags, ',', 1)",
+          "why": "substring_index returns part of the string, here only 'sale', as a STRING rather than an array of all the tags."
+        }
+      ],
+      "in_practice": "Storing tags as an array lets later queries use array functions or explode without re-parsing text on every read. Because the delimiter is a regular expression, characters such as | or . must be escaped.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/split",
+      "evidence": "Splits str around occurrences that match regex and returns an array with a length of at most limit. ... Returns An ARRAY<STRING>. ... SELECT split('apple,banana,cherry', ','); [apple,banana,cherry]"
+    },
+    {
+      "family": "reshaping-filter-multiple-conditions",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer needs a PySpark DataFrame containing only the orders whose status is 'shipped' and whose amount is greater than 0. Which expression returns exactly those rows?",
+      "options": [
+        {
+          "text": "df.filter((col(\"status\") == \"shipped\") & (col(\"amount\") > 0))",
+          "correct": true,
+          "why": "filter keeps the rows where the boolean Column is true, and & combines the two parenthesized conditions so both must hold."
+        },
+        {
+          "text": "df.filter(col(\"status\") == \"shipped\" and col(\"amount\") > 0)",
+          "average": true,
+          "why": "Python's and keyword can't combine Column objects; PySpark raises an error asking for & instead, so the query never runs."
+        },
+        {
+          "text": "df.select((col(\"status\") == \"shipped\") & (col(\"amount\") > 0))",
+          "why": "select returns one boolean column for every order instead of keeping only the matching rows."
+        },
+        {
+          "text": "df.filter((col(\"status\") == \"shipped\") | (col(\"amount\") > 0))",
+          "why": "| is a logical OR, so the result also includes unshipped orders with a positive amount and shipped orders with an amount of 0."
+        }
+      ],
+      "in_practice": "Filtering right after reading bronze shrinks the data every later join and aggregation processes; a status filter that removes 80% of rows makes the rest of the pipeline roughly that much cheaper.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.filter.html",
+      "evidence": "Filters rows using the given condition. where() is an alias for filter(). ... Filter by multiple conditions. >>> df.filter((df.age > 3) & (df.subject == \"Physics\")).show()"
+    },
+    {
+      "family": "reshaping-explode-outer-null-arrays",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer flattens bronze orders into one row per line item with df.select(\"order_id\", explode(\"items\").alias(\"item\")). Cancelled orders, whose items array is null or empty, are missing from the silver table, but finance needs them to appear with a null item. Which change keeps them?",
+      "options": [
+        {
+          "text": "Replace explode with explode_outer",
+          "correct": true,
+          "why": "explode_outer produces a row with a null element when the array is null or empty, so cancelled orders stay in silver with a null item."
+        },
+        {
+          "text": "Fill the null arrays first with df.na.fill on \"items\"",
+          "average": true,
+          "why": "na.fill accepts only int, float, boolean or string replacement values, so it can't put an array into a null array column, and empty arrays aren't null anyway."
+        },
+        {
+          "text": "Replace explode with posexplode",
+          "why": "posexplode adds each element's position but, like explode, produces no rows for a null or empty array."
+        },
+        {
+          "text": "Replace explode with flatten",
+          "why": "flatten merges an array of arrays into a single array; it doesn't generate rows at all."
+        }
+      ],
+      "in_practice": "Inner explode semantics shrink row counts without any error: if 3% of orders are cancelled, silver under-reports order volume by 3%. explode_outer keeps the parent row, so counts reconcile with bronze.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.explode_outer.html",
+      "evidence": "Returns a new row for each element in the given array or map. Unlike explode, if the array/map is null or empty then null is produced."
+    },
+    {
+      "family": "reshaping-withcolumn-loop-plan",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer standardizes a 400-column bronze table by looping over the string columns and running df = df.withColumn(c, trim(col(c))) for each one. The job now spends minutes in query planning on the driver and sometimes fails with a stack overflow error. Which change addresses the cause?",
+      "options": [
+        {
+          "text": "Build all the trimmed expressions and apply them in one select()",
+          "correct": true,
+          "why": "Each withColumn call adds a projection, so hundreds of calls build a very deep plan. One select() with every expression adds a single projection, as the PySpark docs recommend."
+        },
+        {
+          "text": "Increase the driver memory so the larger query plan fits",
+          "average": true,
+          "why": "More memory treats the symptom; the plan still has hundreds of nested projections, so planning stays slow and a wider table fails again."
+        },
+        {
+          "text": "Repartition the DataFrame before the loop to spread out the work",
+          "why": "Repartitioning changes how data is spread across executors, but the problem is plan size on the driver, before any data is processed."
+        },
+        {
+          "text": "Replace trim with a Python UDF so the work runs on the executors",
+          "why": "A Python UDF still adds a projection for every withColumn call and adds serialization overhead, so the job gets slower without a smaller plan."
+        }
+      ],
+      "in_practice": "On wide tables, collapsing a withColumn loop into one select can cut planning time from minutes to seconds, which adds up when the job runs hourly and the cluster is billed the whole time.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.withColumn.html",
+      "evidence": "This method introduces a projection internally. Therefore, calling it multiple times, for instance, via loops in order to add multiple columns can generate big plans which can cause performance issues and even StackOverflowException. To avoid this, use select() with multiple columns at once."
+    },
+    {
+      "family": "reshaping-rename-missing-column-noop",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's silver job renames a column with df.withColumnRenamed(\"custId\", \"customer_id\"). This week the bronze source began delivering that column as cust_id. The silver job still succeeds, but a gold query now fails because customer_id can't be resolved. Why did the silver job succeed?",
+      "options": [
+        {
+          "text": "withColumnRenamed is a no-op for a missing name, so cust_id passed through",
+          "correct": true,
+          "why": "withColumnRenamed returns the DataFrame unchanged when the existing column name is missing, so silver was written with cust_id and no customer_id."
+        },
+        {
+          "text": "Lazy evaluation deferred the rename error until the gold query read the table",
+          "average": true,
+          "why": "There was no deferred error: the silver write is an action that ran the plan, and the rename simply had nothing to rename."
+        },
+        {
+          "text": "The rename failed with a warning that scheduled job runs don't display",
+          "why": "No warning or failure occurs to hide; a rename of a missing column is defined as a no-op."
+        },
+        {
+          "text": "withColumnRenamed renames by position when the name is missing",
+          "why": "withColumnRenamed never falls back to column position; when the name is missing, the DataFrame comes back unchanged."
+        }
+      ],
+      "in_practice": "Silent no-ops push failures downstream, where they cost more to trace. Asserting expected columns before the silver write, such as checking that custId is in df.columns, turns source schema drift into a clear failure at the right step.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.withColumnRenamed.html",
+      "evidence": "Returns a new DataFrame by renaming an existing column. This is a no-op if the schema doesn't contain the given column name."
+    },
+    {
+      "family": "reshaping-drop-column-purge",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A compliance request requires that the ssn values in silver.customers, a Delta table with column mapping enabled, be physically removed from storage. A data engineer runs ALTER TABLE silver.customers DROP COLUMN ssn, and queries no longer show the column. What else must the engineer do to meet the request?",
+      "options": [
+        {
+          "text": "Run REORG TABLE silver.customers APPLY (PURGE), then VACUUM",
+          "correct": true,
+          "why": "With column mapping, DROP COLUMN is metadata-only. REORG ... APPLY (PURGE) rewrites the files that still hold the dropped data, and VACUUM then deletes the old files once they pass the retention threshold."
+        },
+        {
+          "text": "Nothing; DROP COLUMN already rewrote the data files without ssn",
+          "average": true,
+          "why": "Under column mapping, dropping a column changes only metadata; the ssn values remain in the existing data files until those files are rewritten."
+        },
+        {
+          "text": "Run VACUUM right away, without rewriting any files",
+          "why": "VACUUM deletes only files the current table version no longer references. The files holding ssn are still current, so nothing containing ssn is removed."
+        },
+        {
+          "text": "Run REFRESH TABLE silver.customers to clear the column",
+          "why": "REFRESH TABLE invalidates cached data and metadata for the table; it doesn't rewrite or delete any files in storage."
+        }
+      ],
+      "in_practice": "Metadata-only drops make schema changes instant on multi-terabyte tables, but compliance deletes need the extra rewrite. Schedule the REORG off-peak, because it rewrites every file that still contains the column.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/delta-reorg-table",
+      "evidence": "Reorganize a Delta Lake table by rewriting files to purge soft-deleted data, such as the column data dropped by ALTER TABLE DROP COLUMN... After running APPLY (PURGE), the soft-deleted data may still exist in the old files. You can run VACUUM to physically delete the old files."
+    }
+  ]
+}

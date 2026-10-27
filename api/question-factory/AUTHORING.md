@@ -85,4 +85,4 @@ Field limits:
 
 `family` is a unique kebab-case key and never changes once published, because learners' history follows it.
 
-The stored explanation is composed at import. It is the key's `why`, then the tempting distractor's `why`, then the other distractors' `why`, then "In practice:" followed by `in_practice`. Write each `why` as a full sentence that names what it talks about, so it reads well in that order.
+The stored explanation is composed at import as three paragraphs. The first is the key's `why`. The second is the tempting distractor's `why` followed by the other distractors' `why`. The third is "In practice:" followed by `in_practice`. Write each `why` as a full sentence that names what it talks about, so it reads well in that order.

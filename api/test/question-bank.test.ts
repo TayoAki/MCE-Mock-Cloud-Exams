@@ -44,9 +44,16 @@ describe('question factory bank', () => {
     expect(key.rationale.startsWith(item.options.find((o) => o.correct)!.why)).toBe(true);
     expect(key.reviewedNotes).toContain(item.evidence);
 
+    // An explanation stored in an older layout (same words) is brought up to date; an edited one is left alone.
+    await QuestionKey.updateOne({ _id: qv._id }, { $set: { rationale: key.rationale.replace(/\n\n/g, ' ') } });
+    const second = bankItems()[1]!;
+    const secondQv = (await QuestionVersion.findOne({ familyId: (await QuestionFamily.findOne({ examVersionId, familyKey: second.family }).lean())!._id }).lean())!;
+    await QuestionKey.updateOne({ _id: secondQv._id }, { $set: { rationale: 'Edited by a reviewer.' } });
     const before = await QuestionFamily.countDocuments({ examVersionId });
     expect((await addQuestionBank(examVersionId, { publish: true, reviewerId: FIXTURE_REVIEWER_ID })).added).toBe(0);
     expect(await QuestionFamily.countDocuments({ examVersionId })).toBe(before);
+    expect((await QuestionKey.findById(qv._id).lean())!.rationale).toBe(composeRationale(item));
+    expect((await QuestionKey.findById(secondQv._id).lean())!.rationale).toBe('Edited by a reviewer.');
   });
 
   it('fills a full 45-question mock exam across every domain', async () => {
