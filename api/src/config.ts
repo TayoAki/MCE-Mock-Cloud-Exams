@@ -19,6 +19,9 @@ const schema = z.object({
   CORS_ORIGINS: z.string().default('http://localhost:5173,http://localhost:8081'),
   ANTHROPIC_API_KEY: z.string().optional(),
   AI_MODEL: z.string().default('claude-opus-5-5'),
+  /** Used when ANTHROPIC_API_KEY isn't set: AI replies go through OpenRouter instead. */
+  OPENROUTER_API_KEY: z.string().optional(),
+  OPENROUTER_MODEL: z.string().default('anthropic/claude-opus-5.5'),
   AI_DAILY_CALLS_PER_USER: z.coerce.number().int().nonnegative().default(20),
   AI_DAILY_CALLS_GLOBAL: z.coerce.number().int().nonnegative().default(2000),
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),

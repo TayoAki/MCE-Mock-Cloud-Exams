@@ -1,5 +1,3 @@
-import type Anthropic from '@anthropic-ai/sdk';
-import { config } from '../config.js';
 import { Attempt, Domain, Objective, PracticeSession, QuestionKey, QuestionVersion, TutorThread, User, type AnswerType } from '../models/index.js';
 import { track } from '../lib/analytics.js';
 import { seededRandom } from '../lib/answers.js';
@@ -8,7 +6,7 @@ import { revealsAnswer } from '../lib/leak-guard.js';
 import { TUTOR_MAX_MESSAGES } from '../lib/rules.js';
 import { effectiveTimezone, localDate } from '../lib/time.js';
 import { featureSet } from './access.js';
-import { anthropic, logAiError, replyText, reserveBudget } from './ai.js';
+import { aiEnabled, complete, reserveBudget, type ChatMessage } from './ai.js';
 import { DELAYED_FEEDBACK_MODES } from './grading.js';
 import { TUTOR_AFTER_ANSWER_MODES } from './sessions.js';
 
@@ -138,26 +136,7 @@ function afterFallback(c: Context, firstAfter: boolean) {
     : `I can only share the reviewed explanation right now. The documentation goes deeper: ${c.question.sourceUrl}`;
 }
 
-async function generate(system: string, messages: Anthropic.Beta.BetaMessageParam[]): Promise<string | null> {
-  const api = anthropic();
-  if (!api) return null;
-  try {
-    const response = await api.beta.messages.create({
-      model: config.AI_MODEL,
-      max_tokens: 2048,
-      // Re-run on Anthropic's recommended model if the requested one declines.
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      output_config: { effort: 'low' },
-      system,
-      messages,
-    });
-    return replyText(response);
-  } catch (error) {
-    logAiError(error, 'tutor');
-    return null;
-  }
-}
+const generate = (system: string, messages: ChatMessage[]) => complete('tutor', { system, messages });
 
 function threadView(c: Context, thread: { messages: { role: string; text: string; phase: string; origin?: string | null; at: Date }[] } | null) {
   const messages = thread?.messages ?? [];
@@ -167,7 +146,7 @@ function threadView(c: Context, thread: { messages: { role: string; text: string
     session_id: c.session._id,
     phase: c.phase,
     available: c.available,
-    mode: anthropic() ? ('ai' as const) : ('hints' as const),
+    mode: aiEnabled() ? ('ai' as const) : ('hints' as const),
     intro:
       c.phase === 'before'
         ? 'I’ll help you think it through without giving the answer away. What’s tripping you up?'
@@ -204,15 +183,15 @@ export async function askTutor(userId: string, sessionItemId: string, input: { m
   }
 
   const user = await User.findById(userId).select({ timezone: 1, pendingTimezone: 1 }).lean();
-  const messages: Anthropic.Beta.BetaMessageParam[] = [
-    ...history.map((m): Anthropic.Beta.BetaMessageParam => ({ role: m.role === 'learner' ? 'user' : 'assistant', content: m.text })),
+  const messages: ChatMessage[] = [
+    ...history.map((m): ChatMessage => ({ role: m.role === 'learner' ? 'user' : 'assistant', content: m.text })),
     { role: 'user', content: input.message },
   ];
   const system = `${c.phase === 'before' ? GUIDE_PROMPT : DISCUSS_PROMPT}\n\n${questionBlock(c)}`;
 
   let text: string | null = null;
   let guardTripped = false;
-  if (anthropic() && (await reserveBudget(userId, localDate(new Date(), effectiveTimezone(user!))))) {
+  if (aiEnabled() && (await reserveBudget(userId, localDate(new Date(), effectiveTimezone(user!))))) {
     text = await generate(system, messages);
     if (text && c.phase === 'before' && revealsAnswer(text, c.guarded, c.key)) {
       guardTripped = true;

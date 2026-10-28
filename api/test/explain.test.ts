@@ -79,4 +79,27 @@ describe('contextual AI explanations', () => {
     expect(limited.body.notice).toMatch(/limit/);
     expect(create.mock.calls.length).toBe(calls);
   });
+  it('uses OpenRouter when only an OpenRouter key is set, and falls back when it fails', async () => {
+    const before = { anthropic: config.ANTHROPIC_API_KEY, openrouter: config.OPENROUTER_API_KEY };
+    config.ANTHROPIC_API_KEY = undefined;
+    config.OPENROUTER_API_KEY = 'or-test-key';
+    config.AI_DAILY_CALLS_PER_USER = 20;
+    const realFetch = globalThis.fetch;
+    const replies: Response[] = [];
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => (String(url).startsWith('https://openrouter.ai/') ? replies.shift()! : realFetch(url, init)));
+    try {
+      const { token, attemptId, rationale } = await gradedAttempt();
+      replies.push(new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'History is the receipt; the files are the goods.' } }] })));
+      expect((await as(token).post('/explanations', { attempt_id: attemptId, style: 'analogy' }).expect(200)).body).toMatchObject({ origin: 'generated', text: 'History is the receipt; the files are the goods.' });
+      // Two server errors (the call and its one retry) fall back to the reviewed explanation.
+      replies.push(new Response('{}', { status: 500 }), new Response('{}', { status: 500 }));
+      expect((await as(token).post('/explanations', { attempt_id: attemptId, style: 'short' }).expect(200)).body).toMatchObject({ origin: 'reviewed_fallback', text: rationale });
+      expect(fetchSpy.mock.calls.filter(([url]) => String(url).startsWith('https://openrouter.ai/'))).toHaveLength(3);
+      expect(create).not.toHaveBeenCalled();
+    } finally {
+      config.ANTHROPIC_API_KEY = before.anthropic;
+      config.OPENROUTER_API_KEY = before.openrouter;
+      vi.restoreAllMocks();
+    }
+  });
 });

@@ -170,6 +170,51 @@ describe('the tutor', () => {
     expect(call.system).toContain(`<learner_answer result="incorrect">${wrong}</learner_answer>`);
   });
 
+  it('with an OpenRouter key, uses OpenRouter with the same prompts and leak guard', async () => {
+    const before = { anthropic: config.ANTHROPIC_API_KEY, openrouter: config.OPENROUTER_API_KEY };
+    config.ANTHROPIC_API_KEY = undefined;
+    config.OPENROUTER_API_KEY = 'or-test-key';
+    const { token, item } = await lessonItem();
+    const letter = (await QuestionKey.findById(item.question_version_id).lean())!.correctOptions[0];
+    const realFetch = globalThis.fetch;
+    const requests: { headers: Record<string, string>; body: { model: string; messages: { role: string; content: string }[] } }[] = [];
+    const replies: Response[] = [];
+    const answer = (content: string, finish = 'stop') => new Response(JSON.stringify({ choices: [{ finish_reason: finish, message: { role: 'assistant', content } }] }), { status: 200 });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      if (!String(url).startsWith('https://openrouter.ai/')) return realFetch(url, init);
+      requests.push({ headers: init!.headers as Record<string, string>, body: JSON.parse(init!.body as string) });
+      return replies.shift()!;
+    });
+    try {
+      const ask = (message: string) => as(token).post(`/tutor/${item.session_item_id}`, { message, client_message_id: id() }).expect(200);
+      // A reply that gives the answer away is rewritten, exactly as with Anthropic.
+      replies.push(answer(`The answer is ${letter}.`), answer('What has to happen to the files the old version used?'));
+      const guided = (await ask('Which one is it?')).body;
+      expect(guided.mode).toBe('ai');
+      expect(guided.messages[1]).toMatchObject({ origin: 'generated', text: 'What has to happen to the files the old version used?' });
+      expect(requests[0]!.headers.Authorization).toBe('Bearer or-test-key');
+      expect(requests[0]!.body.model).toBe(config.OPENROUTER_MODEL);
+      expect(requests[0]!.body.messages[0]).toMatchObject({ role: 'system' });
+      expect(requests[0]!.body.messages[0]!.content).toMatch(/has NOT answered/);
+      expect(requests[0]!.body.messages.slice(1)).toEqual([{ role: 'user', content: 'Which one is it?' }]);
+      expect(requests[1]!.body.messages[0]!.content).toMatch(/previous draft gave the answer away/);
+
+      // A filtered reply falls back to a reviewed hint.
+      replies.push(answer('', 'content_filter'));
+      expect((await ask('Another hint?')).body.messages[3]).toMatchObject({ origin: 'hint' });
+
+      // A server error is retried once.
+      replies.push(new Response('{}', { status: 503 }), answer('Which option keeps the history you need?'));
+      const retried = (await ask('And now?')).body;
+      expect(retried.messages[5]).toMatchObject({ origin: 'generated', text: 'Which option keeps the history you need?' });
+      expect(requests).toHaveLength(5);
+    } finally {
+      config.ANTHROPIC_API_KEY = before.anthropic;
+      config.OPENROUTER_API_KEY = before.openrouter;
+      vi.restoreAllMocks();
+    }
+  });
+
   it('stays closed during a mock until it is submitted', async () => {
     config.ANTHROPIC_API_KEY = undefined;
     const { token, enrollmentId } = await plus();
