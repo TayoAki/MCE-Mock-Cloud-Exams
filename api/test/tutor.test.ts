@@ -177,7 +177,7 @@ describe('the tutor', () => {
     const { token, item } = await lessonItem();
     const letter = (await QuestionKey.findById(item.question_version_id).lean())!.correctOptions[0];
     const realFetch = globalThis.fetch;
-    const requests: { headers: Record<string, string>; body: { model: string; messages: { role: string; content: string }[] } }[] = [];
+    const requests: { headers: Record<string, string>; body: { model: string; messages: { role: string; content: string }[]; reasoning?: unknown } }[] = [];
     const replies: Response[] = [];
     const answer = (content: string, finish = 'stop') => new Response(JSON.stringify({ choices: [{ finish_reason: finish, message: { role: 'assistant', content } }] }), { status: 200 });
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
@@ -193,7 +193,7 @@ describe('the tutor', () => {
       expect(guided.mode).toBe('ai');
       expect(guided.messages[1]).toMatchObject({ origin: 'generated', text: 'What has to happen to the files the old version used?' });
       expect(requests[0]!.headers.Authorization).toBe('Bearer or-test-key');
-      expect(requests[0]!.body.model).toBe(config.OPENROUTER_MODEL);
+      expect(requests[0]!.body).toMatchObject({ model: 'google/gemini-3.1-flash-lite', max_tokens: 2048, reasoning: { effort: 'minimal', exclude: true } });
       expect(requests[0]!.body.messages[0]).toMatchObject({ role: 'system' });
       expect(requests[0]!.body.messages[0]!.content).toMatch(/has NOT answered/);
       expect(requests[0]!.body.messages.slice(1)).toEqual([{ role: 'user', content: 'Which one is it?' }]);

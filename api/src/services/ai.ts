@@ -74,7 +74,13 @@ async function fromOpenRouter(input: { system: string; messages: ChatMessage[] }
     fetch(OPENROUTER_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${config.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'X-OpenRouter-Title': 'CertPath' },
-      body: JSON.stringify({ model: config.OPENROUTER_MODEL, max_tokens: 2048, messages: [{ role: 'system', content: input.system }, ...input.messages] }),
+      body: JSON.stringify({
+        model: config.OPENROUTER_MODEL,
+        max_tokens: 2048,
+        // Keep reasoning short and out of the response: only the reply text is used.
+        ...(config.OPENROUTER_REASONING_EFFORT === 'default' ? {} : { reasoning: { effort: config.OPENROUTER_REASONING_EFFORT, exclude: true } }),
+        messages: [{ role: 'system', content: input.system }, ...input.messages],
+      }),
       signal: AbortSignal.timeout(config.AI_TIMEOUT_MS),
     });
   let res = await send().catch((error: unknown) => (isTimeout(error) ? Promise.reject(error) : null));

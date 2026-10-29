@@ -100,7 +100,7 @@ The backoffice covers the plan's content workflow: draft → human review → pu
   
   The full 45-question mock now fills from every domain. **None of the questions has had independent subject-matter review.** The seed marks them reviewed by a fixture account so they can be published, and the backoffice labels them "Dev fixture — not subject-matter approval". Each factory item keeps its supporting documentation quote in the reviewer notes, so review can go quickly. Learners can rate each question 1–5 stars after seeing its answer, and the backoffice's low-rated queue puts the questions they rate poorly in front of reviewers first.
 - **Guests are server-side identities.** Grading never happens on the device. Registering upgrades the guest in place, keeping all progress. Merging a guest into a different existing account is not implemented; the sign-in screen says so.
-- **AI help** uses Claude at low effort with server-side refusal fallbacks, per-user and global daily caps, and a timeout. It calls Anthropic directly with `ANTHROPIC_API_KEY`, or OpenRouter with `OPENROUTER_API_KEY` (model `OPENROUTER_MODEL`, Claude Opus 5.5 by default) when only that key is set. The reviewed rationale is shown whenever generation fails, is refused, or neither key is set.
+- **AI help** has per-user and global daily caps and a timeout. It calls Claude directly with `ANTHROPIC_API_KEY` (low effort, server-side refusal fallbacks), or OpenRouter with `OPENROUTER_API_KEY` when only that key is set (model `OPENROUTER_MODEL`, Gemini 3.1 Flash Lite at minimal reasoning by default). The reviewed rationale is shown whenever generation fails, is refused, or neither key is set.
 
 ## Verification
 

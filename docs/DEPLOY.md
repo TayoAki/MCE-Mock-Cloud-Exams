@@ -46,7 +46,7 @@ The watch paths stop a change in one app from rebuilding the others.
 | `INVITE_URL_BASE` | `https://<web domain>/join`, so circle invites open the web app |
 | `EXPO_PUSH_ENABLED` | `true` once the TestFlight build has push set up (see below). Until then reminders are planned but not delivered |
 | `ANTHROPIC_API_KEY` | Optional. With it, the tutor and "Explain another way" generate replies with Claude, capped by `AI_DAILY_CALLS_PER_USER` (20) and `AI_DAILY_CALLS_GLOBAL` (2000). Without an AI key, learners get reviewed hints and the reviewed explanation |
-| `OPENROUTER_API_KEY` | Optional alternative to `ANTHROPIC_API_KEY`: the same features go through OpenRouter. `OPENROUTER_MODEL` picks the model (default `anthropic/claude-opus-5.5`; `anthropic/claude-sonnet-5.5` or `anthropic/claude-haiku-5.5` cost less). If both keys are set, Anthropic is used |
+| `OPENROUTER_API_KEY` | Optional alternative to `ANTHROPIC_API_KEY`: the same features go through OpenRouter. `OPENROUTER_MODEL` picks the model (default `google/gemini-3.1-flash-lite`, $0.25/$1.50 per million input/output tokens; `google/gemini-2.5-flash-lite` costs less, `anthropic/claude-sonnet-5.5` writes better). `OPENROUTER_REASONING_EFFORT` (default `minimal`) keeps the model's thinking short, since it is billed and counts against the reply limit. If both keys are set, Anthropic is used |
 
 **web** and **admin**
 

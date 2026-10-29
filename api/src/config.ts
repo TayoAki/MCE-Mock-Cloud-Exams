@@ -21,7 +21,13 @@ const schema = z.object({
   AI_MODEL: z.string().default('claude-opus-5-5'),
   /** Used when ANTHROPIC_API_KEY isn't set: AI replies go through OpenRouter instead. */
   OPENROUTER_API_KEY: z.string().optional(),
-  OPENROUTER_MODEL: z.string().default('anthropic/claude-opus-5.5'),
+  OPENROUTER_MODEL: z.string().default('google/gemini-3.1-flash-lite'),
+  /**
+   * Reasoning effort sent with OpenRouter calls. Short tutor replies need little,
+   * and reasoning tokens are billed and count against the reply's token limit.
+   * "default" leaves it to the model; OpenRouter maps unsupported levels to the nearest one.
+   */
+  OPENROUTER_REASONING_EFFORT: z.enum(['default', 'none', 'minimal', 'low', 'medium', 'high']).default('minimal'),
   AI_DAILY_CALLS_PER_USER: z.coerce.number().int().nonnegative().default(20),
   AI_DAILY_CALLS_GLOBAL: z.coerce.number().int().nonnegative().default(2000),
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
