@@ -1,0 +1,970 @@
+{
+  "items": [
+    {
+      "family": "lakehouse-metastore-level-securables",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 1,
+      "type": "multiple",
+      "stem": "A platform team is drawing the Unity Catalog object hierarchy for new engineers. Most data assets are addressed as catalog.schema.object, but some securable objects sit directly under the metastore instead of inside a schema. Which two objects belong directly under the metastore? (Choose two.)",
+      "options": [
+        {
+          "text": "A storage credential that holds an IAM role for S3 access",
+          "correct": true,
+          "why": "Storage credentials are metastore-level securables that hold the authentication, such as an IAM role, used to reach cloud storage. They are not part of the catalog.schema namespace."
+        },
+        {
+          "text": "An external location that pairs an S3 path with a credential",
+          "correct": true,
+          "why": "External locations sit directly under the metastore and pair a cloud storage path with the storage credential that authorizes it, so they are governed outside any catalog or schema."
+        },
+        {
+          "text": "A volume that registers a folder of raw JSON files",
+          "average": true,
+          "why": "Volumes govern files in cloud storage, so they are easy to group with storage credentials, but a volume lives inside a schema and is addressed as catalog.schema.volume."
+        },
+        {
+          "text": "A SQL function that standardizes phone numbers",
+          "why": "Functions, including user-defined functions, are schema-level objects in the three-level namespace, alongside tables, views and volumes."
+        },
+        {
+          "text": "A view that joins orders with customer segments",
+          "why": "Views are saved queries that live in a schema next to the tables they read, so they follow the three-level namespace like tables do."
+        }
+      ],
+      "in_practice": "Because credentials and locations sit above every catalog, a platform team can set up a few of them once and let catalog and schema owners register tables and volumes underneath, without handing out IAM roles.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/",
+      "evidence": "Data and AI assets such as tables, views, volumes, functions, models, and services (model services and MCP services) follow a three-level namespace (catalog.schema.object). ... Other objects, such as storage credentials, external locations, connections, and shares, sit directly under the metastore."
+    },
+    {
+      "family": "lakehouse-failed-write-uncommitted-files",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A nightly job appending to the Delta table main.ops.sensor_readings crashed after writing several new Parquet files into the table's directory, but before its commit was recorded. A data engineer queries the table the next morning. How does the failed write affect the query results?",
+      "options": [
+        {
+          "text": "The new files are ignored, since only committed files belong to the table",
+          "correct": true,
+          "why": "Delta Lake makes a write visible only when a commit listing its data files is added to the transaction log. Files from a failed transaction never become part of the table, and VACUUM later deletes such untracked files."
+        },
+        {
+          "text": "Readers see the partial rows until the job is rerun to finish the commit",
+          "average": true,
+          "why": "This treats the table as whatever files sit in its directory. Readers build their snapshot from the transaction log, so files without a commit are invisible rather than partially visible."
+        },
+        {
+          "text": "The table is marked corrupt until the orphaned files are deleted by hand",
+          "why": "A failed transaction doesn't corrupt the table state, and deleting files by hand from a Delta directory is the kind of direct file manipulation Databricks advises against."
+        },
+        {
+          "text": "The table rolls back to the version before the previous successful run",
+          "why": "Nothing is rolled back. The last successful commit stays the current version, and the failed job simply never produced a new one."
+        }
+      ],
+      "in_practice": "Atomic commits make a crash mid-write safe to retry: the rerun adds one clean commit, and the leftover files only cost storage until VACUUM clears them, instead of forcing a manual repair of a multi-terabyte table.",
+      "source": "https://docs.databricks.com/aws/en/lakehouse/acid",
+      "evidence": "Data files are not tracked unless the transaction log records a new version. If a transaction fails after writing data files to a table, these data files will not corrupt the table state, but the files will not become part of the table."
+    },
+    {
+      "family": "lakehouse-lakebase-oltp-app",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A retail team is building an order-management app that inserts and updates individual order rows thousands of times a minute and reads each order back transactionally in milliseconds. The database must be fully integrated with the team's Databricks platform. Which Databricks component fits this workload?",
+      "options": [
+        {
+          "text": "Lakebase, the managed Postgres OLTP database in the platform",
+          "correct": true,
+          "why": "Lakebase is a fully managed Postgres database for online transaction processing that is integrated with the Databricks platform, built for many small transactional reads and writes like this app's."
+        },
+        {
+          "text": "A serverless SQL warehouse querying a Delta table of orders",
+          "average": true,
+          "why": "A serverless SQL warehouse is built for analytical SQL. Thousands of single-row inserts and updates a minute is an OLTP pattern, which an analytical warehouse over Delta tables isn't designed to serve."
+        },
+        {
+          "text": "A Delta table with liquid clustering on the order_id column",
+          "why": "Liquid clustering improves data skipping for analytical scans, but each single-row update is still a Delta commit, which doesn't give an application OLTP-style latency."
+        },
+        {
+          "text": "A Model Serving endpoint that exposes the orders over REST",
+          "why": "Model Serving hosts machine learning models behind REST endpoints. It isn't a transactional database for storing and updating application records."
+        }
+      ],
+      "in_practice": "Keeping the app's operational store in Lakebase avoids running a separate database estate, and the Databricks reference architecture pairs it with data synced from the lakehouse, so one platform serves both the app and analytics.",
+      "source": "https://docs.databricks.com/aws/en/introduction/",
+      "evidence": "Lakebase is an online transactional processing (OLTP) database that is fully integrated with the Databricks Data + AI Platform. This fully managed Postgres database allows you to create and manage OLTP databases stored in Databricks-managed storage."
+    },
+    {
+      "family": "lakehouse-time-travel-at-version-syntax",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is debugging a report and wants to compare today's rows in main.sales.orders with the rows as they were at table version 42, which DESCRIBE HISTORY lists. Which statement reads version 42 without changing the table?",
+      "options": [
+        {
+          "text": "`SELECT * FROM main.sales.orders@v42`",
+          "correct": true,
+          "why": "Delta Lake accepts an @ suffix on the table name for time travel: @v followed by a version number reads that version, the same as VERSION AS OF 42."
+        },
+        {
+          "text": "`SELECT * FROM main.sales.orders WHERE _version = 42`",
+          "average": true,
+          "why": "Filtering on a version column is a common guess, but time travel is specified on the table reference, not in a WHERE clause over a row-level column."
+        },
+        {
+          "text": "`SELECT * FROM main.sales.orders TIMESTAMP AS OF 42`",
+          "why": "TIMESTAMP AS OF expects a timestamp or date string, not a version number. Version 42 needs VERSION AS OF 42 or the @v42 suffix."
+        },
+        {
+          "text": "`RESTORE TABLE main.sales.orders TO VERSION AS OF 42`",
+          "why": "RESTORE rolls the live table back to version 42 for every reader and needs MODIFY. It changes the table instead of reading the old version alongside today's rows."
+        }
+      ],
+      "in_practice": "Reading an old version side by side with the current one lets an engineer diff a report in minutes, without restoring the production table or copying it.",
+      "source": "https://docs.databricks.com/aws/en/tables/history",
+      "evidence": "You can also use the @ syntax to specify the timestamp or version as part of the table name. The timestamp must be in yyyyMMddHHmmssSSS format. You can specify a version with @v."
+    },
+    {
+      "family": "lakehouse-no-direct-delta-file-edits",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer finds that one batch loaded bad rows into the Delta table main.web.clicks, and all of those rows landed in a single Parquet file in the table's S3 directory. The engineer plans to delete that file directly in S3 to remove the rows. What should the engineer do instead?",
+      "options": [
+        {
+          "text": "Run a DELETE on the table with a predicate matching the bad rows",
+          "correct": true,
+          "why": "Changes to a Delta table should go through the table, for example with DELETE, so they are recorded as a new commit in the transaction log. Databricks advises against touching data or log files directly because it can corrupt the table."
+        },
+        {
+          "text": "Delete the file in S3, then run REFRESH TABLE to pick up the change",
+          "average": true,
+          "why": "Removing the file in S3 leaves the transaction log still referencing it, so the table's state no longer matches its files. A metadata refresh doesn't rewrite the log; the change has to be committed through Delta."
+        },
+        {
+          "text": "Delete the file in S3, then run VACUUM to clean up the transaction log",
+          "why": "VACUUM removes data files that the table no longer references. It doesn't edit the log to drop a file that the current version still references."
+        },
+        {
+          "text": "Move the file to an archive prefix so it can be put back if needed",
+          "why": "Moving the file has the same effect as deleting it from the table's point of view: the log still points to the old path, and the table's state is broken."
+        }
+      ],
+      "in_practice": "A DELETE commit keeps the fix auditable in DESCRIBE HISTORY and reversible with time travel, whereas a manual file deletion can break every downstream query on the table until someone repairs it.",
+      "source": "https://docs.databricks.com/aws/en/delta/",
+      "evidence": "Atomic transactions with Delta Lake allow you to use many options for updating data and metadata. To avoid corrupting your tables, Databricks recommends that you avoid interacting directly with data and transaction log files in Delta Lake file directories."
+    },
+    {
+      "family": "lakehouse-attach-workspace-regional-metastore",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A company runs a production workspace in us-east-1 that is attached to the region's Unity Catalog metastore. It is adding a second workspace in us-east-1 for its analytics team, which must query the same catalogs under the same grants. What should the account admin do?",
+      "options": [
+        {
+          "text": "Assign the new workspace to the existing us-east-1 metastore",
+          "correct": true,
+          "why": "A metastore is scoped to one region and can be attached to many workspaces there. Every attached workspace sees the same catalogs, and a grant made in one workspace is effective in all of them."
+        },
+        {
+          "text": "Create a second metastore and share the catalogs into it",
+          "average": true,
+          "why": "Sharing between metastores is for crossing regions or accounts. An organization has one metastore per region, so a second one would only add a sharing hop and a separate set of grants."
+        },
+        {
+          "text": "Register the tables as external tables in a new metastore",
+          "why": "Registering the same tables in a second metastore risks consistency problems, because metadata changes made through one metastore don't register in the other."
+        },
+        {
+          "text": "Copy the production catalogs over with a nightly job",
+          "why": "Copying creates a second set of data that drifts from production and needs its own grants, while attaching the workspace gives live access with no copies."
+        }
+      ],
+      "in_practice": "One metastore per region means a new workspace is productive on day one: it inherits the catalogs, grants and lineage already in place instead of a parallel governance setup to keep in sync.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/securable-objects",
+      "evidence": "A metastore is scoped to a single cloud region. Your organization requires one metastore per region in which it operates. A single metastore can be attached to multiple workspaces in the same region. Permission grants in a metastore apply to all workspaces attached to that metastore."
+    },
+    {
+      "family": "lakehouse-concurrent-update-conflict",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "Two Lakeflow Jobs owned by a data engineering team run at the same time against the Delta table main.billing.invoices. One runs an UPDATE that flags overdue invoices; the other runs a MERGE that corrects amounts on some of the same invoices. Both start from version 310. The MERGE finishes and commits first. The UPDATE then fails at the end of its run, and the table shows only the MERGE's changes. Which explanation fits?",
+      "options": [
+        {
+          "text": "At commit, the UPDATE found the MERGE's conflicting change and failed",
+          "correct": true,
+          "why": "Delta Lake uses optimistic concurrency: a write reads a snapshot, writes files, then validates before committing. The MERGE had committed changes to the same data after version 310, so the UPDATE failed with a concurrent modification exception instead of corrupting the table."
+        },
+        {
+          "text": "The MERGE locked the table, and the UPDATE timed out waiting for it",
+          "average": true,
+          "why": "Databricks doesn't lock tables for reads or writes, so there is nothing to wait on and deadlock isn't possible. Conflicts are detected when the second writer validates its commit."
+        },
+        {
+          "text": "The MERGE outranked the UPDATE, so the UPDATE was rolled back",
+          "why": "Writers have no priority order. Whichever transaction commits first wins, and a later conflicting transaction fails when it validates."
+        },
+        {
+          "text": "Both jobs corrupted the files they shared, so the UPDATE couldn't read them",
+          "why": "The commit protocol exists to prevent this: a conflicting write fails without corrupting anything, and the MERGE's committed version stays intact."
+        }
+      ],
+      "in_practice": "Because conflicts surface as failures rather than silent overwrites, the fix is scheduling or a retry on the losing job; a rerun reads the new version and applies the overdue flags on top of the corrected amounts.",
+      "source": "https://docs.databricks.com/aws/en/lakehouse/acid",
+      "evidence": "Checks whether the proposed changes conflict with any other changes that may have been concurrently committed since the snapshot that was read. ... If there are conflicts, the write operation fails with a concurrent modification exception. This failure prevents corruption of data."
+    },
+    {
+      "family": "lakehouse-catalog-unit-of-isolation",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team is setting up Unity Catalog in us-east-1 for three business units: finance, marketing and supply chain. Each unit's managed tables must be stored in a separate S3 bucket that the unit owns, and governance should stay as simple as possible. Which design follows Databricks recommendations?",
+      "options": [
+        {
+          "text": "One metastore, with a catalog per unit that has its own managed storage",
+          "correct": true,
+          "why": "Catalogs are the primary unit of data isolation. Giving each unit's catalog a managed location in the unit's bucket stores its managed tables there, while all units share one regional metastore."
+        },
+        {
+          "text": "One metastore per business unit, each with metastore-level storage",
+          "average": true,
+          "why": "Metastores give regional isolation but aren't meant as the default unit of data isolation, and an organization has one metastore per region. Separate metastores would also split grants and lineage."
+        },
+        {
+          "text": "One shared catalog, with a schema per unit writing to one bucket",
+          "why": "A single shared bucket fails the requirement that each unit's data sit in its own bucket, and Databricks prefers catalog-level storage as the primary isolation boundary."
+        },
+        {
+          "text": "External tables for every unit, each pointing at the unit's bucket",
+          "why": "External tables give up the governance and optimization benefits of managed tables, which Databricks recommends for new tables. Separate storage comes from managed locations on catalogs."
+        }
+      ],
+      "in_practice": "Catalog-level storage lets each unit see its data land in a bucket it owns, for its own cost reporting and retention rules, while governance stays in one metastore with one audit trail.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/best-practices",
+      "evidence": "Metastores provide regional isolation but are not intended as default units of data isolation. Data isolation typically begins at the catalog level. ... Give preference to catalog-level storage as your primary unit of data isolation."
+    },
+    {
+      "family": "lakehouse-lineage-temp-table-staging",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly notebook stages rows from main.sales.orders_eu and main.sales.orders_us in a permanent table, main.scratch.orders_stage, and then builds main.reports.all_orders from it. Governance reviewers complain that lineage for all_orders stops at the staging table, and the scratch schema keeps filling up. Which change addresses both problems?",
+      "options": [
+        {
+          "text": "Stage the rows in a table created with CREATE TEMP TABLE",
+          "correct": true,
+          "why": "Temporary tables exist only for the session and add nothing to the catalog. Lineage passes through them, linking the permanent source tables straight to all_orders at table and column level."
+        },
+        {
+          "text": "Drop main.scratch.orders_stage at the end of each run",
+          "average": true,
+          "why": "Dropping the staging table cleans up the schema, but a permanent staging table still appears in lineage as its own node, so all_orders keeps tracing back to it instead of the sources."
+        },
+        {
+          "text": "Replace the staging table with a global temporary view",
+          "why": "Global temp views aren't captured in lineage, so the link from the source tables to all_orders would be lost instead of passed through."
+        },
+        {
+          "text": "Read the staging data by its S3 path, not its table name",
+          "why": "Path-based references lose column-level lineage in Catalog Explorer, which makes the gap worse rather than connecting the sources to all_orders."
+        }
+      ],
+      "in_practice": "Temp-table staging keeps impact analysis honest: a change to orders_eu shows all_orders as a direct downstream consumer, and the catalog isn't cluttered with hundreds of short-lived scratch tables.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage",
+      "evidence": "Temporary tables don't appear in lineage. When a temporary table sits between permanent tables, lineage connects the permanent upstream tables directly to the permanent downstream table, at both the table and column level."
+    },
+    {
+      "family": "lakehouse-time-travel-partial-repair",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "Yesterday at 14:00 a buggy script deleted every row for customer_id 111 from main.sales.orders. Since then, ingestion jobs have committed thousands of valid new orders. A data engineer must bring back customer 111's rows today without losing any of the newer orders. Which approach meets this requirement?",
+      "options": [
+        {
+          "text": "Insert the customer's rows from a TIMESTAMP AS OF read before the delete",
+          "correct": true,
+          "why": "Time travel reads the table as it was before the delete, and inserting only customer 111's rows from that snapshot leaves every newer commit in place. Databricks documents this pattern for fixing accidental deletes."
+        },
+        {
+          "text": "Restore the table to the version committed just before the delete",
+          "average": true,
+          "why": "RESTORE rolls the whole table back, so it would also remove the thousands of valid orders committed since the delete. It suits whole-table rollbacks, not repairing one customer's rows."
+        },
+        {
+          "text": "Run UNDROP TABLE on main.sales.orders to recover the deleted rows",
+          "why": "UNDROP recovers a dropped table. It doesn't bring back rows removed by DELETE from a table that still exists."
+        },
+        {
+          "text": "Clone the table as of yesterday and swap it in for the current one",
+          "why": "Swapping in an older clone loses the newer orders just as RESTORE does, and it also breaks the table's history and downstream references."
+        }
+      ],
+      "in_practice": "A targeted repair from time travel turns a bad delete into a five-minute fix with no data loss, whereas a full RESTORE would force every ingestion job to reload a day of orders.",
+      "source": "https://docs.databricks.com/aws/en/tables/history",
+      "evidence": "To fix accidental deletes to a table for the user 111: INSERT INTO my_table SELECT * FROM my_table TIMESTAMP AS OF date_sub(current_date(), 1) WHERE userId = 111"
+    },
+    {
+      "family": "lakehouse-lineage-retention-system-tables",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "In October 2026 an auditor asks a data engineer which tables fed main.finance.revenue in March 2025. The engineer queries system.access.table_lineage for March 2025 and gets no rows, although the pipeline has run daily since 2024. The metastore was created in 2023. Where can the engineer find that lineage?",
+      "options": [
+        {
+          "text": "In Catalog Explorer's Lineage tab, with the All available range",
+          "correct": true,
+          "why": "Catalog Explorer keeps lineage indefinitely, back to September 1, 2024 for metastores created before that date, which covers March 2025. Its default range is one year, so the engineer must widen it."
+        },
+        {
+          "text": "Nowhere, because lineage older than a year is deleted everywhere",
+          "average": true,
+          "why": "The one-year limit applies to the lineage system tables, which keep a rolling one-year window. Lineage shown in Catalog Explorer is retained indefinitely for data captured after September 1, 2024."
+        },
+        {
+          "text": "In the DESCRIBE HISTORY output for main.finance.revenue",
+          "why": "DESCRIBE HISTORY lists the table's own commits, kept for 30 days by default. It doesn't record which upstream tables fed a write."
+        },
+        {
+          "text": "In system.access.column_lineage, which keeps a longer history",
+          "why": "Both lineage system tables, table_lineage and column_lineage, keep the same rolling one-year window of data."
+        }
+      ],
+      "in_practice": "Knowing which store keeps what lets an audit request be answered in minutes; teams that need lineage queryable in SQL beyond a year can copy the system tables into their own table on a schedule.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage",
+      "evidence": "Lineage data displayed in Catalog Explorer is retained indefinitely. All lineage data captured after September 1, 2024 is available. ... Lineage system tables (system.access.table_lineage and system.access.column_lineage) retain a rolling 1-year window of data."
+    },
+    {
+      "family": "lakehouse-multi-table-atomic-transaction",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A finance data engineer writes a scheduled SQL script that debits one row of main.ledger.accounts, credits another row, and inserts a row into main.ledger.audit_log. Auditors require that all three changes commit together or not at all. Both are Unity Catalog managed Delta tables, and the script runs on a serverless SQL warehouse. Which approach meets the requirement?",
+      "options": [
+        {
+          "text": "Enable catalog commits (Beta) on both tables and use BEGIN ATOMIC ... END",
+          "correct": true,
+          "why": "By default each statement is its own transaction on one table. A BEGIN ATOMIC ... END block commits all of its statements together or rolls them all back, and tables written in such a transaction need catalog commits enabled."
+        },
+        {
+          "text": "Run the three statements in one SQL cell, which commits them together",
+          "average": true,
+          "why": "Each SQL statement commits as its own atomic transaction against one table, whether or not statements share a cell. A failed insert would leave the debit and credit committed."
+        },
+        {
+          "text": "Do the debit and credit in one MERGE and RESTORE if the insert fails",
+          "why": "A MERGE makes the two account changes atomic, but restoring after a failed insert is a manual rollback that can also discard other commits made in the meantime."
+        },
+        {
+          "text": "Set delta.isolationLevel to Serializable on both tables first",
+          "why": "A stricter isolation level changes how conflicts between concurrent writers are detected. It doesn't group statements on different tables into one commit."
+        }
+      ],
+      "in_practice": "One atomic block replaces hand-written compensation logic: a failed audit insert can't leave balances changed without a record, a gap that otherwise takes a reconciliation job to find.",
+      "source": "https://docs.databricks.com/aws/en/lakehouse/acid",
+      "evidence": "By default, each SQL statement executes as its own atomic transaction against one table. You can also group multiple statements across multiple tables into a single atomic transaction using BEGIN ATOMIC ... END; syntax. All changes succeed together or roll back together. Transactions that span multiple tables require catalog commits enabled on participating tables."
+    },
+    {
+      "family": "lakehouse-workspace-storage-bucket",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A cloud admin is cleaning up S3 for a classic Databricks workspace. All business tables live under Unity Catalog external locations, so the admin proposes deleting the workspace storage bucket supplied when the workspace was created. Which concern should a data engineer raise before the deletion?",
+      "options": [
+        {
+          "text": "It holds workspace system data, and deleting it can't be undone",
+          "correct": true,
+          "why": "Classic workspace storage holds system data such as job run results, notebook revisions, cached query results and cluster logs. Databricks warns not to delete or modify it, because a workspace whose storage is deleted can't be recovered."
+        },
+        {
+          "text": "None, because notebooks and job runs live in the control plane",
+          "average": true,
+          "why": "The control plane runs the backend services and their databases, but the workspace also depends on its storage bucket, where run results, notebook revisions and logs are kept."
+        },
+        {
+          "text": "None once DBFS mounts are removed, since it only backs DBFS",
+          "why": "DBFS root may share the bucket, but the bucket also holds workspace system data and, for automatically enabled workspaces, the workspace catalog's storage."
+        },
+        {
+          "text": "It must first be copied, because external tables point into it",
+          "why": "The external tables live under their own external locations, not in the workspace bucket. The risk is losing the system data the workspace itself needs."
+        }
+      ],
+      "in_practice": "Flagging the workspace bucket as do-not-delete in cloud cleanup policies avoids an outage that no backup of business tables can fix, since the workspace itself would have to be rebuilt.",
+      "source": "https://docs.databricks.com/aws/en/getting-started/high-level-architecture",
+      "evidence": "Do not delete or modify the workspace storage in your cloud account. A Databricks workspace depends on both its control plane databases and its workspace storage for correct operation. If workspace storage is deleted, the workspace cannot be recovered."
+    },
+    {
+      "family": "compute-access-mode-auto-ml-runtime",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data scientist creates classic all-purpose compute in the simple form, selects a Databricks Runtime for Machine Learning version, and leaves Access mode at its default of Auto. Which access mode does the compute get?",
+      "options": [
+        {
+          "text": "Dedicated, because Auto picks it for machine learning runtimes",
+          "correct": true,
+          "why": "Auto chooses Standard unless a machine learning runtime, a GPU instance type or a Databricks Runtime below 14.3 is selected, in which case it uses Dedicated."
+        },
+        {
+          "text": "Standard, because Auto always picks the recommended mode",
+          "average": true,
+          "why": "Standard is the recommended mode and what Auto usually picks, but Databricks Runtime for ML isn't supported on standard compute, so Auto switches to Dedicated."
+        },
+        {
+          "text": "No isolation shared, since ML runtimes need full machine access",
+          "why": "No isolation shared is a legacy access mode marked as not recommended, and Auto doesn't select it."
+        },
+        {
+          "text": "Standard, unless the data scientist also picks a GPU instance",
+          "why": "A GPU instance type is one trigger for Dedicated, but the machine learning runtime alone is enough for Auto to choose Dedicated."
+        }
+      ],
+      "in_practice": "Knowing the Auto rules avoids surprises: an ML cluster comes up as dedicated compute for one user or group, so teammates who expected to share it like a standard cluster need a group assignment instead.",
+      "source": "https://docs.databricks.com/aws/en/compute/standard-overview",
+      "evidence": "By default in the UI, access mode is set to Auto, which means the access mode is automatically chosen for you based on your selected Databricks Runtime. Auto defaults to Standard unless a machine learning runtime, a GPU instance type, or a Databricks Runtime lower than 14.3 is selected, in which case Dedicated is used."
+    },
+    {
+      "family": "compute-serverless-versionless-upgrades",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform team runs dozens of Lakeflow Jobs on serverless compute. On classic job clusters, the team spent days each quarter moving jobs to newer Databricks Runtime versions. What must the team do to keep its serverless jobs on current runtime releases?",
+      "options": [
+        {
+          "text": "Nothing; Databricks upgrades the serverless runtime automatically",
+          "correct": true,
+          "why": "Serverless compute is versionless: Databricks upgrades the runtime for all users, while code targets a stable environment version and the underlying server is updated independently."
+        },
+        {
+          "text": "Edit each job to select the newest Databricks Runtime version",
+          "average": true,
+          "why": "Choosing a Databricks Runtime version is the classic model. Serverless doesn't offer runtime versions to pick, because workloads always run on the latest runtime."
+        },
+        {
+          "text": "Recreate the jobs each quarter so they pick up the new runtime",
+          "why": "Nothing needs to be recreated. The same jobs run on the upgraded runtime as Databricks rolls releases out."
+        },
+        {
+          "text": "Pin an LTS runtime in a compute policy applied to the jobs",
+          "why": "Compute policies aren't supported on serverless compute, and serverless doesn't let you pin a Databricks Runtime version."
+        }
+      ],
+      "in_practice": "Versionless compute removes a recurring upgrade project; what remains is choosing an environment version, which Databricks supports for three years, and testing newer ones on the team's own schedule.",
+      "source": "https://docs.databricks.com/aws/en/compute/serverless/",
+      "evidence": "Serverless compute is a versionless product, which means that Databricks automatically upgrades the serverless compute runtime to support enhancements and upgrades to the platform. All users get the same updates, rolled out over a short period of time."
+    },
+    {
+      "family": "compute-serverless-billing-usage-delay",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A FinOps analyst wants the DBU cost of a serverless job run that finished 20 minutes ago. Querying system.billing.usage for the job's ID returns no rows for that run, although earlier runs of the same job appear. What is the most likely explanation?",
+      "options": [
+        {
+          "text": "Usage can take up to 24 hours to appear in the billing table",
+          "correct": true,
+          "why": "There can be a delay of up to 24 hours between running a workload and its usage appearing in the billable usage system table, so a run from minutes ago may not be there yet."
+        },
+        {
+          "text": "Serverless runs are billed only at month end and backfilled",
+          "average": true,
+          "why": "Serverless usage does land in system.billing.usage per workload, as the earlier runs show. The gap is a reporting delay of up to 24 hours, not monthly batching."
+        },
+        {
+          "text": "The run used the serverless jobs SKU, which the table omits",
+          "why": "Serverless jobs usage is recorded in system.billing.usage, which is exactly where the earlier runs of the same job were found."
+        },
+        {
+          "text": "Serverless DBUs are charged to the workspace, not to a job",
+          "why": "Billing records carry usage metadata such as job IDs, which is how the earlier runs could be found. Only the timing differs for this run."
+        }
+      ],
+      "in_practice": "Cost dashboards built on the billing table should treat the latest day as incomplete; alerting on yesterday's totals instead of the last hour avoids false zero-spend readings.",
+      "source": "https://docs.databricks.com/aws/en/compute/serverless/",
+      "evidence": "Yes, there could be up to a 24-hour delay between when you run a workload and its usage being reflected in the billable usage system table."
+    },
+    {
+      "family": "compute-serverless-global-temp-view",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer moves a notebook from classic all-purpose compute to serverless compute. The notebook builds an intermediate result with CREATE GLOBAL TEMP VIEW so that a second notebook, run later in another session, can read it. What should the engineer change for serverless?",
+      "options": [
+        {
+          "text": "Write the result to a table that the second notebook reads",
+          "correct": true,
+          "why": "Global temp views aren't supported on serverless compute. For passing data between sessions, Databricks recommends creating tables, or session temporary views within a session."
+        },
+        {
+          "text": "Nothing, since serverless supports global temp views as classic does",
+          "average": true,
+          "why": "Serverless compute drops several classic features, and global temp views are one of them, so the notebook's CREATE GLOBAL TEMP VIEW won't work there."
+        },
+        {
+          "text": "Cache the result with CACHE TABLE so the next notebook finds it",
+          "why": "CACHE TABLE isn't supported on serverless compute and raises an exception, and a cache wouldn't share data across sessions anyway."
+        },
+        {
+          "text": "Save the result as a file in the notebook's local working directory",
+          "why": "The working directory on serverless isn't guaranteed, and compute-local paths don't persist, so local files aren't a reliable hand-off between sessions."
+        }
+      ],
+      "in_practice": "A table hand-off also survives retries and shows up in lineage, so a two-notebook pipeline becomes restartable instead of depending on one long-lived cluster session.",
+      "source": "https://docs.databricks.com/aws/en/compute/serverless/limitations",
+      "evidence": "Global temp views are not supported. When cross-session data passing is required, Databricks recommends using session temporary views or creating tables."
+    },
+    {
+      "family": "compute-serverless-usage-policy-tags",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A FinOps team attributes classic compute spend with custom cluster tags such as cost_center. Teams are now moving their notebooks and jobs to serverless compute, and the FinOps team needs the same cost_center attribution in billing data. What should the platform team use?",
+      "options": [
+        {
+          "text": "Serverless usage policies that apply the cost_center tag",
+          "correct": true,
+          "why": "Serverless compute has no cluster tags, and notebook tags aren't supported. Serverless usage policies attach custom tags to serverless usage so it can be attributed in billing data."
+        },
+        {
+          "text": "Custom tags set in each notebook's compute settings",
+          "average": true,
+          "why": "Notebook tags aren't supported on serverless, and there is no cluster for custom tags to sit on, so tagging moves to serverless usage policies."
+        },
+        {
+          "text": "Compute policies that require a cost_center tag",
+          "why": "Compute policies govern classic compute configuration and aren't supported on serverless compute."
+        },
+        {
+          "text": "Tags on an instance pool shared by serverless jobs",
+          "why": "Serverless compute doesn't use instance pools, so pool tags never reach serverless usage records."
+        }
+      ],
+      "in_practice": "Setting up usage policies before the migration keeps chargeback reports continuous; otherwise a month of serverless spend lands untagged and has to be split by hand.",
+      "source": "https://docs.databricks.com/aws/en/compute/serverless/limitations",
+      "evidence": "Notebook tags are not supported. Use serverless usage policies to tag serverless usage."
+    },
+    {
+      "family": "compute-streaming-autoscaling-pipelines",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs a 24/7 Structured Streaming job on classic jobs compute with autoscaling enabled. Traffic drops sharply at night, but the cluster rarely shrinks, so the team pays for idle workers. What does Databricks recommend for streaming workloads that need to scale with load?",
+      "options": [
+        {
+          "text": "Run the stream in a Lakeflow pipeline with enhanced autoscaling",
+          "correct": true,
+          "why": "Classic compute autoscaling has limitations scaling down for Structured Streaming. Databricks recommends Lakeflow Spark Declarative Pipelines with enhanced autoscaling for streaming workloads."
+        },
+        {
+          "text": "Lower the cluster's minimum number of workers to one",
+          "average": true,
+          "why": "A lower floor gives the cluster room to shrink, but classic autoscaling's scale-down limits for streaming still apply, so it can stay near its peak size anyway."
+        },
+        {
+          "text": "Enable Spark dynamic allocation on the same cluster",
+          "why": "Databricks warns against Spark dynamic allocation on compute that uses Databricks autoscaling, because the two make conflicting scaling decisions and cause executor churn."
+        },
+        {
+          "text": "Attach the cluster to an instance pool of spot workers",
+          "why": "Pools speed up acquiring instances and spot lowers their price, but neither changes how the cluster decides to scale down."
+        }
+      ],
+      "in_practice": "Enhanced autoscaling sizes a pipeline to its workload, so a stream that needs 20 workers by day can drop to a handful overnight instead of paying for peak capacity around the clock.",
+      "source": "https://docs.databricks.com/aws/en/compute/configure",
+      "evidence": "Compute auto-scaling has limitations scaling down cluster size for Structured Streaming workloads. Databricks recommends using Spark Declarative Pipelines on Lakeflow with enhanced autoscaling for streaming workloads."
+    },
+    {
+      "family": "compute-serverless-seven-day-limit",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer must backfill nine years of clickstream history into a Unity Catalog table. Estimates put a single run of the backfill notebook at about nine days. The team's policy is to run new jobs on serverless compute. How should the engineer run the backfill?",
+      "options": [
+        {
+          "text": "Split it into smaller runs, such as one per year of history",
+          "correct": true,
+          "why": "Serverless compute has a maximum runtime of 7 days; longer runs are terminated by the platform and not retried. Breaking the work into smaller runs, or using classic compute, avoids the limit."
+        },
+        {
+          "text": "Run it as one serverless job with task retries enabled",
+          "average": true,
+          "why": "A run that exceeds 7 days is terminated and isn't retried, so a single nine-day run fails near the end however its retries are set."
+        },
+        {
+          "text": "Run it on serverless with performance-optimized mode off",
+          "why": "Standard mode changes startup latency and cost. It doesn't change the 7-day maximum runtime of serverless compute."
+        },
+        {
+          "text": "Raise spark.databricks.execution.timeout above nine days",
+          "why": "That property sets a query execution timeout, which serverless jobs don't impose by default. The 7-day maximum runtime is a separate platform limit."
+        }
+      ],
+      "in_practice": "Year-sized chunks also make the backfill restartable: a failure on day five costs one chunk of rework, not a nine-day rerun, and chunks can run in parallel to finish sooner.",
+      "source": "https://docs.databricks.com/aws/en/compute/serverless/limitations",
+      "evidence": "Serverless compute has a maximum runtime of 7 days. Runs that exceed 7 days are terminated by the platform and are not retried. To run workloads longer than 7 days, break them into smaller runs or use classic compute."
+    },
+    {
+      "family": "compute-serverless-pipeline-incremental-mv",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer maintains a Lakeflow Spark Declarative Pipelines pipeline on classic compute with a materialized view over a 5 TB orders table that receives a few thousand new rows per hour. Every update recomputes the whole view, and costs keep climbing. The pipeline already uses Unity Catalog. Which change lets the view refresh incrementally?",
+      "options": [
+        {
+          "text": "Switch the pipeline to serverless compute",
+          "correct": true,
+          "why": "Incremental refresh for materialized views is available only on serverless pipelines. On classic compute, materialized views are always fully recomputed."
+        },
+        {
+          "text": "Enable Photon on the classic pipeline cluster",
+          "average": true,
+          "why": "Photon speeds up the recompute, which makes it a common first fix, but on classic compute the materialized view is still fully recomputed on every update."
+        },
+        {
+          "text": "Add more workers to the classic pipeline cluster",
+          "why": "More workers can shorten the full recompute but don't make it incremental, so the cost per update stays high."
+        },
+        {
+          "text": "Convert the materialized view into a standard view",
+          "why": "A standard view recomputes its query on every read, which moves the full computation into each dashboard query instead of making refreshes incremental."
+        }
+      ],
+      "in_practice": "When only a sliver of a 5 TB source changes each hour, incremental refresh processes that sliver instead of the whole table, which can turn an hour-long recompute into minutes of compute.",
+      "source": "https://docs.databricks.com/aws/en/ldp/concepts/serverless-vs-classic-compute",
+      "evidence": "Incremental refresh for materialized views is available only on serverless pipelines. Materialized views that run on classic compute are always fully recomputed."
+    },
+    {
+      "family": "compute-apps-for-webhook-listener",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team needs a service that receives webhook calls from a payment provider around the clock, responds to each HTTP request, and lands the events for downstream processing. A teammate proposes a continuous serverless job whose notebook opens an HTTP listener. Which option does Databricks recommend for the listener?",
+      "options": [
+        {
+          "text": "Databricks Apps, hosting the endpoint as a serverless app",
+          "correct": true,
+          "why": "A workload that answers HTTP requests or holds connections is an application, not a streaming pipeline. Databricks recommends building it with Databricks Apps, its serverless platform for hosting custom applications."
+        },
+        {
+          "text": "A serverless job with a continuous trigger running the listener",
+          "average": true,
+          "why": "A continuous job keeps a notebook running, but Databricks says not to run workloads that listen on a port or respond to HTTP requests as a serverless job."
+        },
+        {
+          "text": "A Lakeflow pipeline in continuous mode that polls the provider",
+          "why": "Continuous pipelines process unbounded data from sources such as storage or message buses. They don't expose an HTTP endpoint that a provider can call."
+        },
+        {
+          "text": "A classic all-purpose cluster running a web server on its driver",
+          "why": "An all-purpose cluster is built for interactive notebooks; keeping one up as a web host is costly and leaves the team managing a cluster that Databricks Apps would replace."
+        }
+      ],
+      "in_practice": "Splitting the listener into an app and the processing into a pipeline lets each scale on its own: the app answers a few requests per second cheaply, while an incremental pipeline batches the landed events.",
+      "source": "https://docs.databricks.com/aws/en/compute/serverless/streaming",
+      "evidence": "A workload that needs to hold a long-lived connection, listen on a port, or respond to incoming HTTP requests is not a streaming pipeline; it is an application. Do not run these workloads on a serverless job."
+    },
+    {
+      "family": "compute-pool-max-capacity-per-team",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "Two data engineering teams share an AWS account whose instance quota allows 100 instances for Databricks classic compute. Last month team A's autoscaling jobs took nearly the whole quota, and team B's nightly jobs failed to start. The platform team wants each team guaranteed a fair share. Which configuration meets this goal?",
+      "options": [
+        {
+          "text": "A pool per team, each with Maximum Capacity set to 50",
+          "correct": true,
+          "why": "Maximum Capacity caps a pool's idle plus in-use instances. Databricks suggests separate capped pools, such as two pools of 50 under a quota of 100, so one team's work can't starve the other's."
+        },
+        {
+          "text": "A shared pool with Minimum Idle Instances set to 50",
+          "average": true,
+          "why": "Minimum idle instances keep capacity warm for faster starts, but they don't cap how many instances either team can take."
+        },
+        {
+          "text": "One pool for both teams with Maximum Capacity of 100",
+          "why": "A single cap at the quota keeps the account under its limit, but team A can still consume all 100 instances and block team B."
+        },
+        {
+          "text": "Autoscaling on every cluster with at most 50 workers",
+          "why": "Per-cluster limits don't cap a team's total, so several team A clusters of 50 workers each would still exhaust the quota."
+        }
+      ],
+      "in_practice": "Capped pools turn a quota outage into a predictable limit: a cluster that asks for more than its team's pool allows fails fast with INSTANCE_POOL_MAX_CAPACITY_FAILURE instead of starving another team's SLA jobs.",
+      "source": "https://docs.databricks.com/aws/en/compute/pools",
+      "evidence": "You want to protect one set of work from impacting another set of work. For example, suppose your instance quota is 100 and you have teams A and B that need to run jobs. You can create pool A with a max 50 and pool B with max 50 so that the two teams share the 100 quota fairly."
+    },
+    {
+      "family": "compute-serverless-no-vpc-peering",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's nightly job on classic jobs compute reads from a PostgreSQL database in another VPC, connected to the workspace VPC by VPC peering. After the team moves the job to serverless compute, every connection to the database times out, while reads from Unity Catalog tables in S3 still work. Which change restores private connectivity?",
+      "options": [
+        {
+          "text": "Create a private endpoint from serverless compute to the database VPC",
+          "correct": true,
+          "why": "Serverless compute doesn't support VPC peering. For private connectivity, you create private endpoints from serverless to resources in your VPC. S3 is a regional service that isn't affected, which is why table reads still work."
+        },
+        {
+          "text": "Add the serverless compute plane to the existing peering connection",
+          "average": true,
+          "why": "Peering is how classic compute reaches resources in the customer network, but serverless compute doesn't support VPC peering, so it can't use that connection."
+        },
+        {
+          "text": "Install the PostgreSQL JDBC driver with an init script on the job",
+          "why": "Serverless compute doesn't support init scripts, and the symptom is network reachability, not a missing driver."
+        },
+        {
+          "text": "Switch the job from standard to performance-optimized mode",
+          "why": "Performance modes change startup latency and cost. They don't change how serverless compute routes traffic to a private network."
+        }
+      ],
+      "in_practice": "Auditing peered data sources before a serverless migration avoids a failed night: each one needs a private endpoint, or a firewall allowlist kept current by automation, since serverless IP addresses can change.",
+      "source": "https://docs.databricks.com/aws/en/compute/serverless/best-practices",
+      "evidence": "Serverless compute does not support VPC peering, which is a common way to connect classic Databricks compute to data sources in your cloud account. Instead, if you require private connectivity from serverless, you can create private endpoints from serverless to resources in your VPC."
+    },
+    {
+      "family": "compute-standard-mode-kinesis-service-credential",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer moves a Structured Streaming job that reads from Amazon Kinesis off a legacy no-isolation cluster and onto classic compute in standard access mode. On the old cluster, an instance profile gave the job access to the stream; on the new cluster, the job can't authenticate to Kinesis. Which change follows Databricks guidance for standard compute?",
+      "options": [
+        {
+          "text": "Create a Unity Catalog service credential and use it to read Kinesis",
+          "correct": true,
+          "why": "Standard compute doesn't support instance profiles that configure access to streaming sources such as Kafka or Kinesis. Databricks directs you to service credentials, the Unity Catalog securable for reaching external cloud services."
+        },
+        {
+          "text": "Attach the same instance profile to the standard access mode cluster",
+          "average": true,
+          "why": "Attaching the profile is how the old cluster worked, but standard access mode doesn't support instance profiles for Kinesis or Kafka streaming sources."
+        },
+        {
+          "text": "Create a storage credential and an external location for the stream",
+          "why": "Storage credentials and external locations govern paths in cloud storage. A Kinesis stream is a cloud service, which is what a service credential covers."
+        },
+        {
+          "text": "Create a Unity Catalog connection object for the Kinesis stream",
+          "why": "Connections store the endpoint and credentials for external database systems, such as federation sources. They aren't used to authenticate to Kinesis."
+        }
+      ],
+      "in_practice": "Service credentials put stream access under Unity Catalog grants and audit, instead of letting anyone who can attach to a cluster with the instance profile reach a production stream.",
+      "source": "https://docs.databricks.com/aws/en/compute/standard-limitations",
+      "evidence": "Instance profiles that configure access to external sources such as Kafka or Kinesis for streaming workloads are not supported. Instead, use service credentials."
+    },
+    {
+      "family": "compute-photon-api-runtime-engine",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A platform team defines its classic job clusters in Jobs API JSON. A data engineer notices that a nightly join job runs much faster on a job cluster created in the UI than on the API-defined cluster, with identical instance types and Databricks Runtime version. The Spark UI for the API-defined run shows no Photon operators in the query DAG. Which explanation fits the difference?",
+      "options": [
+        {
+          "text": "The API needs runtime_engine set to PHOTON; the UI enables it by default",
+          "correct": true,
+          "why": "Databricks enables Photon by default for classic compute created in the UI. Clusters created with the Clusters API or Jobs API must enable it explicitly by setting runtime_engine to PHOTON."
+        },
+        {
+          "text": "Photon falls back to Spark for any job launched through the Jobs API",
+          "average": true,
+          "why": "Photon falls back to Spark only for unsupported operations, such as UDFs. How a cluster was created doesn't cause a fallback; the API cluster never had Photon enabled."
+        },
+        {
+          "text": "Photon needs an LTS runtime, which the API cluster didn't request",
+          "why": "Both clusters run the same Databricks Runtime version, so the runtime isn't the difference; the missing piece is the runtime_engine setting."
+        },
+        {
+          "text": "Photon runs only on serverless compute when jobs come from the API",
+          "why": "Photon is available on classic jobs compute too. It just has to be enabled explicitly when the cluster is defined through the API."
+        }
+      ],
+      "in_practice": "Adding runtime_engine: PHOTON to cluster templates makes API-built jobs match their UI-built twins; for join-heavy nightly jobs that can mean much shorter runs, though Photon instances bill DBUs at a different rate, so compare total cost.",
+      "source": "https://docs.databricks.com/aws/en/compute/photon",
+      "evidence": "For classic all-purpose compute, jobs compute, and classic Lakeflow pipelines, Databricks enables Photon by default. ... If you create these resources using the Clusters API or Jobs API, you must explicitly enable Photon by setting runtime_engine to PHOTON."
+    },
+    {
+      "family": "compute-pool-tags-cloud-resources",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A FinOps team allocates AWS costs to departments using EC2 tags. A department's job cluster has the custom tag dept=risk, and the tag shows up in Databricks billing usage data. But the EC2 instances behind the cluster don't carry the tag, so the AWS bill lists them as unallocated. The cluster's driver and workers come from an instance pool. What should the platform team change?",
+      "options": [
+        {
+          "text": "Add dept=risk as a custom tag on the instance pool",
+          "correct": true,
+          "why": "For compute launched from pools, cluster custom tags apply only to DBU usage reports and don't propagate to cloud resources. Pool tags are applied to the pool's VMs and disks, and pool-backed clusters inherit them."
+        },
+        {
+          "text": "Re-add the tag on the cluster and restart the cluster",
+          "average": true,
+          "why": "Restarting doesn't help: on pool-backed compute, cluster custom tags reach only the DBU usage reports, never the EC2 instances that the pool provides."
+        },
+        {
+          "text": "Require the dept tag on the cluster with a compute policy",
+          "why": "A policy can enforce the tag on the cluster, but it is still a cluster tag, so it doesn't propagate to the pool's instances."
+        },
+        {
+          "text": "Move the cluster's workers from spot to on-demand instances",
+          "why": "Spot or on-demand pricing doesn't affect tagging. The tags are missing because the instances belong to the pool."
+        }
+      ],
+      "in_practice": "Tagging pools per department, or giving each department its own pool, lands both the Databricks DBU charges and the AWS instance charges on the same cost center without manual allocation.",
+      "source": "https://docs.databricks.com/aws/en/compute/configure",
+      "evidence": "Specify tags as key-value pairs when you create compute, and Databricks applies these tags to cloud resources like VMs and disk volumes, as well as the Databricks usage logs. For compute launched from pools, the custom tags are only applied to DBU usage reports and do not propagate to cloud resources."
+    },
+    {
+      "family": "lakehouse-reads-snapshot-isolation",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data analyst starts a 20-minute aggregation over the Delta table main.retail.orders at 09:00. At 09:05, while the aggregation is still running, a Lakeflow Job's MERGE commits a new version of the same table. Which data does the analyst's aggregation read?",
+      "options": [
+        {
+          "text": "The table version that was current when its read began, without the MERGE",
+          "correct": true,
+          "why": "Databricks provides snapshot isolation on reads: a query reads one consistent version of the table, so a write that commits while it runs neither blocks it nor leaks partial changes into its result."
+        },
+        {
+          "text": "The new version, after the query pauses for the MERGE to release its lock",
+          "average": true,
+          "why": "Lock-based databases behave this way, but Delta Lake uses optimistic concurrency control with no locks on reading or writing, so the running query never waits for the MERGE."
+        },
+        {
+          "text": "A mix of old and new files, depending on which files it scans after 09:05",
+          "why": "Snapshot isolation rules out a mixed read: the query keeps reading the version it started from, and the MERGE's files are visible only to reads that start after the commit."
+        },
+        {
+          "text": "No rows, because it fails with a concurrent modification error",
+          "why": "Concurrent modification errors come from conflicting writes detected at commit time; a read-only query isn't validated against later commits, so it completes normally."
+        }
+      ],
+      "in_practice": "Dashboards and ETL can share a table around the clock: a long report never blocks the hourly MERGE and never shows half-applied changes, so no maintenance window is needed for writes.",
+      "source": "https://docs.databricks.com/aws/en/lakehouse/acid",
+      "evidence": "For managing concurrent transactions, Databricks uses optimistic concurrency control. This means that there are no locks on reading or writing against a table, and deadlock is not a possibility. By default, Databricks provides snapshot isolation on reads and write-serializable isolation on writes."
+    },
+    {
+      "family": "lakehouse-transaction-single-log-entry",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly script wraps an UPDATE, a DELETE and a MERGE on main.billing.invoices in one BEGIN ATOMIC ... END block. The table is a Unity Catalog managed table with catalog commits (Beta) enabled. The next morning, an auditor runs DESCRIBE HISTORY on the table. How does last night's transaction appear in the history?",
+      "options": [
+        {
+          "text": "As one new table version that covers all three statements",
+          "correct": true,
+          "why": "Each successful transaction is recorded as a single entry in the table's Delta log, however many statements it ran, and the individual operations are kept as JSON metadata inside that entry."
+        },
+        {
+          "text": "As three new table versions, one for each statement in the block",
+          "average": true,
+          "why": "Outside a transaction each statement commits as its own version, but statements inside BEGIN ATOMIC ... END commit together as one entry in the Delta log."
+        },
+        {
+          "text": "As three new table versions plus a fourth that marks the commit",
+          "why": "A transaction adds neither per-statement versions nor a separate commit marker; the whole transaction becomes one Delta log entry."
+        },
+        {
+          "text": "As no new version until the next OPTIMIZE compacts the changes",
+          "why": "A transaction's changes become a table version when it commits; OPTIMIZE compacts small files and plays no part in recording commits."
+        }
+      ],
+      "in_practice": "One history entry per nightly batch keeps the audit trail readable and gives a single version boundary to roll back to, instead of three separate commits to unpick after a bad run.",
+      "source": "https://docs.databricks.com/aws/en/transactions",
+      "evidence": "Each successful transaction appears as a single entry in the table's Delta log, regardless of how many individual statements ran within the transaction. This allows for a clean audit trail and simplifies rollback operations. Individual operations within a transaction are available as JSON metadata in the Delta log entry for the transaction."
+    },
+    {
+      "family": "lakehouse-dr-deep-clone-secondary-region",
+      "objective": "platform.lakehouse",
+      "guide": "1.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A retailer runs its production lakehouse in us-east-1 and keeps a standby workspace, with its own Unity Catalog metastore, in us-west-2. If all of us-east-1 goes down, 40 critical gold Delta tables must be usable in us-west-2 within hours, and up to a day of data loss is acceptable. The platform team wants the lowest-cost approach that meets this. How should the tables reach us-west-2?",
+      "options": [
+        {
+          "text": "Run Delta deep clones into us-west-2 storage on a daily schedule",
+          "correct": true,
+          "why": "Databricks recommends Delta Deep Clone to replicate critical tables across regions: a deep clone copies the data files as well as the metadata, so the copy in us-west-2 stands on its own when us-east-1 is lost."
+        },
+        {
+          "text": "Create shallow clones in us-west-2, which copy only table metadata",
+          "average": true,
+          "why": "Shallow clones are cheaper, but they reference the source table's data files, which stay in us-east-1 storage, so they become unreadable in exactly the regional outage the plan must survive."
+        },
+        {
+          "text": "Share the tables to the us-west-2 metastore with OpenSharing",
+          "why": "A share gives the standby region live read access to data that still lives in us-east-1; it creates no second copy, so it fails along with the primary region."
+        },
+        {
+          "text": "Rely on the control plane's automatic failover between zones",
+          "why": "Control plane high availability recovers from the loss of one availability zone within a region; a full regional outage is a disaster recovery case that needs data replicated to another region."
+        }
+      ],
+      "in_practice": "A daily deep clone gives an RPO of about a day for the cost of a second copy of the data; because deep clones can be synced incrementally, tables that need a tighter RPO can simply be cloned more often.",
+      "source": "https://docs.databricks.com/aws/en/lakehouse-architecture/deployment-guide/ha-dr",
+      "evidence": "Disaster recovery is the ability to recover from an outage affecting an entire cloud region and continue business operations in a secondary region. ... Delta tables: Delta Deep Clone for replicating tables across regions. ... Use Delta Deep Clone to replicate critical tables across regions."
+    },
+    {
+      "family": "compute-group-cluster-group-privileges",
+      "objective": "platform.compute",
+      "guide": "1.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data science team shares classic all-purpose compute in dedicated access mode on Databricks Runtime 15.4 LTS, assigned to its group ds_team. Maya, a team member, holds SELECT on main.hr.salaries from a separate project, but ds_team has no grant on that table. Her query of main.hr.salaries works on a SQL warehouse but fails with a permission error on the group compute. What explains this?",
+      "options": [
+        {
+          "text": "Commands on group compute run with ds_team's privileges, not Maya's own",
+          "correct": true,
+          "why": "On compute dedicated to a group, a member's permissions are down-scoped to the group's, so every query runs with the group's privileges; ds_team itself needs SELECT on the table."
+        },
+        {
+          "text": "Dedicated access mode applies only the privileges of the compute's creator",
+          "average": true,
+          "why": "Dedicated access mode can be assigned to a single user or to a group; when it is assigned to a group, the group's privileges apply, not those of the creator or of the individual member."
+        },
+        {
+          "text": "Her grant reaches classic compute only after the compute is restarted",
+          "why": "Restarting the compute doesn't change whose privileges apply; on group compute the group's privileges govern every query, so the query would fail again after a restart."
+        },
+        {
+          "text": "Group compute can read only tables stored in the group's workspace folder",
+          "why": "The group folder holds notebooks, experiments and other workspace assets; table access on group compute is governed by the group's Unity Catalog privileges, not by folder location."
+        }
+      ],
+      "in_practice": "Granting data to the group rather than to members keeps results identical for everyone on the shared compute, and the audit log still records both identities, run_by for the user and run_as for the group.",
+      "source": "https://docs.databricks.com/aws/en/compute/group-access",
+      "evidence": "When a user is connected to a compute resource dedicated to a group (a group cluster), the user's permissions automatically down-scopes to the group's permissions. ... All commands, queries, and other actions performed on a group cluster use the permissions assigned to the group, not the individual user."
+    }
+  ]
+}

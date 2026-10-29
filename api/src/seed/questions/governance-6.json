@@ -1,0 +1,345 @@
+{
+  "items": [
+    {
+      "family": "privileges-metastore-grant-no-name",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A metastore admin must let the `platform-leads` group create new catalogs in the Unity Catalog metastore that is attached to the workspace. Which SQL statement does this?",
+      "options": [
+        { "text": "GRANT CREATE CATALOG ON METASTORE TO `platform-leads`", "correct": true, "why": "Metastore privileges are granted with ON METASTORE and no name, because the metastore attached to the workspace is assumed. CREATE CATALOG is a metastore-level privilege that a metastore admin or account admin can grant." },
+        { "text": "GRANT CREATE CATALOG ON METASTORE prod_us_east TO `platform-leads`", "average": true, "why": "Naming the metastore feels natural because every other securable is named, but a metastore grant leaves the name out: it always targets the metastore attached to the current workspace." },
+        { "text": "GRANT CREATE SCHEMA ON CATALOG main TO `platform-leads`", "why": "CREATE SCHEMA on a catalog lets the group add schemas inside main. It doesn't let the group create new catalogs in the metastore." },
+        { "text": "GRANT ALL PRIVILEGES ON METASTORE TO `platform-leads`", "why": "ALL PRIVILEGES isn't listed among the privileges that apply to a metastore; catalog creation is delegated with the specific CREATE CATALOG privilege." }
+      ],
+      "in_practice": "Delegating CREATE CATALOG to a small leads group lets domain teams set up their own catalogs without queuing for the metastore admin, while everyone else still can't add top-level containers.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/",
+      "evidence": "Grant permissions on a metastore. Permissions required: Metastore admin or account admin. ... GRANT <privilege-type> ON METASTORE TO <principal>; When you grant privileges on a metastore, you do not include the metastore name, because the metastore that is attached to your workspace is assumed."
+    },
+    {
+      "family": "privileges-account-group-not-workspace-local",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer must give the claims analysts SELECT on a Unity Catalog table. Two groups contain exactly those people: `claims-analysts-ws`, a legacy workspace-local group created years ago in the workspace admin settings, and `claims-analysts`, an account group synced from the identity provider. Which group can receive the grant?",
+      "options": [
+        { "text": "The account group, because only account groups can be granted Unity Catalog access", "correct": true, "why": "Account groups can be granted access to data in a Unity Catalog metastore. Workspace-local groups are legacy groups limited to the workspace that created them, and they can't be granted access to Unity Catalog data." },
+        { "text": "The workspace-local group, because the table is queried from that workspace", "average": true, "why": "Using the group that lives where the queries run seems logical, but workspace-local groups can't be granted access to Unity Catalog data at all; Databricks recommends converting them to account groups." },
+        { "text": "Either group, as long as the name is wrapped in backticks in the GRANT", "why": "Backticks only quote principal names that contain special characters such as hyphens. They don't make a workspace-local group eligible for Unity Catalog grants." },
+        { "text": "Neither group, so the grant must go to each member's user account", "why": "Account groups are valid Unity Catalog principals, and Databricks recommends granting privileges to groups rather than to individual users so access scales with membership." }
+      ],
+      "in_practice": "Granting to an identity-provider-synced account group means joiners and leavers are handled by the IdP, and one group serves every workspace the team uses instead of a copy per workspace.",
+      "source": "https://docs.databricks.com/aws/en/admin/users-groups/groups",
+      "evidence": "Account groups can be granted access to data in a Unity Catalog metastore. Known as workspace-local groups, these are legacy groups that used only within the workspace in which they were created. They cannot be assigned to other workspaces, granted access to Unity Catalog data, or assigned account-level roles."
+    },
+    {
+      "family": "privileges-view-owner-describe-extended",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "During an access review, a data engineer must confirm with SQL which principal currently owns the table main.sales.orders. The table was created two years ago, and its ownership may have been transferred since then. Which statement shows the current owner?",
+      "options": [
+        { "text": "DESCRIBE TABLE EXTENDED main.sales.orders", "correct": true, "why": "DESCRIBE <securable-type> EXTENDED returns the object's details, including its current owner. Any user with BROWSE on the object or one of its parents can view the owner this way." },
+        { "text": "DESCRIBE HISTORY main.sales.orders, reading the first version's user", "average": true, "why": "The table history records who ran each operation, so its first version shows the creator. If ownership was transferred later, the creator is no longer the owner." },
+        { "text": "SHOW GRANTS ON TABLE main.sales.orders, finding ALL PRIVILEGES", "why": "Owners have every capability implicitly, but Databricks doesn't explicitly grant them ALL PRIVILEGES, so SHOW GRANTS doesn't reveal who the owner is." },
+        { "text": "SHOW GRANTS ON SCHEMA main.sales, finding the owner row", "why": "SHOW GRANTS lists privilege grants, and ownership isn't a grant, so the parent schema's grants don't name the table's owner either." }
+      ],
+      "in_practice": "Ownership decides who can grant, transfer and drop an object, so reviews that read the owner from DESCRIBE rather than from history catch tables still owned by people who have left.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/",
+      "evidence": "You can use Catalog Explorer or SQL statements to view an object's owner. Permissions required: Any user with the BROWSE privilege on the object or a parent of the object can view the object owner. ... DESCRIBE <securable-type> EXTENDED <catalog>.<schema>.<securable-name>;"
+    },
+    {
+      "family": "privileges-volume-upload-files",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 1,
+      "type": "multiple",
+      "stem": "A service principal must upload vendor CSV files into the existing managed volume ops.landing.vendor_files and list them afterward. It already has USE CATALOG on ops and USE SCHEMA on ops.landing. Which two privileges on the volume does it need? (Choose two.)",
+      "options": [
+        { "text": "READ VOLUME", "correct": true, "why": "Reading or listing files in a volume requires READ VOLUME, and Databricks lists READ VOLUME together with WRITE VOLUME for creating, deleting or updating files." },
+        { "text": "WRITE VOLUME", "correct": true, "why": "WRITE VOLUME lets a principal add, modify or delete files in a volume. With READ VOLUME and the usage privileges on the parents, it covers uploading files." },
+        { "text": "MODIFY", "average": true, "why": "MODIFY is the write privilege for table data. Volumes have their own file privileges, and MODIFY isn't one of the privileges that apply to a volume." },
+        { "text": "WRITE FILES", "why": "WRITE FILES applies to an external location for direct path access, which Databricks recommends against; files inside a volume are governed by READ VOLUME and WRITE VOLUME." },
+        { "text": "CREATE VOLUME", "why": "CREATE VOLUME is granted on a schema to create new volumes. Uploading files into a volume that already exists doesn't need it." }
+      ],
+      "in_practice": "Granting file access on the volume rather than on the bucket path keeps vendor uploads governed and audited in Unity Catalog, and switching vendors later means changing grants on one object.",
+      "source": "https://docs.databricks.com/aws/en/volumes/privileges",
+      "evidence": "Read or list files: USE CATALOG, USE SCHEMA, READ VOLUME. Create, delete, or update files: USE CATALOG, USE SCHEMA, READ VOLUME, WRITE VOLUME."
+    },
+    {
+      "family": "privileges-execute-single-function",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Analysts in the `bi-analysts` group must call the SQL UDF main.util.normalize_sku in their queries. They already have USE CATALOG on main and USE SCHEMA on main.util, and the schema also holds functions they shouldn't use. Following Databricks' least-privilege advice, which statement should a data engineer run?",
+      "options": [
+        { "text": "GRANT EXECUTE ON FUNCTION main.util.normalize_sku TO `bi-analysts`", "correct": true, "why": "EXECUTE lets a principal invoke a function and view its definition. Databricks recommends granting EXECUTE on individual functions, together with USE CATALOG and USE SCHEMA on the parents." },
+        { "text": "GRANT EXECUTE ON SCHEMA main.util TO `bi-analysts`", "average": true, "why": "A schema-level EXECUTE works, but it covers every current and future function in main.util, including the ones the analysts shouldn't call." },
+        { "text": "GRANT SELECT ON FUNCTION main.util.normalize_sku TO `bi-analysts`", "why": "SELECT applies to tables, views, materialized views and shares. Invoking a function requires EXECUTE." },
+        { "text": "GRANT USAGE ON FUNCTION main.util.normalize_sku TO `bi-analysts`", "why": "USAGE belongs to the legacy Hive metastore privilege model and isn't a Unity Catalog privilege; calling a function in Unity Catalog requires EXECUTE." }
+      ],
+      "in_practice": "Function-level grants matter when a schema mixes harmless helpers with sensitive ones such as decryption UDFs; a schema-wide EXECUTE would quietly expose every new function a teammate adds.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/privileges-reference",
+      "evidence": "Following the principle of least privilege, Databricks recommends granting EXECUTE on individual functions. You can also grant EXECUTE on a schema or catalog to allow a user to execute all current and future functions within that schema or catalog."
+    },
+    {
+      "family": "privileges-ownership-not-inherited-creator",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "The catalog finance is owned by the `finance-admins` group. A data engineer who isn't in that group creates the table finance.core.payments with CREATE TABLE. Who owns the new table?",
+      "options": [
+        { "text": "The data engineer, because the creator becomes the owner", "correct": true, "why": "The principal that creates an object becomes its initial owner, and ownership doesn't inherit downward. The finance-admins group can still manage the table through catalog ownership, but it doesn't own the table." },
+        { "text": "The finance-admins group, because it owns the parent catalog", "average": true, "why": "Owning a catalog gives the ability to manage its child objects, but it doesn't make the catalog owner the owner of tables that others create inside it." },
+        { "text": "The owner of the finance.core schema that contains the table", "why": "Schema ownership doesn't pass down either; like catalog ownership, it gives the ability to manage the table, not ownership of it." },
+        { "text": "The metastore admin, until someone transfers the ownership", "why": "Unity Catalog makes the creating principal the owner when the object is created; ownership isn't parked with the metastore admin." }
+      ],
+      "in_practice": "Because tables belong to whoever creates them, production pipelines should run as a service principal or hand tables to a group with ALTER ... OWNER TO, so ownership doesn't leave with one person.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/permissions-concepts",
+      "evidence": "The principal that creates an object becomes its initial owner. ... Ownership doesn't inherit downward in Unity Catalog. However, object owners do automatically have the ability to manage all child objects."
+    },
+    {
+      "family": "privileges-metastore-admin-no-direct-access",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A compliance officer asks a data platform lead whether members of the group assigned as metastore admin can query every table in the metastore by default. What is the accurate answer?",
+      "options": [
+        { "text": "No; they lack direct access but can grant it to themselves, and that is audit-logged", "correct": true, "why": "Metastore admins can transfer ownership of any object to themselves or grant access, so their access to data is indirect. There is no direct access by default, and permission grants are audit-logged." },
+        { "text": "Yes; the metastore admin role includes SELECT on every table in the metastore", "average": true, "why": "The role is powerful, but its default privileges are metastore-level ones such as CREATE CATALOG. Reading a table still takes a grant the admin would have to make, and that grant is audit-logged." },
+        { "text": "No; metastore admins can never read data, even by granting themselves privileges", "why": "Metastore admins can manage privileges and transfer ownership of any object in the metastore, so they can give themselves access; they just don't have it by default." },
+        { "text": "Only for tables in catalogs created after they became metastore admin", "why": "Nothing in the role depends on when a catalog was created; metastore admins have no direct data access to any catalog by default." }
+      ],
+      "in_practice": "Because self-grants are audit-logged, security teams can alert on grants made by metastore admins and keep the role to a small group instead of trusting it blindly.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/admin-privileges",
+      "evidence": "Grant access to data: Grant anyone read and write access to any data in the metastore. This ability is indirect because metastore admins can transfer ownership of any object to themselves. There is no direct access by default. Permission grants are audit-logged."
+    },
+    {
+      "family": "privileges-refresh-materialized-view",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Before each board meeting, a BI lead must manually refresh the materialized view sales.gold.daily_kpis, which a data engineer created in Databricks SQL. The lead already has SELECT on it and the usage privileges on its parents, and must not become its owner. Which privilege should the engineer grant?",
+      "options": [
+        { "text": "REFRESH on the materialized view", "correct": true, "why": "REFRESH lets a user manually trigger a refresh of a materialized view, as long as the user also has USE CATALOG and USE SCHEMA on its parents." },
+        { "text": "MODIFY on the materialized view", "average": true, "why": "A refresh rewrites the view's data, so MODIFY sounds right, but MODIFY isn't one of the privileges that apply to a materialized view; the right to refresh comes from REFRESH." },
+        { "text": "MANAGE on the materialized view", "why": "MANAGE lets someone grant privileges on, transfer ownership of and drop the view, which is far more than refreshing it requires." },
+        { "text": "CREATE MATERIALIZED VIEW on the schema", "why": "CREATE MATERIALIZED VIEW lets the lead create new materialized views in the schema; it gives no right to refresh one that already exists." }
+      ],
+      "in_practice": "Granting REFRESH lets business users pull fresh numbers on demand before key meetings without filing a ticket, while the engineering team keeps ownership of the definition.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/privileges-reference",
+      "evidence": "REFRESH. Applicable object types: MATERIALIZED VIEW. Allows a user to refresh a materialized view. The user must also have USE SCHEMA on the parent schema and USE CATALOG on the parent catalog."
+    },
+    {
+      "family": "privileges-service-principal-user-role",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer created the service principal `etl-prod-sp` last month and so holds the Service Principal Manager role on it. When the engineer edits a production job they own and tries to set its Run as identity to etl-prod-sp, the change is rejected. What does the engineer need?",
+      "options": [
+        { "text": "The Service Principal User role on etl-prod-sp", "correct": true, "why": "The Service Principal User role is what lets a user run jobs as a service principal. Service Principal Manager doesn't include it, so even the creator must be assigned the User role explicitly." },
+        { "text": "CAN MANAGE permission on the job, as well as ownership", "average": true, "why": "Job permissions decide who can edit and run the job, and as its owner the engineer already has them. Running as a service principal is controlled by roles on the service principal itself." },
+        { "text": "An OAuth secret generated for etl-prod-sp", "why": "OAuth secrets let tools authenticate as the service principal. They aren't what allows a user to pick it as a job's Run as identity." },
+        { "text": "USE CATALOG and SELECT for etl-prod-sp on the job's tables", "why": "The service principal will need data privileges for the job to succeed, but those grants don't decide whether the engineer may set it as the Run as identity." }
+      ],
+      "in_practice": "Assigning the User role to a deployment group rather than to individuals lets any on-call engineer move a job onto its service principal, while the Manager role stays with a few administrators.",
+      "source": "https://docs.databricks.com/aws/en/security/auth/access-control/service-principal-acl",
+      "evidence": "Service Principal User allows workspace users to run jobs as the service principal. ... Users with the Service Principal Manager role do not inherit the Service Principal User role. If you want to use the service principal to execute jobs, you need to explicitly assign yourself the service principal user role, even after creating the service principal."
+    },
+    {
+      "family": "privileges-show-grants-own-only",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer with SELECT on main.finance.ledger runs SHOW GRANTS ON TABLE main.finance.ledger to prepare an access review, and the output lists only the engineer's own grants. When the table's owner runs the same command, it lists every principal's grants. What explains the difference?",
+      "options": [
+        { "text": "Seeing all grants takes ownership, MANAGE, READ METADATA or metastore admin", "correct": true, "why": "Metastore admins, the object's owner, the owner of its catalog or schema, and users with MANAGE or READ METADATA on the object can see all grants. Anyone else sees only their own grants on it." },
+        { "text": "Listing other principals' grants needs BROWSE on the catalog", "average": true, "why": "BROWSE exposes names, descriptions and tags for discovery, not security-sensitive metadata such as grants. Seeing every grant takes READ METADATA, MANAGE or ownership." },
+        { "text": "Grants on a table are visible only with SELECT on its schema", "why": "SELECT gives access to data, not to an object's grants; holding it on the schema wouldn't reveal other principals' grants on the table." },
+        { "text": "SHOW GRANTS lists only grants made from the current workspace", "why": "Unity Catalog grants live in the metastore, not in a workspace. The difference comes from the engineer lacking permission to view other principals' grants." }
+      ],
+      "in_practice": "For recurring access reviews, granting READ METADATA to the reviewers' group lets them see every grant without being able to change any, instead of borrowing an owner's account.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/",
+      "evidence": "Metastore admins, users with the READ METADATA or MANAGE privilege on the object, the owner of the object, or the owner of the catalog or schema that contains the object can see all grants on the object. If you do not have the above permissions, you can view only your own grants on the object."
+    },
+    {
+      "family": "privileges-read-metadata-on-metastore",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A security audit team must inspect grants, row filters, column masks and ABAC policies on every object in the metastore, including catalogs that teams create later. The auditors must not read any table data or change anything. Which grant should a metastore admin make to the `security-auditors` group?",
+      "options": [
+        { "text": "GRANT READ METADATA ON METASTORE TO `security-auditors`", "correct": true, "why": "READ METADATA shows owner-level metadata such as grants, filters, masks and policies without data or modify access. Unlike other metastore-level privileges, it inherits to every object in the metastore, including future ones." },
+        { "text": "GRANT BROWSE ON CATALOG <each catalog> TO `security-auditors`", "average": true, "why": "BROWSE supports discovery with names, descriptions and tags. It doesn't expose grants, filters, masks or policies, and per-catalog grants would miss catalogs created later." },
+        { "text": "GRANT MANAGE ON CATALOG <each catalog> TO `security-auditors`", "why": "MANAGE would show the metadata, but it also lets the auditors grant privileges, transfer ownership and drop objects, and per-catalog grants miss new catalogs." },
+        { "text": "GRANT ALL PRIVILEGES ON CATALOG <each catalog> TO `security-auditors`", "why": "ALL PRIVILEGES gives data access such as SELECT and MODIFY, and it doesn't include READ METADATA at all." }
+      ],
+      "in_practice": "One metastore-level READ METADATA grant gives auditors and SREs a read-only view of every access control, so new catalogs are covered on day one without anyone remembering to add a grant.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/privileges-reference",
+      "evidence": "No usage privileges are required when READ METADATA is granted on the metastore or on a catalog. ... Unlike other metastore-level privileges, READ METADATA granted on the metastore also inherits down to all objects in the metastore."
+    },
+    {
+      "family": "privileges-workspace-catalog-default-grants",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "In a workspace that was enabled for Unity Catalog automatically, a newly added analyst creates a table in the default schema of the workspace catalog on day one, although nobody granted the analyst anything. A security reviewer asks a data engineer why this worked. What is the explanation?",
+      "options": [
+        { "text": "Workspace users get USE CATALOG on it and CREATE TABLE in its default schema", "correct": true, "why": "All workspace users receive USE CATALOG on the workspace catalog, plus USE SCHEMA, CREATE TABLE and other create privileges on its default schema, so the analyst needed no extra grant." },
+        { "text": "New users join the account users group, which owns the workspace catalog", "average": true, "why": "Workspace admins, not all account users, are the default owners of the workspace catalog. The analyst's rights come from the default grants to workspace users." },
+        { "text": "Every user receives CREATE TABLE on the metastore when added", "why": "CREATE TABLE is granted on schemas or catalogs, not on the metastore. The analyst's right comes from default grants on the workspace catalog's default schema." },
+        { "text": "Workspace users hold ALL PRIVILEGES on the whole workspace catalog", "why": "The defaults are narrower: USE CATALOG on the catalog, and USE SCHEMA plus a set of create privileges on the default schema, not ALL PRIVILEGES on everything." }
+      ],
+      "in_practice": "Treat the workspace catalog's default schema as a sandbox and keep shared, governed data in separate catalogs, where only explicit grants decide who can create or read tables.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/",
+      "evidence": "Workspace admins are the default owners of the workspace catalog. ... All workspace users receive the USE CATALOG privilege on the workspace catalog. Workspace users also receive the USE SCHEMA, CREATE TABLE, CREATE VOLUME, CREATE MODEL, CREATE FUNCTION, and CREATE MATERIALIZED VIEW privileges on the default schema in the catalog."
+    },
+    {
+      "family": "privileges-pipeline-dataset-owner-run-as",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "The materialized view sales.gold.daily_revenue is defined in a Lakeflow Spark Declarative Pipeline that runs as an engineer who is leaving the company. The platform team wants the service principal `sales-etl-sp` to own the view from now on. Which approach works?",
+      "options": [
+        { "text": "Set the pipeline's run-as to sales-etl-sp; the next refresh makes it the owner", "correct": true, "why": "Materialized views and streaming tables created by Lakeflow pipelines can't have their ownership transferred directly. Changing the pipeline's run-as user updates the owner on the next refresh." },
+        { "text": "Run ALTER MATERIALIZED VIEW sales.gold.daily_revenue OWNER TO sales-etl-sp", "average": true, "why": "Direct ownership transfer works for materialized views created with Databricks SQL, but not for datasets that a Lakeflow pipeline manages; their owner follows the pipeline's run-as user." },
+        { "text": "Grant sales-etl-sp MANAGE on the materialized view", "why": "MANAGE lets the service principal administer grants on the view, but it doesn't make it the owner, and the view stays tied to the departing engineer's identity." },
+        { "text": "Change the owner on the view's Overview tab in Catalog Explorer", "why": "Pipeline-created datasets can't have their ownership transferred directly by any route, including Catalog Explorer; the owner follows the pipeline's run-as user." }
+      ],
+      "in_practice": "Tying dataset ownership to a pipeline's service principal turns offboarding into one run-as change, instead of failed refreshes and orphaned tables after the engineer's account is removed.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/",
+      "evidence": "Materialized views and streaming tables created with Lakeflow pipelines can't have their ownership directly transferred. Instead, change the run-as user of the pipeline that owns the datasets. With the next refresh, the owner will be updated to the run-as user."
+    },
+    {
+      "family": "privileges-fine-grained-insert-append",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "(Beta) A service principal on serverless compute only appends rows to main.bronze.click_events with INSERT INTO; it never updates, deletes or changes the schema. Security asks a data engineer for grants narrower than MODIFY, using the fine-grained DML privileges. Which set should the engineer grant?",
+      "options": [
+        { "text": "USE CATALOG and USE SCHEMA, plus SELECT and INSERT on the table", "correct": true, "why": "INSERT is a least-privilege alternative to MODIFY, and INSERT INTO needs only INSERT. Like MODIFY, it also requires SELECT on the table and USE CATALOG and USE SCHEMA on the parents." },
+        { "text": "USE CATALOG and USE SCHEMA, plus SELECT and MODIFY on the table", "average": true, "why": "This works and is the familiar grant, but MODIFY gives full write access, including updates, deletes and schema changes, which security asked to avoid." },
+        { "text": "USE CATALOG and USE SCHEMA, plus INSERT alone on the table", "why": "INSERT on its own isn't enough: a principal exercising INSERT, UPDATE or DELETE must also have SELECT on the table." },
+        { "text": "USE CATALOG and USE SCHEMA, plus SELECT, INSERT and DELETE", "why": "DELETE is needed for operations that remove data, such as INSERT OVERWRITE or TRUNCATE, not for plain appends, so it exceeds what this job needs." }
+      ],
+      "in_practice": "Append-only grants mean a bug or leaked credential in an ingestion job can add bad rows but can't delete history, so recovery is a cleanup rather than a restore.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/fine-grained-dml-privileges",
+      "evidence": "The fine-grained DML privileges INSERT, UPDATE, and DELETE are least-privilege alternatives to MODIFY on Unity Catalog tables. ... To exercise any of these privileges, a principal must also have the following privileges: SELECT on the table, USE SCHEMA on the parent schema, USE CATALOG on the parent catalog."
+    },
+    {
+      "family": "privileges-workspace-catalog-binding",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "The `analysts` group holds SELECT on tables in prod_catalog and queries them from two production workspaces. Compliance now requires that prod_catalog can't be queried from the dev workspace, which is attached to the same metastore, while analysts keep their production access. What should the catalog owner do?",
+      "options": [
+        { "text": "Bind prod_catalog to the two production workspaces only", "correct": true, "why": "Workspace-catalog binding restricts a catalog to specific workspaces. Access from an unbound workspace is denied even for users with explicit grants, so production access stays unchanged." },
+        { "text": "Revoke the analysts' grants, then re-grant them in production", "average": true, "why": "Grants live in the metastore and apply from every attached workspace, so they can't be re-granted per workspace; limiting which workspaces reach a catalog is what binding is for." },
+        { "text": "Run DENY SELECT ON CATALOG prod_catalog in the dev workspace", "why": "The DENY statement isn't supported in Unity Catalog; it applies only to the legacy hive_metastore catalog." },
+        { "text": "Detach the dev workspace from the Unity Catalog metastore", "why": "Detaching would cut the dev workspace off from every catalog in the metastore, not just prod_catalog, and break legitimate development work." }
+      ],
+      "in_practice": "Binding prod to production workspaces keeps dev notebooks from reading or accidentally writing live data, and a read-only binding can open a reporting workspace without any write risk.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/workspace-catalog-binding",
+      "evidence": "In Unity Catalog, all catalogs are accessible by default from any workspace attached to the same metastore. Workspace-catalog binding lets you override this default to restrict a catalog to one or more specific workspaces. Access from an unbound workspace is denied, even for users with explicit privilege grants on the catalog."
+    },
+    {
+      "family": "privileges-metastore-admin-takeover",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "The catalog marketing was owned by an engineer's user account, which was deleted when the engineer left. The workspace was enabled for Unity Catalog automatically, and no metastore admin has been assigned. A workspace admin tries to transfer the catalog to the `marketing-owners` group and to grant privileges on it, but both fail. What should the team do?",
+      "options": [
+        { "text": "Have an account admin assign a metastore admin group, which then transfers ownership", "correct": true, "why": "Workspace admins can create objects but can't grant on or transfer objects they don't own. Taking over a catalog whose owner was removed needs a metastore admin, which an account admin assigns, ideally as a group." },
+        { "text": "Wait for ownership to pass automatically to the workspace admins group", "average": true, "why": "Ownership isn't reassigned when the owner's account is removed; taking over such a catalog is exactly the case that requires a metastore admin." },
+        { "text": "Have the workspace admin grant themselves MANAGE on the catalog first", "why": "Granting MANAGE is itself a grant on an object the workspace admin doesn't own, which is what workspace admins can't do here." },
+        { "text": "Drop the catalog and recreate it under the marketing-owners group", "why": "Dropping a catalog also requires ownership or MANAGE, which the workspace admin lacks, and it would destroy the catalog's contents instead of taking them over." }
+      ],
+      "in_practice": "Making the metastore admin a small group rather than a person avoids this lockout, and production catalogs owned by groups don't get stranded when one person leaves.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/admin-privileges",
+      "evidence": "Change ownership of objects or grant privileges on objects that you do not own. For example, this is required when taking over a catalog after the original owning account is removed. Workspace admins can create objects but cannot make grants on or change ownership of existing objects they do not own."
+    },
+    {
+      "family": "privileges-view-owner-transfer-restricted",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer owns both the table main.bi.revenue and the view main.bi.revenue_v. Yesterday the engineer transferred the table to the `bi-owners` group, which they don't belong to, without trouble. Today ALTER VIEW main.bi.revenue_v OWNER TO `bi-owners` fails. What explains this?",
+      "options": [
+        { "text": "Owners can transfer a view only to themselves or a group they belong to", "correct": true, "why": "To prevent privilege escalation, only a metastore admin can transfer a view, function or model to any principal. Owners and MANAGE holders can transfer them only to their own username or a group they're a member of." },
+        { "text": "The engineer needs MANAGE on the view in addition to owning it", "average": true, "why": "Ownership already includes the right to transfer ownership, and MANAGE holders face the same restriction on views as owners, so adding MANAGE wouldn't help." },
+        { "text": "Views can't be owned by groups, only by users or service principals", "why": "Groups can own views; Databricks even suggests transferring a view to a group to enable collaborative editing. The limit is on who may transfer it to an arbitrary group." },
+        { "text": "ALTER VIEW can't change ownership; only Catalog Explorer can", "why": "ALTER <securable-type> ... OWNER TO works for views as well as tables. The refusal comes from the rule on who may transfer a view, whichever tool is used." }
+      ],
+      "in_practice": "A view's owner decides what data it exposes, so teams handing views to a reporting group either ask a metastore admin to do the transfer or add the engineer to the group first.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/",
+      "evidence": "To prevent privilege escalations, only a metastore admin can transfer ownership of a view, function, or model to any user, service principal, or group in the account. Current owners and users with the MANAGE privilege are restricted to transferring ownership to their username or to a group that they are member of."
+    },
+    {
+      "family": "privileges-revoke-modify-keeps-insert",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "(Beta) The `contractors` group writes to main.bronze.orders. SHOW GRANTS on the table lists SELECT, INSERT and MODIFY for the group, all granted directly, with no write grants on the schema or catalog. Under a new contract the group may only query the data. What should a data engineer run so the group keeps SELECT but can no longer change any rows?",
+      "options": [
+        { "text": "REVOKE MODIFY, INSERT ON TABLE main.bronze.orders FROM `contractors`", "correct": true, "why": "INSERT is a child of MODIFY, and composite and child privileges are granted and revoked independently. Revoking MODIFY alone leaves the explicitly granted INSERT, so both must be revoked." },
+        { "text": "REVOKE MODIFY ON TABLE main.bronze.orders FROM `contractors`", "average": true, "why": "Revoking the composite MODIFY doesn't revoke a child privilege that was granted explicitly, so the group could still append rows through INSERT." },
+        { "text": "REVOKE INSERT ON TABLE main.bronze.orders FROM `contractors`", "why": "MODIFY on its own grants full write access to the table's data, so the group could still insert, update and delete rows." },
+        { "text": "REVOKE MODIFY ON SCHEMA main.bronze FROM `contractors`", "why": "The write grants sit on the table, not the schema. A REVOKE succeeds even when nothing was granted at that level, so the table grants would stay in place." }
+      ],
+      "in_practice": "Access reviews should list INSERT, UPDATE and DELETE next to MODIFY; offboarding scripts that revoke only MODIFY can leave a write path open for months.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/fine-grained-dml-privileges",
+      "evidence": "MODIFY is a composite privilege, and INSERT, UPDATE, and DELETE are its children. ... Composite and child privileges are granted and revoked independently: granting MODIFY does not grant INSERT, UPDATE, or DELETE, and revoking MODIFY does not revoke any of them that were granted explicitly."
+    },
+    {
+      "family": "privileges-manage-table-needs-usage",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A governance lead grants a data steward MANAGE on the table finance.core.ledger so the steward can handle access requests for that one table. The steward holds no other privileges in the finance catalog. When the steward runs GRANT SELECT ON TABLE finance.core.ledger TO `fpa-analysts`, it fails with a permission error. What is the smallest fix?",
+      "options": [
+        { "text": "Grant the steward USE CATALOG on finance and USE SCHEMA on finance.core", "correct": true, "why": "MANAGE on a table, view, volume or function requires USE CATALOG on the parent catalog and USE SCHEMA on the parent schema, or ownership or MANAGE on a parent. Only those usage privileges are missing." },
+        { "text": "Grant the steward SELECT on the table, so they hold what they grant", "average": true, "why": "Granting needs MANAGE, not SELECT; users with MANAGE can grant privileges they don't hold. SELECT also wouldn't supply the usage privileges on the parents that are missing." },
+        { "text": "Grant the steward MANAGE on the schema finance.core instead", "why": "MANAGE on a schema still requires USE CATALOG on the parent catalog, which the steward lacks, and it would widen the steward's scope to every table in the schema." },
+        { "text": "Grant the steward READ METADATA on the table as well", "why": "READ METADATA shows grants and other metadata read-only. It adds no ability to grant, and the steward would still lack the usage privileges." }
+      ],
+      "in_practice": "Table-level MANAGE plus usage privileges lets a steward run access requests for one sensitive table without being able to administer, drop or re-own anything else in the schema.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/permissions-concepts",
+      "evidence": "MANAGE on a non-container object, such as a table, view, volume, or function, requires USE CATALOG on the parent catalog and USE SCHEMA on the parent schema (or ownership or MANAGE on either parent)."
+    },
+    {
+      "family": "privileges-hive-any-file-bypass",
+      "objective": "governance.privileges",
+      "guide": "7.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A legacy workspace still protects hive_metastore tables with table access control, and the `interns` group was denied SELECT on hr.salaries. During an audit, a data engineer finds interns reading the same data with spark.read.format('delta').load() on the table's storage path, from a cluster enabled for table access control. What explains this, and what closes the gap?",
+      "options": [
+        { "text": "The group has access to ANY FILE, which bypasses table ACLs; revoke it", "correct": true, "why": "ANY FILE controls access to the underlying filesystem, and users with it can bypass restrictions on catalogs, schemas, tables and views by reading files directly. Revoking it from interns closes the path." },
+        { "text": "The DENY covers only SQL; add a DENY on the hr schema as well", "average": true, "why": "A schema-level DENY is still a table ACL, which reading the storage path sidesteps. The bypass comes from ANY FILE, so that is the privilege to revoke." },
+        { "text": "Table ACLs apply only in Databricks SQL, so clusters ignore them", "why": "Table access control is enforced on clusters enabled for it, as this one is. The path read works because ANY FILE gives filesystem access." },
+        { "text": "A DENY on a table hides its name from listings but not its data", "why": "A DENY blocks access to the table and also hides it from table listings; the data is reachable here only through the file path that ANY FILE opens." }
+      ],
+      "in_practice": "Auditing who holds ANY FILE is a quick win before a Unity Catalog migration: one forgotten grant can undo every table-level restriction in a legacy workspace.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/table-acls/object-privileges",
+      "evidence": "ANY FILE: controls access to the underlying filesystem. Users granted access to ANY FILE can bypass the restrictions put on the catalog, schemas, tables, and views by reading from the filesystem directly."
+    }
+  ]
+}

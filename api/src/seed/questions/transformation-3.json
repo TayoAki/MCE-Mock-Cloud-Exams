@@ -1,0 +1,469 @@
+{
+  "items": [
+    {
+      "family": "cleaning-coalesce-fallback-columns",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer builds silver.contacts from a bronze CRM export with three nullable phone columns: mobile_phone, home_phone and work_phone. The silver column contact_phone must hold the mobile number when present, otherwise the home number, otherwise the work number. Which SQL expression produces contact_phone?",
+      "options": [
+        {
+          "text": "coalesce(mobile_phone, home_phone, work_phone)",
+          "correct": true,
+          "why": "coalesce returns its first non-null argument, evaluating the arguments left to right, so it falls back from mobile to home to work and returns NULL only when all three are missing."
+        },
+        {
+          "text": "ifnull(mobile_phone, home_phone)",
+          "average": true,
+          "why": "ifnull is the two-argument form of coalesce, so it covers the mobile-to-home fallback but never reaches work_phone; contacts with only a work number would get NULL."
+        },
+        {
+          "text": "nvl2(mobile_phone, home_phone, work_phone)",
+          "why": "nvl2 returns its second argument when the first is not null, so a contact with a mobile number would get the home number instead, and one without a mobile number would get the work number."
+        },
+        {
+          "text": "concat_ws(',', mobile_phone, home_phone, work_phone)",
+          "why": "concat_ws joins the non-null values into one delimited string, so a contact with several numbers would get all of them in one field instead of a single chosen number."
+        }
+      ],
+      "in_practice": "Writing the fallback order once in silver means every downstream report applies the same rule; on a contact table of ~20 million rows, that stops each dashboard from picking a different phone number for the same customer.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/coalesce",
+      "evidence": "Returns the first non-null argument. ... Unlike for regular functions where all arguments are evaluated before invoking the function, coalesce evaluates arguments left to right until a non-null value is found. If all arguments are NULL, the result is NULL."
+    },
+    {
+      "family": "cleaning-trim-padded-values",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer notices that a GROUP BY on city in a bronze table returns 'Paris', 'Paris ' and ' Paris' as three separate groups, because the source system pads some values with spaces. Multi-word names such as 'New York' must stay intact. Which SQL expression standardizes city for the silver table?",
+      "options": [
+        {
+          "text": "trim(city)",
+          "correct": true,
+          "why": "trim with a single argument removes the leading and trailing space characters, so all three Paris variants become 'Paris' while the space inside 'New York' is kept."
+        },
+        {
+          "text": "rtrim(city)",
+          "average": true,
+          "why": "rtrim removes only trailing characters, so 'Paris ' is fixed but ' Paris' keeps its leading space and still forms its own group."
+        },
+        {
+          "text": "regexp_replace(city, ' ', '')",
+          "why": "regexp_replace replaces every match of the pattern, so it also removes the space inside multi-word names and turns 'New York' into 'NewYork'."
+        },
+        {
+          "text": "upper(city)",
+          "why": "upper changes only the letter case; the padded values keep their spaces and still group separately."
+        }
+      ],
+      "in_practice": "Untrimmed values quietly split aggregates and break joins: a padded city or country code can drop rows from a gold revenue report, and nobody notices until the totals fail to reconcile with the source system.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/trim",
+      "evidence": "Removes the leading or trailing space characters from str. ... SELECT '+' || trim(' SparkSQL ') || '+'; +SparkSQL+"
+    },
+    {
+      "family": "cleaning-dropna-required-keys",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer is cleaning bronze orders in PySpark before writing a silver table. Rows missing order_id or customer_id can't be used and must be removed. Optional columns such as coupon_code and gift_message are null on most valid orders, and those orders must be kept. Which call meets these requirements?",
+      "options": [
+        {
+          "text": "df.dropna(subset=[\"order_id\", \"customer_id\"])",
+          "correct": true,
+          "why": "With subset, dropna checks only the listed columns, and the default how='any' drops a row when either key is null; nulls in the optional columns are ignored."
+        },
+        {
+          "text": "df.dropna()",
+          "average": true,
+          "why": "Without subset, dropna considers every column with how='any', so it would also delete the many valid orders that have no coupon_code or gift_message."
+        },
+        {
+          "text": "df.dropna(how=\"all\", subset=[\"order_id\", \"customer_id\"])",
+          "why": "With how='all', a row is dropped only when both keys are null, so orders missing just one of the two keys would still reach silver."
+        },
+        {
+          "text": "df.dropna(thresh=2)",
+          "why": "thresh keeps any row that has at least two non-null values in any columns, so it doesn't check the two keys specifically and lets rows without them through."
+        }
+      ],
+      "in_practice": "Targeting only the required keys keeps silver complete: on a feed where 70% of orders carry no coupon, a bare dropna() would silently remove most of the day's orders, while a subset check removes only the few rows that can't be joined.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.dropna.html",
+      "evidence": "subset: str, tuple or list, optional list of column names to consider. how: the values that can be 'any' or 'all', default 'any'. If 'any', drop a row if it contains any nulls. If 'all', drop a row only if all its values are null."
+    },
+    {
+      "family": "cleaning-to-number-currency-strings",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer is loading silver.invoices on a SQL warehouse. In bronze, amount is a STRING formatted like '$1,249.99' or '$85.00', and silver needs a DECIMAL. A first attempt with try_cast(amount AS DECIMAL(10,2)) returned NULL for every row. Which expression converts the values correctly?",
+      "options": [
+        {
+          "text": "to_number(amount, '$999,999.99')",
+          "correct": true,
+          "why": "to_number casts a STRING to DECIMAL using a format, and the format's $ and , elements tell it where the currency sign and thousands separator appear, so '$1,249.99' becomes 1249.99."
+        },
+        {
+          "text": "CAST(amount AS DECIMAL(10,2))",
+          "average": true,
+          "why": "A plain CAST doesn't understand currency signs or grouping separators either; with ANSI mode on, it raises an error on these strings instead of returning NULL."
+        },
+        {
+          "text": "to_number(amount, '999,999.99')",
+          "why": "This format has no $ element, so the currency sign is a character the format doesn't permit, and to_number raises an INVALID_FORMAT error."
+        },
+        {
+          "text": "try_to_number(amount, '$999.99')",
+          "why": "This format allows only three digits before the decimal point and no grouping separator, so values such as '$1,249.99' don't match and come back as NULL."
+        }
+      ],
+      "in_practice": "An explicit format documents the expected input: if a vendor switches to '1.249,99' or a euro sign, to_number fails loudly instead of loading wrong amounts into a finance table, and try_to_number can route the misfits to a quarantine table.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/to_number",
+      "evidence": "Returns expr cast to DECIMAL using formatting fmt. ... L or $ Specifies the location of the $ currency sign. ... , or G Specifies the position of the , grouping (thousands) separator."
+    },
+    {
+      "family": "cleaning-overwrite-schema-type-change",
+      "objective": "transformation.cleaning",
+      "guide": "3.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's nightly notebook rebuilds main.silver.patients with df.write.mode(\"overwrite\").saveAsTable(...). A new standard requires birth_date, currently a STRING in silver, to be a DATE, so the engineer adds a to_date() conversion. The next run fails with a schema mismatch error. The table must still be fully rebuilt each night. Which change fixes the write?",
+      "options": [
+        {
+          "text": "Add .option(\"overwriteSchema\", \"true\") to the overwrite write",
+          "correct": true,
+          "why": "By default an overwrite replaces the data but keeps the existing schema; setting overwriteSchema to true lets the rewrite replace the schema too, including changing birth_date from STRING to DATE."
+        },
+        {
+          "text": "Add .option(\"mergeSchema\", \"true\") to the overwrite write",
+          "average": true,
+          "why": "mergeSchema turns on schema evolution, which adds columns that are new in the source; it doesn't replace an existing STRING column with a DATE, so the mismatch remains."
+        },
+        {
+          "text": "Run ALTER TABLE ... ALTER COLUMN birth_date TYPE DATE first",
+          "why": "Changing a Delta column's type in place is limited to type widening, such as INT to BIGINT, and STRING to DATE isn't a supported widening, so this statement can't make the change."
+        },
+        {
+          "text": "Replace to_date() with try_cast() so bad strings become NULL",
+          "why": "The failure comes from the table's schema, not from unparseable values; try_cast still produces a DATE column, so the write hits the same mismatch."
+        }
+      ],
+      "in_practice": "The overwriteSchema rewrite stays one atomic overwrite, and Delta history still lets the team time travel to last night's STRING version if a consumer breaks; announcing the type change first avoids surprise errors in dashboards that parse the old strings.",
+      "source": "https://docs.databricks.com/aws/en/delta/update-schema",
+      "evidence": "You can change a column's type or name or drop a column by rewriting the table. To do this, use the overwriteSchema option. ... By default, overwriting the data in a table doesn't overwrite the schema."
+    },
+    {
+      "family": "joins-full-outer-reconciliation",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer reconciles billing_accounts with crm_accounts on account_id. The result must include every account found in either table, with NULLs in the columns from whichever side has no matching account. Which join type should the query use?",
+      "options": [
+        {
+          "text": "FULL OUTER JOIN",
+          "correct": true,
+          "why": "A full outer join returns all rows from both tables and appends NULL on the side that has no match, so accounts missing from either system appear in the result."
+        },
+        {
+          "text": "LEFT OUTER JOIN",
+          "average": true,
+          "why": "A left join keeps every billing account but drops CRM accounts that have no billing record, which are exactly the gaps a reconciliation must surface."
+        },
+        {
+          "text": "INNER JOIN",
+          "why": "An inner join returns only accounts present in both tables, so every mismatch the reconciliation is looking for would be filtered out."
+        },
+        {
+          "text": "LEFT ANTI JOIN",
+          "why": "A left anti join returns only billing accounts with no CRM match, without any CRM columns, so it misses CRM-only accounts and the matched pairs."
+        }
+      ],
+      "in_practice": "One full outer join turns reconciliation into a single query: filtering for a NULL key on either side lists both kinds of drift, which on ~2 million accounts replaces two left-join reports that someone had to compare by hand.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-join",
+      "evidence": "FULL [OUTER] Returns all values from both relations, appending NULL values on the side that does not have a match. It is also referred to as a full outer join."
+    },
+    {
+      "family": "joins-null-safe-equal-region",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer joins regional_targets t to regional_sales s on country and region. Country-level rows have region set to NULL in both tables, and those rows must match each other. Which comparison should the join condition use for region?",
+      "options": [
+        {
+          "text": "t.region <=> s.region",
+          "correct": true,
+          "why": "The null-safe equal operator returns true when both operands are NULL and false when only one is, so country-level rows match each other and regional rows still match on value."
+        },
+        {
+          "text": "t.region = s.region",
+          "average": true,
+          "why": "Regular equality returns NULL when either operand is NULL, and a join keeps only pairs where the condition is true, so the country-level rows never pair up."
+        },
+        {
+          "text": "t.region IN (s.region)",
+          "why": "IN works like a set of equality checks joined with OR, so a NULL region still yields UNKNOWN and the country-level rows stay unmatched."
+        },
+        {
+          "text": "t.region IS NULL AND s.region IS NULL",
+          "why": "This matches only rows where both regions are NULL, so regional rows with the same non-null region would stop matching."
+        }
+      ],
+      "in_practice": "Null-safe keys matter in composite joins on dimensions: an ordinary equality on a nullable level column can silently drop every country-level target from a variance report, so totals come up short with no error pointing at the cause.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-null-semantics",
+      "evidence": "In order to compare the NULL values for equality, Databricks provides a null-safe equal operator (<=>), which returns False when one of the operand is NULL and returns True when both the operands are NULL."
+    },
+    {
+      "family": "joins-left-semi-existence",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A marketing team asks a data engineer for a silver table of customers who have placed at least one order, containing only the columns from customers. Some customers have hundreds of orders, and each customer must appear exactly once. Which query meets the requirement?",
+      "options": [
+        {
+          "text": "SELECT c.* FROM customers c LEFT SEMI JOIN orders o ON c.customer_id = o.customer_id",
+          "correct": true,
+          "why": "A left semi join returns the rows of the left table that have a match on the right, with only the left table's columns, so each ordering customer appears once however many orders exist."
+        },
+        {
+          "text": "SELECT c.* FROM customers c INNER JOIN orders o ON c.customer_id = o.customer_id",
+          "average": true,
+          "why": "An inner join returns one row per matching order, so a customer with 300 orders appears 300 times; selecting only c.* hides the order columns but keeps the duplicates."
+        },
+        {
+          "text": "SELECT c.* FROM customers c LEFT JOIN orders o ON c.customer_id = o.customer_id",
+          "why": "A left join keeps every customer, including those with no orders, and still repeats each customer once per matching order."
+        },
+        {
+          "text": "SELECT c.* FROM customers c LEFT ANTI JOIN orders o ON c.customer_id = o.customer_id",
+          "why": "A left anti join returns the opposite set: the customers that have no matching order at all."
+        }
+      ],
+      "in_practice": "A semi join answers an existence question without fan-out: joining ~5 million customers to ~400 million orders, it skips producing hundreds of millions of duplicate rows that a DISTINCT would then have to remove.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-join",
+      "evidence": "[ LEFT ] SEMI Returns values from the left side of the table reference that has a match with the right. It is also referred to as a left semi join."
+    },
+    {
+      "family": "joins-union-by-name-missing-columns",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer stacks two monthly PySpark DataFrames before writing silver. The March extract, df_mar, added a loyalty_tier column that the January extract, df_jan, lacks; all other columns share names. The combined result must keep every row and show NULL for loyalty_tier on January rows. Which call does this?",
+      "options": [
+        {
+          "text": "df_mar.unionByName(df_jan, allowMissingColumns=True)",
+          "correct": true,
+          "why": "unionByName matches columns by name, and with allowMissingColumns=True a column that exists on only one side is filled with NULL for the other side's rows."
+        },
+        {
+          "text": "df_mar.unionByName(df_jan)",
+          "average": true,
+          "why": "unionByName resolves columns by name, but allowMissingColumns defaults to False, so the extra loyalty_tier column isn't tolerated and the call fails instead of filling NULLs."
+        },
+        {
+          "text": "df_mar.union(df_jan)",
+          "why": "union resolves columns by position rather than by name, so it can't line up a column that only one DataFrame has; the column counts differ and the union fails."
+        },
+        {
+          "text": "df_mar.join(df_jan, \"customer_id\", \"full_outer\")",
+          "why": "A full outer join places the two extracts side by side on customer_id instead of stacking their rows, so it doesn't produce one combined set of monthly rows."
+        }
+      ],
+      "in_practice": "allowMissingColumns lets a pipeline absorb additive source changes, such as a new loyalty field, without hand-written select lists per month; pairing it with a schema check stops a renamed column from silently becoming two half-null columns.",
+      "source": "https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.unionByName.html",
+      "evidence": "This method performs a union operation on both input DataFrames, resolving columns by name (rather than position). When allowMissingColumns is True, missing columns will be filled with null."
+    },
+    {
+      "family": "joins-not-in-null-anti-join",
+      "objective": "transformation.joins",
+      "guide": "3.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's daily data quality job lists orphan orders with: select * from silver.orders where customer_id not in (select customer_id from silver.customers). It found orphans every day until a faulty load inserted one customers row with a NULL customer_id. Since then it returns zero rows, although orphan orders still exist. Which rewrite returns the orphan orders?",
+      "options": [
+        {
+          "text": "SELECT o.* FROM silver.orders o LEFT ANTI JOIN silver.customers c ON o.customer_id = c.customer_id",
+          "correct": true,
+          "why": "A left anti join returns the orders with no matching customer; a NULL customer_id in customers never satisfies the equality, so it matches nothing and can't hide the orphans."
+        },
+        {
+          "text": "Keep the NOT IN query and add customer_id IS NOT NULL to the outer WHERE clause",
+          "average": true,
+          "why": "The NULL that breaks the query is in the subquery's list, not in orders: NOT IN returns UNKNOWN for every value missing from a list that contains a NULL, so filtering the outer rows still returns nothing."
+        },
+        {
+          "text": "SELECT o.* FROM silver.orders o LEFT SEMI JOIN silver.customers c ON o.customer_id = c.customer_id",
+          "why": "A left semi join returns the orders that do have a matching customer, which is the opposite of the orphan list."
+        },
+        {
+          "text": "SELECT o.* FROM silver.orders o LEFT JOIN silver.customers c ON o.customer_id = c.customer_id",
+          "why": "A left join returns every order, matched or not; without a filter for a missing customer it doesn't isolate the orphans."
+        }
+      ],
+      "in_practice": "A data quality check that silently returns zero rows is the dangerous kind; an anti join keeps an orphan check over ~50 million orders correct even after a bad dimension load slips a NULL key in.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-null-semantics",
+      "evidence": "NOT IN always returns UNKNOWN when the list contains NULL and does not contain the input value. ... These two expressions are not affected by presence of NULL in the result of the subquery. They are normally faster because they can be converted to semijoins and anti-semijoins without special provisions for null awareness."
+    },
+    {
+      "family": "reshaping-posexplode-line-number",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer flattens the items array in bronze orders so that silver has one row per item. Silver must also record each item's position within the original array as line_number. Which table-valued generator function returns both the element and its position?",
+      "options": [
+        {
+          "text": "posexplode",
+          "correct": true,
+          "why": "posexplode un-nests an array into rows and returns a pos column holding each element's position next to the element itself in col."
+        },
+        {
+          "text": "explode",
+          "average": true,
+          "why": "explode produces one row per element, but its output holds only the element, so the original position is lost."
+        },
+        {
+          "text": "explode_outer",
+          "why": "explode_outer also returns a row when the array is NULL, but like explode it returns no position column."
+        },
+        {
+          "text": "inline",
+          "why": "inline expands an array of structs into one column per struct field; it doesn't report where each element sat in the array."
+        }
+      ],
+      "in_practice": "Keeping pos means line order survives the flatten, so a silver order_lines table can be matched back to invoice lines one to one, and reprocessing ~10 million orders yields the same line numbers on every run.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/posexplode",
+      "evidence": "Returns a set of rows by un-nesting expr with numbering of positions. ... The columns produced by posexplode of an array are named pos and col."
+    },
+    {
+      "family": "reshaping-struct-star-flatten",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A bronze table stores each order's address in a STRUCT column named shipping, with the fields street, city and postal_code. A data engineer wants the silver table to have street, city and postal_code as top-level columns next to order_id. Which SQL query does this?",
+      "options": [
+        {
+          "text": "SELECT order_id, shipping.* FROM bronze_orders",
+          "correct": true,
+          "why": "A star after a struct column selects all of its fields as separate columns at that level, so street, city and postal_code become top-level columns."
+        },
+        {
+          "text": "SELECT order_id, explode(shipping) FROM bronze_orders",
+          "average": true,
+          "why": "explode works on ARRAY and MAP values and turns their elements into rows; a STRUCT isn't a collection, so it can't spread fields into columns this way."
+        },
+        {
+          "text": "SELECT order_id, struct(*) AS shipping FROM bronze_orders",
+          "why": "struct(*) does the opposite: it nests columns into a single STRUCT column instead of unpacking one."
+        },
+        {
+          "text": "SELECT order_id, shipping FROM bronze_orders",
+          "why": "Selecting the column by name keeps shipping as one STRUCT column, so its fields stay nested."
+        }
+      ],
+      "in_practice": "Top-level columns are easier to filter, cluster and document in silver. The star unpacks only one level, so a nested geo struct inside shipping stays a struct until it is unpacked as well.",
+      "source": "https://docs.databricks.com/aws/en/semi-structured/complex-types",
+      "evidence": "Use the star operator (*) to select all fields within a given field. note This only unpacks nested fields at the specified depth. SELECT column_name.* FROM table_name"
+    },
+    {
+      "family": "reshaping-split-zero-based-index",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer adds an email_domain column to a silver table on a SQL warehouse, expecting 'example.com' from 'jane@example.com'. The first attempt, split(email, '@')[2], fails with an INVALID_ARRAY_INDEX error. Which expression returns the domain?",
+      "options": [
+        {
+          "text": "split(email, '@')[1]",
+          "correct": true,
+          "why": "The bracket operator counts array positions from 0, so index 1 is the second element of the split result, the part after the @."
+        },
+        {
+          "text": "element_at(split(email, '@'), 1)",
+          "average": true,
+          "why": "element_at counts positions from 1, so index 1 returns the first element, 'jane', instead of the domain."
+        },
+        {
+          "text": "split(email, '@', 1)[1]",
+          "why": "A limit of 1 returns a one-element array holding the whole string, so index 1 is out of bounds and raises the same error."
+        },
+        {
+          "text": "split_part(email, '@', 0)",
+          "why": "split_part counts parts from 1 and raises INVALID_INDEX_OF_ZERO when the part number is 0."
+        }
+      ],
+      "in_practice": "Mixing 0-based brackets with 1-based element_at and split_part is a common source of quietly wrong columns: an off-by-one that returns the user name instead of the domain passes null checks yet skews every email-domain metric downstream.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/bracketsign",
+      "evidence": "The first element of an ARRAY is at index 0. ... If the keyExpr is out of bound for the ARRAY expr, Databricks raises an INVALID_ARRAY_INDEX error."
+    },
+    {
+      "family": "reshaping-unpivot-include-nulls",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer reshapes a wide bronze table, sales_wide, with columns store_id, year, q1, q2, q3 and q4 into silver rows of store_id, year, quarter and sales. Stores that opened mid-year have NULL in their early quarters, and the finance team needs those quarters kept as rows with NULL sales so the gaps stay visible. Which FROM clause meets this requirement?",
+      "options": [
+        {
+          "text": "FROM sales_wide UNPIVOT INCLUDE NULLS (sales FOR quarter IN (q1, q2, q3, q4))",
+          "correct": true,
+          "why": "UNPIVOT rotates the listed columns into rows, with one column for the original column name and one for its value, and INCLUDE NULLS keeps the rows whose value is NULL."
+        },
+        {
+          "text": "FROM sales_wide UNPIVOT (sales FOR quarter IN (q1, q2, q3, q4))",
+          "average": true,
+          "why": "This is the right reshape, but UNPIVOT defaults to EXCLUDE NULLS, so the quarters before a store opened would be dropped instead of appearing as NULL rows."
+        },
+        {
+          "text": "FROM sales_wide PIVOT (sum(sales) FOR quarter IN ('q1', 'q2', 'q3', 'q4'))",
+          "why": "PIVOT goes the other way, turning row values into columns, and sales_wide has no quarter or sales column to pivot on."
+        },
+        {
+          "text": "FROM sales_wide, LATERAL explode(array(q1, q2, q3, q4)) AS t(sales)",
+          "why": "Exploding an array of the four columns returns one row per value, NULLs included, but it loses which quarter each value came from."
+        }
+      ],
+      "in_practice": "Keeping NULL rows preserves a regular grid of four quarters per store, so a gold report can tell 'no sales recorded' from 'row missing', which matters when ~5% of stores open mid-year.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-unpivot",
+      "evidence": "Transforms the rows of the preceding table_reference by rotating groups of columns into rows ... INCLUDE NULLS or EXCLUDE NULLS: Whether, or not to filter out rows with NULL in the value_column. The default is EXCLUDE NULLS."
+    },
+    {
+      "family": "reshaping-rename-column-mapping",
+      "objective": "transformation.reshaping",
+      "guide": "3.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer must rename cust_nm to customer_name in silver.customers, an existing Delta table of about 4 TB that was created without column mapping. All readers run current Databricks Runtime versions, and the rename must not rewrite the table's data files. Which approach meets these requirements?",
+      "options": [
+        {
+          "text": "Set 'delta.columnMapping.mode' = 'name', then run ALTER TABLE ... RENAME COLUMN",
+          "correct": true,
+          "why": "Column mapping makes renames metadata-only, and name mode can be set on an existing table; once it is on, RENAME COLUMN changes the name without rewriting data files."
+        },
+        {
+          "text": "Rewrite the table using withColumnRenamed and .option(\"overwriteSchema\", \"true\")",
+          "average": true,
+          "why": "This does rename the column, but it works by rewriting the whole table, which is exactly the 4 TB rewrite the requirement rules out."
+        },
+        {
+          "text": "Set 'delta.columnMapping.mode' = 'id', then run ALTER TABLE ... RENAME COLUMN",
+          "why": "id mode also enables metadata-only renames, but it must be set when the table is created and can't be set on an existing table."
+        },
+        {
+          "text": "Run REORG TABLE silver.customers APPLY (PURGE), then RENAME COLUMN",
+          "why": "REORG ... APPLY (PURGE) rewrites files to purge data from dropped columns; it doesn't enable column mapping, so it adds a rewrite without making a metadata-only rename possible."
+        }
+      ],
+      "in_practice": "Enabling column mapping upgrades the table protocol, and a rename is a non-additive change that can stop streams reading the table; give those streams a schemaTrackingLocation before the rename so they keep running.",
+      "source": "https://docs.databricks.com/aws/en/delta/column-mapping",
+      "evidence": "name: This enables metadata-only column renames and drops, and allows special characters in column names. name mode may be set on new and existing tables. id: ... id mode must be set on table creation and cannot be set on existing tables."
+    }
+  ]
+}

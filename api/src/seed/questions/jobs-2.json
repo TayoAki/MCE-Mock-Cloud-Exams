@@ -1,0 +1,376 @@
+{
+  "items": [
+    {
+      "family": "triggers-advanced-schedule-quartz-cron",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer sets up an Advanced schedule on a Lakeflow Jobs job and checks Show Cron Syntax to edit the expression by hand. Which syntax does the schedule expression use?",
+      "options": [
+        {
+          "text": "Quartz cron syntax",
+          "correct": true,
+          "why": "An Advanced schedule sets the period, starting time and time zone, and Show Cron Syntax displays and edits that schedule as a Quartz cron expression."
+        },
+        {
+          "text": "Standard five-field Unix crontab syntax",
+          "average": true,
+          "why": "Five-field crontab lines are what most engineers know from Linux and other schedulers, but Lakeflow Jobs uses Quartz syntax, which starts with a seconds field, so crontab entries must be converted rather than pasted in."
+        },
+        {
+          "text": "ISO 8601 repeating intervals such as R/PT1H",
+          "why": "ISO 8601 repeating intervals are used by some orchestrators, but a Lakeflow Jobs schedule isn't expressed that way; its cron view shows Quartz syntax."
+        },
+        {
+          "text": "Spark SQL interval literals such as INTERVAL 1 HOUR",
+          "why": "Spark SQL interval literals describe durations inside queries, not job schedules; an Advanced job schedule is edited as a Quartz cron expression."
+        }
+      ],
+      "in_practice": "Teams migrating crontab entries from another scheduler must rewrite them in Quartz form (for example, 0 0 2 * * ? for 02:00 daily); checking the expression in the UI before deploying keeps a nightly load from firing at the wrong time.",
+      "source": "https://docs.databricks.com/aws/en/jobs/scheduled",
+      "evidence": "Advanced: Specify the period, starting time, and time zone. Optionally select the Show Cron Syntax checkbox to display and edit the schedule in Quartz Cron Syntax."
+    },
+    {
+      "family": "triggers-pause-lets-active-run-finish",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer pauses a job's scheduled trigger in the Schedules & Triggers section while a run started by that trigger is still in progress. What happens to the job?",
+      "options": [
+        {
+          "text": "The current run continues, and the trigger starts no new runs until resumed",
+          "correct": true,
+          "why": "Pausing a trigger stops it from starting new runs, but any run that is already active keeps going. Resuming picks up the same schedule that was configured before."
+        },
+        {
+          "text": "The current run is canceled, and the trigger starts no new runs until resumed",
+          "average": true,
+          "why": "Pausing a trigger isn't a cancel: active runs are left to finish and only future runs from that trigger are stopped. Stopping the in-progress run would take a separate cancel."
+        },
+        {
+          "text": "The current run pauses at its active task and continues when the trigger resumes",
+          "why": "A trigger controls when runs start, not how a run in progress executes, so the active run isn't suspended mid-task; it simply continues to completion."
+        },
+        {
+          "text": "The trigger is removed, so the schedule must be configured again to restart it",
+          "why": "Pause and Delete are separate controls: a paused trigger keeps its configuration and resumes on the same schedule, while Delete removes the trigger from the job."
+        }
+      ],
+      "in_practice": "Pausing is the safe way to hold a pipeline during an upstream incident or a maintenance window: in-flight work finishes cleanly, nothing new starts, and Resume restores the original schedule without re-entering any settings.",
+      "source": "https://docs.databricks.com/aws/en/jobs/triggers",
+      "evidence": "To pause an active trigger, click Pause. Any currently active runs continue, but the trigger no longer starts new runs. To resume the trigger, click Resume. The configured behavior resumes on the same schedule previously configured."
+    },
+    {
+      "family": "triggers-file-arrival-uc-storage-location",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is adding a file arrival trigger to a Lakeflow Jobs job in a workspace with Unity Catalog enabled. Which storage location can the trigger be configured to monitor?",
+      "options": [
+        {
+          "text": "The root or a subpath of a Unity Catalog volume or external location",
+          "correct": true,
+          "why": "File arrival triggers require a storage location that is a Unity Catalog volume or external location, and the trigger can watch its root or any subpath."
+        },
+        {
+          "text": "Any cloud storage path the job's compute can read with an instance profile",
+          "average": true,
+          "why": "Compute credentials are how jobs reach storage outside Unity Catalog, but a file arrival trigger only monitors locations governed by Unity Catalog as volumes or external locations."
+        },
+        {
+          "text": "The managed storage location of a Unity Catalog catalog or schema",
+          "why": "The path used for a file arrival trigger must not contain external tables or the managed locations of catalogs and schemas, so managed storage can't be monitored."
+        },
+        {
+          "text": "A DBFS root folder such as dbfs:/FileStore/landing/",
+          "why": "The DBFS root isn't a Unity Catalog volume or external location, so it doesn't meet the storage requirement for a file arrival trigger."
+        }
+      ],
+      "in_practice": "Requiring Unity Catalog locations means the trigger follows the same governance as the data: whoever configures it needs READ on the location and CAN MANAGE on the job, so landing zones stay auditable instead of depending on cluster credentials.",
+      "source": "https://docs.databricks.com/aws/en/jobs/file-arrival-triggers",
+      "evidence": "You must use a storage location that is either a volume or an external location configured in Unity Catalog. A file arrival trigger can be configured to monitor the root of a Unity Catalog external location or volume, or a subpath of an external location or volume."
+    },
+    {
+      "family": "triggers-simple-schedule-no-start-time",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer needs a job to run every 12 hours, exactly at 00:00 and 12:00 Europe/Berlin time. Which schedule configuration meets this requirement?",
+      "options": [
+        {
+          "text": "An Advanced schedule with the period, starting time and time zone set",
+          "correct": true,
+          "why": "An Advanced schedule lets you set the period, the starting time and the time zone (optionally as Quartz cron), so runs land exactly at 00:00 and 12:00 Berlin time."
+        },
+        {
+          "text": "A Simple schedule with an interval of 12 hours",
+          "average": true,
+          "why": "A Simple schedule repeats at the interval, but you can't choose when its first run happens; the scheduler picks that time, so runs won't reliably fall on 00:00 and 12:00."
+        },
+        {
+          "text": "Two Simple schedules of 24 hours each, one per run time",
+          "why": "Splitting the job across two Simple schedules doesn't help, because neither lets you specify its first run time; the scheduler still chooses when each one starts."
+        },
+        {
+          "text": "A file arrival trigger with a minimum time between triggers of 43200",
+          "why": "Minimum time between triggers only spaces out runs caused by new files; it is data-driven and can't pin runs to specific clock times."
+        }
+      ],
+      "in_practice": "Fixed clock times matter when consumers expect data at known moments, such as a midday refresh before a 12:30 review; an Advanced schedule pinned to a time zone gives that predictability, while a Simple interval runs at whatever offset the scheduler chose.",
+      "source": "https://docs.databricks.com/aws/en/jobs/scheduled",
+      "evidence": "Advanced: Specify the period, starting time, and time zone. ... You cannot specify the time for the first run for a simple schedule. The scheduler chooses a time when you configure the schedule."
+    },
+    {
+      "family": "triggers-continuous-for-always-on-stream",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team runs an always-on Structured Streaming job that reads clickstream events from Kafka into a bronze table. It is set up the legacy way, with an unlimited retry policy and maximum concurrent runs of 1, and someone starts it with Run now after each deployment. The team wants the stream to stay up and restart itself after failures. Which trigger setup does Databricks recommend?",
+      "options": [
+        {
+          "text": "A continuous trigger, so a new run starts whenever a run ends or fails",
+          "correct": true,
+          "why": "Databricks recommends continuous mode for always-on streaming workloads. It replaces the old pattern of unlimited retries with one concurrent run, and it restarts the job on failure with exponential backoff."
+        },
+        {
+          "text": "A scheduled trigger every minute, keeping maximum concurrent runs at 1",
+          "average": true,
+          "why": "A per-minute schedule only restarts a stopped stream at the next tick and is meant for periodic batch work; Databricks recommends continuous mode rather than scheduling an always-on stream."
+        },
+        {
+          "text": "The unlimited retry policy, started with Run now after each deployment",
+          "why": "Unlimited retries with one concurrent run is the legacy recommendation that continuous mode replaces, and it still depends on someone starting the job after every deployment."
+        },
+        {
+          "text": "A table update trigger on the bronze table the stream writes into",
+          "why": "The bronze table changes only when the stream itself writes to it, so a trigger on that table can't start a stopped stream; table update triggers suit downstream jobs."
+        }
+      ],
+      "in_practice": "A continuous job removes the 'who restarts the stream?' problem: after a transient Kafka outage it backs off and comes back on its own, and the streaming checkpoint keeps restarts from reprocessing data.",
+      "source": "https://docs.databricks.com/aws/en/jobs/continuous",
+      "evidence": "Databricks recommends using continuous mode for always-on streaming workloads. Continuous mode replaces legacy recommendations for Structured Streaming workloads to configure jobs with an unlimited retry policy and a maximum of one concurrent run."
+    },
+    {
+      "family": "triggers-dst-hourly-run-utc",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer schedules an hourly metering job with an Advanced schedule in the America/Chicago time zone. Billing requires one run for every hour of absolute time all year. After the spring clock change, the team finds an hourly run missing from the run history. Which change prevents this?",
+      "options": [
+        {
+          "text": "Set the schedule's time zone to UTC",
+          "correct": true,
+          "why": "In a time zone that observes daylight saving time, an hourly job can be skipped or appear delayed when DST begins or ends. To run at every hour of absolute time, choose UTC."
+        },
+        {
+          "text": "Raise the job's maximum concurrent runs to 2",
+          "average": true,
+          "why": "Runs are skipped when they exceed max concurrency, which makes this tempting, but this gap comes from the DST clock change in the schedule's time zone, not from overlapping runs."
+        },
+        {
+          "text": "Add a task retry policy so the missed hour is retried",
+          "why": "Retries apply to runs that started and failed; a run that the schedule never created has nothing to retry."
+        },
+        {
+          "text": "Schedule the job every 30 minutes in the same time zone",
+          "why": "Doubling the frequency creates two runs in most hours, which breaks the one-run-per-hour requirement, and it still follows the same DST-observing clock."
+        }
+      ],
+      "in_practice": "Hourly metering, billing and SLA jobs usually key on UTC hours. Scheduling in UTC gives one run per hour all year (8,760 in a normal year), and reports can still convert timestamps to local time for display.",
+      "source": "https://docs.databricks.com/aws/en/jobs/scheduled",
+      "evidence": "If you select a time zone that observes daylight saving time, an hourly job is skipped or might appear to be delayed by an hour or two when daylight saving time begins or ends. To run at every hour (absolute time), choose UTC."
+    },
+    {
+      "family": "triggers-table-update-all-tables",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer builds a job that joins main.sales.orders with main.sales.customers to refresh a gold table. Two separate pipelines refresh these tables at different times each night, and running the join after only one of them has refreshed produces an inconsistent gold table. Which trigger configuration fits these dependencies?",
+      "options": [
+        {
+          "text": "A table update trigger on both tables, set to run when All tables are updated",
+          "correct": true,
+          "why": "When a table update trigger monitors several tables, it can run the job only once all of them have been updated, so the join waits until both nightly refreshes have landed."
+        },
+        {
+          "text": "A table update trigger on both tables, set to run when Any table is updated",
+          "average": true,
+          "why": "Any table is the right choice when each input can be processed on its own, but here it starts the join as soon as the first pipeline finishes, before the other table is fresh."
+        },
+        {
+          "text": "A scheduled trigger at 06:00, after both pipelines usually finish",
+          "why": "A fixed time relies on both pipelines finishing on schedule; on a late night the join still runs on stale data, and on an early night it waits needlessly."
+        },
+        {
+          "text": "Two separate jobs, each with a table update trigger on one table",
+          "why": "Separate jobs each react to a single table, so neither knows whether the other table is fresh; the dependency on both inputs belongs in one trigger."
+        }
+      ],
+      "in_practice": "Gating on all inputs prevents half-updated gold tables, which otherwise surface as mismatched totals in morning reports and force a manual rerun after someone notices.",
+      "source": "https://docs.databricks.com/aws/en/jobs/trigger-table-update",
+      "evidence": "The trigger can run when one table updates, or when all tables being monitored by the trigger are updated. ... When selecting multiple tables, you can specify if a job is triggered when any or all of the tables are updated."
+    },
+    {
+      "family": "triggers-table-update-cooldown",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "An upstream streaming table receives a commit every two to three minutes during business hours and none overnight or on weekends. A data engineer's downstream job recomputes an expensive aggregate from it. Results may be up to about 30 minutes old while the table is changing, and the team wants no runs when it hasn't changed. Which configuration meets these requirements?",
+      "options": [
+        {
+          "text": "A table update trigger with Minimum time between triggers set to 1800",
+          "correct": true,
+          "why": "Minimum time between triggers waits that long after a run completes before another can start, even if the table keeps updating, so runs happen about every 30 minutes while data changes and not at all when it doesn't."
+        },
+        {
+          "text": "A scheduled trigger that runs the job every 30 minutes",
+          "average": true,
+          "why": "A 30-minute schedule meets the freshness target, but it also runs all night and all weekend when the table hasn't changed, which is the cost the team wants to avoid."
+        },
+        {
+          "text": "A table update trigger with Wait after last change set to 1800",
+          "why": "Wait after last change restarts its timer on every update, and with commits every few minutes a 30-minute quiet period never occurs during the day, so runs are held until activity stops."
+        },
+        {
+          "text": "A table update trigger with no advanced options set",
+          "why": "Without a cooldown, the trigger can start a new run soon after each commit, so the expensive aggregate is recomputed far more often than the 30-minute target needs."
+        }
+      ],
+      "in_practice": "A cooldown turns a chatty source into a predictable cadence: for example, about 20 runs on a busy day instead of 200, and none on weekends, while consumers still see data no more than about half an hour old.",
+      "source": "https://docs.databricks.com/aws/en/jobs/trigger-table-update",
+      "evidence": "Minimum time between triggers in seconds: The minimum time to wait to trigger a run after a previous run completes. Tables updated during this period trigger a run only after the waiting time expires."
+    },
+    {
+      "family": "triggers-file-arrival-overwrite-no-run",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A partner system refreshes /Volumes/ops/feeds/inbound/inventory.csv several times a day by overwriting the file in place. A data engineer configures a file arrival trigger on /Volumes/ops/feeds/inbound/. The first upload started a run, but later refreshes start no runs, and the trigger reports no errors. What explains this behavior?",
+      "options": [
+        {
+          "text": "Only new files start runs, and an overwrite with the same name isn't a new file",
+          "correct": true,
+          "why": "File arrival triggers fire on new files. Overwriting an existing file with a file of the same name doesn't trigger a run, so the partner should write uniquely named files instead."
+        },
+        {
+          "text": "The default limit of one active run makes the trigger skip later arrivals",
+          "average": true,
+          "why": "Runs are skipped for max concurrency only while another run is still active; the first run finished hours earlier, so concurrency doesn't explain the missing runs."
+        },
+        {
+          "text": "The trigger waits for a _SUCCESS marker file before it starts another run",
+          "why": "Marker files are a convention some writers use, but file arrival triggers don't wait for them; they start runs when new files appear in the monitored path."
+        },
+        {
+          "text": "The trigger checks storage once a day, so later refreshes wait for tomorrow",
+          "why": "File arrival triggers make a best effort to check for new files every minute, so check frequency doesn't explain refreshes that never start a run."
+        }
+      ],
+      "in_practice": "Asking producers for immutable, timestamped file names such as inventory_20261027T0900.csv fixes the trigger and leaves an audit trail of every delivery; Auto Loader in the triggered job then processes each file exactly once.",
+      "source": "https://docs.databricks.com/aws/en/jobs/file-arrival-triggers",
+      "evidence": "Only new files trigger runs. Overwriting an existing file with a file of the same name does not trigger a run."
+    },
+    {
+      "family": "triggers-table-update-run-as-select",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A platform team switches a job's Run as identity from an engineer to a new service principal. The job has a table update trigger on main.finance.ledger. Since the switch, the ledger keeps receiving commits but no runs start, and the job's failure notifications report that the trigger can't be evaluated. Which change fixes the trigger?",
+      "options": [
+        {
+          "text": "Grant it SELECT on the table plus USE CATALOG and USE SCHEMA",
+          "correct": true,
+          "why": "The trigger reads the table's metadata and change history as the Run as principal, which needs SELECT on the table plus USE CATALOG and USE SCHEMA; without them the trigger fails to evaluate and the job doesn't run."
+        },
+        {
+          "text": "Grant it CAN MANAGE permission on the job",
+          "average": true,
+          "why": "Job permissions control who can edit and run the job, but the trigger fails because it can't read the monitored table, which takes Unity Catalog privileges for the Run as principal."
+        },
+        {
+          "text": "Grant it MODIFY on the table so it can track commits",
+          "why": "MODIFY allows writing to the table; the trigger only reads metadata and change history, which requires SELECT along with USE CATALOG and USE SCHEMA."
+        },
+        {
+          "text": "Enable file events on the table's external location",
+          "why": "File events improve a table update trigger's performance and scale, but they don't give the Run as principal the read access it needs to evaluate the trigger."
+        }
+      ],
+      "in_practice": "Ownership changes are a common way for data-driven jobs to go quiet: the trigger stops firing instead of a run failing loudly. Checking Run as grants, and keeping failure notifications on, catches this before a finance close misses a day.",
+      "source": "https://docs.databricks.com/aws/en/jobs/trigger-table-update",
+      "evidence": "Unity Catalog tables: SELECT on the table, plus USE CATALOG and USE SCHEMA on its catalog and schema. If the Run as principal does not have SELECT on a monitored object, the trigger fails to evaluate and the job does not run."
+    },
+    {
+      "family": "triggers-table-update-plus-scheduled-backup",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's job builds a daily finance summary from main.finance.gl_entries, which an upstream pipeline usually updates between 01:00 and 03:00. The summary should be built as soon as fresh data lands, but auditors require a run by 06:00 every day, even when the upstream pipeline is late or skipped, so the job can flag missing data. The workspace has the Multiple Triggers preview enabled. Which configuration meets both requirements?",
+      "options": [
+        {
+          "text": "A table update trigger on gl_entries plus a scheduled trigger at 06:00",
+          "correct": true,
+          "why": "With multiple triggers, any active trigger that evaluates to true starts a run, so the table update trigger runs the job when data lands and the 06:00 schedule guarantees a run when it doesn't."
+        },
+        {
+          "text": "A table update trigger on gl_entries, with no other trigger on the job",
+          "average": true,
+          "why": "A table update trigger reacts quickly to fresh data, but if the upstream pipeline is skipped there is no commit and therefore no run, so the 06:00 audit requirement isn't met."
+        },
+        {
+          "text": "A scheduled trigger at 06:00, with no other trigger on the job",
+          "why": "A fixed 06:00 run satisfies the auditors but waits hours after data that landed at 01:00, missing the requirement to build the summary as soon as data arrives."
+        },
+        {
+          "text": "A continuous trigger on the job plus a scheduled trigger at 06:00",
+          "why": "A continuous trigger can't be combined with any other trigger, and keeping the job always running would cost far more than the one or two runs a day this needs."
+        }
+      ],
+      "in_practice": "Pairing a data-driven trigger with a time-based backstop gives low latency on normal days and a guaranteed run on bad ones. Because both can fire on the same day, the job should be idempotent, for example by overwriting that day's summary.",
+      "source": "https://docs.databricks.com/aws/en/jobs/triggers",
+      "evidence": "When any active trigger evaluates to true, it starts a run. For example, you can use a table update trigger to start a job run when data is ready, and add an additional scheduled trigger as a backup."
+    },
+    {
+      "family": "triggers-view-federated-use-schedule",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's job reads main.reporting.customer_360, a Unity Catalog view that joins a Delta table with a federated PostgreSQL table. The engineer adds a table update trigger on the view; it saves without errors, but when only the PostgreSQL data changes, no run starts. The report must reflect PostgreSQL changes within one day. Which approach meets this requirement?",
+      "options": [
+        {
+          "text": "Use a daily scheduled trigger, since table update triggers miss federated changes",
+          "correct": true,
+          "why": "Views that depend on federated tables aren't supported by table update triggers. The trigger can still be created, but updates to that dependency never start a run, so a time-based schedule is the reliable choice."
+        },
+        {
+          "text": "Grant the Run as principal SELECT on the federated PostgreSQL table",
+          "average": true,
+          "why": "Missing SELECT does make a table update trigger fail to evaluate, but that isn't the problem here: federated dependencies aren't monitored at all, so grants won't make their changes start runs."
+        },
+        {
+          "text": "Set the trigger's Trigger when option to Any table is updated",
+          "why": "Trigger when chooses between any or all of several monitored objects; it doesn't add support for a view's federated dependency, whose changes still go undetected."
+        },
+        {
+          "text": "Enable file events on the external location that stores the Delta table",
+          "why": "File events speed up change detection for tables stored on that location, but PostgreSQL changes never reach it, so the trigger still won't fire for them."
+        }
+      ],
+      "in_practice": "Data-driven triggers only help when the platform can see the change. For sources outside Unity Catalog's change tracking, a schedule matched to the freshness SLA (here, nightly) is simpler and more reliable than a trigger that silently never fires.",
+      "source": "https://docs.databricks.com/aws/en/jobs/trigger-table-update",
+      "evidence": "The following views are not supported: ... Views that depend on federated tables. Creation of triggers for views containing unsupported dependencies still succeed, but no job runs are triggered when an unsupported dependency is updated."
+    }
+  ]
+}

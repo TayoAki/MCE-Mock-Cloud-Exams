@@ -1,0 +1,753 @@
+{
+  "items": [
+    {
+      "family": "monitoring-matrix-view-run-trend",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants to see at a glance whether a job in Lakeflow Jobs has been getting slower over its recent runs, and which of its tasks is driving the change. Which view shows this?",
+      "options": [
+        {
+          "text": "The matrix view on the job's Runs tab",
+          "correct": true,
+          "why": "The matrix view on the Runs tab shows the job's run history with a row per task, and the height of each run and task bar reflects its duration, so a task that keeps growing stands out across runs."
+        },
+        {
+          "text": "The Timeline view on one job run's details page",
+          "average": true,
+          "why": "The Timeline view shows how long each task took and how tasks overlapped, but only within a single run, so it can't show a trend across runs."
+        },
+        {
+          "text": "The Spark UI event timeline of the job's cluster",
+          "why": "The Spark UI describes the Spark jobs and stages that ran on one cluster, not the run history of a Lakeflow job, so it gives no run-over-run comparison."
+        },
+        {
+          "text": "The metrics page of the job's compute resource",
+          "why": "Compute metrics show CPU, memory and network use of a cluster over time, not task durations compared across the job's runs."
+        }
+      ],
+      "in_practice": "Checking the matrix view each morning catches gradual slowdowns, for example a task creeping from 10 to 25 minutes as input grows, before it pushes the job past its SLA.",
+      "source": "https://docs.databricks.com/aws/en/jobs/monitor",
+      "evidence": "The matrix view shows a history of runs for the job, including each job task. ... The height of the individual job run and task run bars visually indicates the run duration."
+    },
+    {
+      "family": "monitoring-system-table-six-month-baseline",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer is asked whether a nightly job in Lakeflow Jobs is slower this month than over the past six months. The job's Runs tab can't answer this, because the UI keeps run history for 60 days. The engineer has been granted read access to the system catalog. Which approach gives the six-month baseline?",
+      "options": [
+        {
+          "text": "Query system.lakeflow.job_run_timeline, which keeps 365 days of runs",
+          "correct": true,
+          "why": "The jobs system tables, including job_run_timeline, have a 365-day free retention period, so run start and end times from the last six months can be queried and aggregated into a baseline."
+        },
+        {
+          "text": "Widen the Runs tab's start-time filter to cover six months",
+          "average": true,
+          "why": "Filters only narrow the run history the UI already has, and Databricks keeps job run history for 60 days, so the older runs aren't there to show."
+        },
+        {
+          "text": "List the job's runs for six months with the Databricks CLI",
+          "why": "The CLI reads the same Jobs API run history as the UI, which is kept for 60 days, so it can't return runs from six months ago."
+        },
+        {
+          "text": "Export each run's notebook results to HTML and compare them",
+          "why": "HTML export preserves a run's notebook source and outputs for later reading; it doesn't give a queryable duration history, and runs older than 60 days are already gone."
+        }
+      ],
+      "in_practice": "A query over the timeline table can compute p50 and p95 run times per month, turning 'it feels slower' into a measured regression, say 30%, that justifies resizing or tuning work.",
+      "source": "https://docs.databricks.com/aws/en/admin/system-tables/jobs",
+      "evidence": "All job-related system tables live in the system.lakeflow schema. ... job_run_timeline: Tracks the job runs and related metadata. Supports streaming: Yes. Free retention period: 365 days."
+    },
+    {
+      "family": "monitoring-run-duration-columns-zero",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer builds a duration trend for a five-task job in Lakeflow Jobs by averaging run_duration_seconds from system.lakeflow.job_run_timeline. Every run returns 0, even though each run took about 40 minutes and the rows were written days ago. Which change gives usable durations?",
+      "options": [
+        {
+          "text": "Read per-task durations from system.lakeflow.job_task_run_timeline",
+          "correct": true,
+          "why": "The duration columns in job_run_timeline are filled only for single-task jobs created with the legacy Jobs APIs; multi-task runs log 0 there, and Databricks points to job_task_run_timeline, which reports durations per task run."
+        },
+        {
+          "text": "Keep only the rows where result_state is set, since only final slices hold durations",
+          "average": true,
+          "why": "result_state is filled only on a run's final slice, but that rule doesn't apply to the duration columns; for a multi-task job they log 0 on every row."
+        },
+        {
+          "text": "Wait for the next refresh, because duration columns lag behind run records",
+          "why": "Records usually arrive within an hour, and these rows are days old; the zeros come from the kind of job, not from delivery lag."
+        },
+        {
+          "text": "Join system.billing.usage to pick up each run's duration",
+          "why": "The billing usage table records consumed compute for cost attribution; it isn't where Databricks documents run durations, and it doesn't fix the zeros in the timeline table."
+        }
+      ],
+      "in_practice": "Picking the right source matters for alerting: a dashboard built on the zero-filled column would show every run as instant and hide a real slowdown, such as one task growing from 5 to 20 minutes.",
+      "source": "https://docs.databricks.com/aws/en/admin/system-tables/jobs",
+      "evidence": "The duration columns in the job_run_timeline table ... are only populated for single-task jobs that were created using the legacy Jobs APIs ... For non-legacy or multi-task job runs, these columns log a value of 0. ... use the job_task_run_timeline table, which reports durations per task run."
+    },
+    {
+      "family": "monitoring-duration-warning-threshold",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A nightly job in Lakeflow Jobs usually finishes in about 40 minutes. The data engineering team wants an email when a run goes past 60 minutes so they can investigate the slowdown, but a slow run must still finish because morning dashboards depend on its output. What should the team configure?",
+      "options": [
+        {
+          "text": "An expected duration of 60 minutes with a Duration Warning notification",
+          "correct": true,
+          "why": "With an expected duration set, Lakeflow Jobs can send an email or system notification when a run exceeds the threshold while the run keeps going, and the Runs tab also flags the overrun."
+        },
+        {
+          "text": "A 60-minute timeout on the job with a Failure notification",
+          "average": true,
+          "why": "A timeout stops the run when it is reached, so the alert would arrive together with a missing refresh, which is exactly what the dashboards can't afford."
+        },
+        {
+          "text": "A Streaming backlog notification with a 60-minute threshold",
+          "why": "Streaming backlog notifications track the backlog metrics of streaming queries, not the wall-clock duration of a batch run."
+        },
+        {
+          "text": "A Start notification, compared by hand with the Success email",
+          "why": "Start and Success emails would let someone work out the duration afterward, but nothing alerts the team when the 60-minute mark passes."
+        }
+      ],
+      "in_practice": "Duration warnings act as an early signal: a team that sees the job creep from 40 to 70 minutes over a quarter can tune or resize it before it collides with the 6 a.m. dashboard refresh.",
+      "source": "https://docs.databricks.com/aws/en/jobs/notifications",
+      "evidence": "If you have configured an expected duration for a job, you can add an email or system notification if the job or task exceeds the configured threshold. To receive a notification for a job or task that exceeds a duration threshold, select Duration Warning."
+    },
+    {
+      "family": "monitoring-repaired-run-duration-spike",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer charts the Duration column for a job's runs in Lakeflow Jobs. The job normally takes about 50 minutes, but Tuesday's run shows over 8 hours. That run failed at 1 a.m. while a source system was down; once the source was back, the engineer repaired the run at 9 a.m., and the two re-run tasks took 15 minutes. What explains the 8-hour value?",
+      "options": [
+        {
+          "text": "The duration spans from the original run's start to the end of the latest repair",
+          "correct": true,
+          "why": "For a repaired run, the Duration in the Runs tab covers the time from when the first run started until the latest repair run finished, so the idle hours before the repair are included."
+        },
+        {
+          "text": "The repair re-ran every task, including the ones that had already succeeded",
+          "average": true,
+          "why": "A repair re-runs only the unsuccessful tasks and their dependents; tasks that succeeded aren't re-run, so they add no time."
+        },
+        {
+          "text": "The repaired tasks waited in a queue for compute until 9 a.m.",
+          "why": "Nothing was queued before the engineer started the repair at 9 a.m.; the gap is idle time between the failure and the repair, which the run's duration still counts."
+        },
+        {
+          "text": "The Duration column adds up all task durations instead of wall-clock time",
+          "why": "The task durations here add up to far less than 8 hours; the value is long because a repaired run's duration runs from the first start to the last repair's finish."
+        }
+      ],
+      "in_practice": "When building a baseline from run durations, exclude or tag repaired runs; otherwise one overnight outage can inflate the average enough to hide a genuine 20% slowdown.",
+      "source": "https://docs.databricks.com/aws/en/jobs/repair-job-failures",
+      "evidence": "The Duration value displayed in the Runs tab includes the time the first run started until the time when the latest repair run finished. For example, if a run failed twice and succeeded on the third run, the duration includes the time for all three runs."
+    },
+    {
+      "family": "monitoring-task-failure-alerts",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A job in Lakeflow Jobs loads orders and then runs cleanup_and_notify, its only leaf task, which uses the Run if condition All done. Several recent runs show the status Succeeded with failures, yet the team's job-level Failure email never arrived. The team wants an email whenever any task fails, without emails for clean runs. What should they configure?",
+      "options": [
+        {
+          "text": "Failure notifications on the individual tasks",
+          "correct": true,
+          "why": "A run that ends Succeeded with failures counts as successful, so a job-level Failure notification doesn't fire; task notifications send a failure email after every failed task."
+        },
+        {
+          "text": "Success added to the job-level notification",
+          "average": true,
+          "why": "Selecting Success does cover runs that end Succeeded with failures, but it also emails after every clean run, which the team wants to avoid."
+        },
+        {
+          "text": "The Run if condition All succeeded on cleanup_and_notify",
+          "why": "With All succeeded, the cleanup task would be marked Upstream failed after a load failure; the run would then end Failed and alert, but cleanup would no longer run."
+        },
+        {
+          "text": "A Duration Warning notification on the job",
+          "why": "A duration warning fires when a run exceeds its expected duration; it says nothing about which tasks failed."
+        }
+      ],
+      "in_practice": "Task-level failure alerts let the on-call engineer see a broken load even when downstream cleanup keeps the run green, instead of discovering a missing day of orders when finance reports a gap.",
+      "source": "https://docs.databricks.com/aws/en/jobs/notifications",
+      "evidence": "To receive a failure notification after every failed task, use task notifications instead. ... A job that has been completed in a Succeeded with failures state is considered to be in a successful state."
+    },
+    {
+      "family": "monitoring-upstream-failed-task",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer opens last night's run of a job in Lakeflow Jobs and sees in the task graph that publish_report shows Upstream failed, while the run as a whole is Failed. publish_report uses the default Run if condition. Where should the engineer look first to find the root cause?",
+      "options": [
+        {
+          "text": "At the upstream tasks publish_report depends on, to find the failed one",
+          "correct": true,
+          "why": "With the default Run if condition, All succeeded, a task whose dependencies didn't all succeed is marked Upstream failed and never runs, so the error lives in a failed task earlier in the graph."
+        },
+        {
+          "text": "At publish_report's own output and error message",
+          "average": true,
+          "why": "publish_report never ran, so it has no error of its own; Upstream failed means the blocker is one of its dependencies."
+        },
+        {
+          "text": "At the job's maximum concurrent runs setting",
+          "why": "Exceeding the concurrency limit skips a whole run; it doesn't mark a single task Upstream failed while other tasks in the same run executed."
+        },
+        {
+          "text": "At publish_report's Run if condition, to change it to All done",
+          "why": "Switching to All done would make publish_report run after a failure and publish incomplete data; it hides the blocker instead of finding it."
+        }
+      ],
+      "in_practice": "Reading the graph from the red node upward saves time: in a 15-task job, one failed ingestion task often explains every Upstream failed task below it, so one fix and one repair are enough.",
+      "source": "https://docs.databricks.com/aws/en/jobs/run-if",
+      "evidence": "All succeeded: All dependencies have run and succeeded. This is the default setting. The task is marked as Upstream failed if the condition is unmet."
+    },
+    {
+      "family": "monitoring-runs-tab-top-errors",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform lead wants one place to see how many job runs failed in the workspace over the last 48 hours and which error types occurred most often. Where in the Lakeflow Jobs UI is this shown?",
+      "options": [
+        {
+          "text": "The Runs tab under Jobs & Pipelines, with its Top 5 error types table",
+          "correct": true,
+          "why": "The Runs tab shows a Finished runs count graph for the last 48 hours and a Top 5 error types table, and its filters by status, time and error code apply to both and to the runs list."
+        },
+        {
+          "text": "The matrix view on each individual job's Runs tab",
+          "average": true,
+          "why": "The matrix view shows the history of one job, so comparing failure causes across the workspace would mean opening every job one by one."
+        },
+        {
+          "text": "The event log on each job cluster's compute page",
+          "why": "A compute event log records cluster lifecycle events such as starts, resizes and terminations, not run outcomes across all jobs."
+        },
+        {
+          "text": "The History tab of each table in Catalog Explorer",
+          "why": "Catalog Explorer history lists operations on one table, such as writes and maintenance, not job run failures and their error types."
+        }
+      ],
+      "in_practice": "Scanning the top error types after a weekend shows whether 30 failures share one cause, such as an expired credential, so the team fixes one thing instead of triaging 30 runs.",
+      "source": "https://docs.databricks.com/aws/en/jobs/monitor",
+      "evidence": "The Finished runs count graph shows the number of runs completed in the last 48 hours. ... The Top 5 error types table shows a list of the most frequent error types from the selected time range, allowing you to quickly see the most common causes of issues in your workspace."
+    },
+    {
+      "family": "monitoring-timeline-view-bottleneck",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "One run of a multi-task job in Lakeflow Jobs took twice as long as usual. Which view of the job run details page is designed to show which tasks took longest and how the tasks overlapped in that run?",
+      "options": [
+        {
+          "text": "The Timeline view",
+          "correct": true,
+          "why": "The Timeline view identifies tasks that take a long time to complete and shows dependencies and overlap, which reveals the task that stretched the run."
+        },
+        {
+          "text": "The Graph view",
+          "average": true,
+          "why": "The Graph view shows the task DAG and lets you click a node for its details, but it doesn't lay tasks out on a time axis to show overlap."
+        },
+        {
+          "text": "The lineage panel",
+          "why": "The lineage link lists the upstream and downstream Unity Catalog tables of the job; it carries no task timings."
+        },
+        {
+          "text": "The Finished runs graph",
+          "why": "The Finished runs count graph counts completed runs across jobs over time; it doesn't break a single run down by task."
+        }
+      ],
+      "in_practice": "The timeline often shows that the critical path, not total work, sets the runtime; moving one long task off that path can, for example, cut a 2-hour run to 80 minutes without more compute.",
+      "source": "https://docs.databricks.com/aws/en/jobs/monitor",
+      "evidence": "Jobs have a timeline view to identify tasks that are taking a long time to complete, understand dependencies and overlap to help debug and optimize these jobs."
+    },
+    {
+      "family": "monitoring-submit-run-name-filter",
+      "objective": "troubleshooting.monitoring",
+      "guide": "6.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Apache Airflow starts Databricks work with the DatabricksSubmitRunOperator. A data engineer filters the Runs tab under Jobs & Pipelines by the expected job name and finds none of yesterday's runs. Why?",
+      "options": [
+        {
+          "text": "They are one-time runs with no saved job, so no job name matches them",
+          "correct": true,
+          "why": "The runs/submit endpoint creates one-time runs with no associated job, so a Name filter can't match them; filter by Run ID, Run as or Start time, or create a job and trigger it instead."
+        },
+        {
+          "text": "Runs started by external orchestrators never appear in the Runs tab",
+          "average": true,
+          "why": "The Runs tab includes runs started by external tools such as Apache Airflow or Azure Data Factory; these runs are listed but can't be matched by a job name."
+        },
+        {
+          "text": "Runs older than 24 hours move out of the Runs tab into an archive",
+          "why": "Databricks keeps job and pipeline run history for 60 days, so yesterday's runs are still in the list."
+        },
+        {
+          "text": "The Runs tab only lists runs of jobs that the viewer personally owns",
+          "why": "The Runs tab lists runs of the jobs and pipelines the user has access to, not only ones they own, so ownership doesn't explain the empty search."
+        }
+      ],
+      "in_practice": "Having Airflow trigger a saved job instead of submitting one-time runs gives searchable history, retries and repair runs, which shortens triage when an overnight DAG fails.",
+      "source": "https://docs.databricks.com/aws/en/jobs/monitor",
+      "evidence": "Runs submitted through the Jobs API runs/submit endpoint, including runs from the Apache Airflow DatabricksSubmitRunOperator, are one-time runs that aren't backed by a saved job. Because these runs have no associated job, you can't find them by filtering on a job Name."
+    },
+    {
+      "family": "spark-ui-skew-summary-metrics",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer opens the stage page for the longest stage of a slow job and wants to check that stage for data skew. Which comparison on the stage page does Databricks recommend?",
+      "options": [
+        {
+          "text": "The Max task duration against the 75th percentile in Summary Metrics",
+          "correct": true,
+          "why": "Skew shows up as a few tasks running much longer than the rest; if the Max duration in Summary Metrics exceeds the 75th percentile by 50% or more, the stage might have skew."
+        },
+        {
+          "text": "The Spill (Disk) size against the Spill (Memory) size for the stage",
+          "average": true,
+          "why": "Spill statistics show that tasks ran short of execution memory, which is a different problem; a stage can spill evenly across all its tasks with no skew at all."
+        },
+        {
+          "text": "The stage's Shuffle Read size against its Shuffle Write size",
+          "why": "Shuffle Read and Shuffle Write measure how much data the stage exchanged, not how evenly the work was split across its tasks."
+        },
+        {
+          "text": "The stage's task count against the number of cores in the cluster",
+          "why": "The task count tells you about parallelism, for example a single-task stage, but it doesn't show whether some tasks did far more work than others."
+        }
+      ],
+      "in_practice": "The check takes seconds and steers the fix: a 10-minute Max against a 40-second 75th percentile points to key skew, where adding workers would only add idle cores.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/long-spark-stage-page",
+      "evidence": "To check for skew, scroll down to Summary Metrics. Compare the Max duration to the 75th percentile duration. ... If the Max duration exceeds the 75th percentile by 50% or more, the stage might have skew."
+    },
+    {
+      "family": "spark-ui-shuffle-read-write-columns",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer suspects that the longest stage of a job spends its time exchanging data between executors for a join, not reading the source tables. Which columns in the job's stage list show how much data the stage moved this way?",
+      "options": [
+        {
+          "text": "Shuffle Read and Shuffle Write",
+          "correct": true,
+          "why": "Shuffle Read and Shuffle Write report how much shuffle data a stage read and wrote, which is the data exchanged between stages for joins and aggregations."
+        },
+        {
+          "text": "Input and Output",
+          "average": true,
+          "why": "Input and Output count data read from and written to storage, such as Delta Lake, Parquet or CSV files, not data exchanged between executors."
+        },
+        {
+          "text": "Spill (Memory) and Spill (Disk)",
+          "why": "Spill measures data that didn't fit in execution memory and was written to disk; it often accompanies a shuffle but doesn't measure the shuffle itself."
+        },
+        {
+          "text": "Duration and Tasks: Succeeded/Total",
+          "why": "Duration and task counts tell you how long the stage ran and how parallel it was, not how much data it shuffled."
+        }
+      ],
+      "in_practice": "A stage that shuffles hundreds of gigabytes to join a large table with a small dimension is a cue to check the join strategy, since broadcasting the small side avoids shuffling the large one.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/long-spark-stage",
+      "evidence": "Input: How much data this stage read from storage, such as Delta Lake, Parquet, or CSV files. ... Shuffle Read: How much shuffle data this stage read. Shuffle Write: How much shuffle data this stage wrote."
+    },
+    {
+      "family": "spark-ui-single-task-window",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer runs SELECT *, ROW_NUMBER() OVER (ORDER BY reading_ts) AS seq FROM iot.readings on a 16-worker cluster. The Spark UI shows that the longest stage ran exactly one task while the other cores sat idle. The sequence only needs to restart for each device_id. Which change speeds up this stage?",
+      "options": [
+        {
+          "text": "Add PARTITION BY device_id to the window specification",
+          "correct": true,
+          "why": "Without PARTITION BY, the window spans the whole dataset and one task processes every row; partitioning by device_id lets Spark spread the window across many tasks."
+        },
+        {
+          "text": "Add more workers so Spark can split the stage",
+          "average": true,
+          "why": "A single-task stage has no parallelism to spread, so extra workers would sit idle just like the current ones."
+        },
+        {
+          "text": "Set spark.sql.shuffle.partitions to auto",
+          "why": "Auto-optimized shuffle chooses the number of shuffle partitions, but a window with no PARTITION BY still needs all rows in one partition, so the stage stays at one task."
+        },
+        {
+          "text": "Lower the AQE skew join thresholds",
+          "why": "AQE skew handling splits skewed partitions in sort merge and shuffle hash joins; this stage is a window with no join, and its problem is one partition, not skew."
+        }
+      ],
+      "in_practice": "On a 16-worker cluster, a single-task stage uses one core out of dozens, so fixing the window can turn a multi-hour step into minutes and stop paying for idle workers.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/one-spark-task",
+      "evidence": "A window function without PARTITION BY. Without a PARTITION BY clause, the window spans the whole dataset, so one task processes every row. Add a PARTITION BY clause if your logic allows it."
+    },
+    {
+      "family": "spark-ui-aqe-skew-threshold",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer finds skew in a stage that runs an inner sort merge join between two large tables: Summary Metrics show a Max task duration of 9 minutes against a 75th percentile of 30 seconds. The largest shuffle partition is about 200 MB and the median is 8 MB, and the plan's SortMergeJoin node doesn't have isSkew set to true. AQE runs with default settings. Which configuration change lets AQE split the skewed partition?",
+      "options": [
+        {
+          "text": "Lower spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes below 200MB",
+          "correct": true,
+          "why": "AQE treats a partition as skewed only if it exceeds both the factor (default 5) times the median and the byte threshold (default 256MB); at 200 MB it fails the byte test, so lowering that threshold lets AQE split it."
+        },
+        {
+          "text": "Raise spark.sql.adaptive.skewJoin.skewedPartitionFactor above 5",
+          "average": true,
+          "why": "A higher factor makes skew detection stricter, not looser, and the partition is already 25 times the median, so the factor isn't what blocks it."
+        },
+        {
+          "text": "Raise spark.databricks.adaptive.autoBroadcastJoinThreshold above both table sizes",
+          "why": "Both tables are large, so broadcasting one isn't practical, and AQE never applies skew handling to broadcast joins."
+        },
+        {
+          "text": "Set spark.sql.adaptive.coalescePartitions.enabled to false",
+          "why": "Coalescing merges small post-shuffle partitions; turning it off does nothing to make AQE treat the 200 MB partition as skewed."
+        }
+      ],
+      "in_practice": "Letting AQE split the hot partition turns one 9-minute task into several short ones without code changes, which is cheaper to maintain than salting join keys by hand.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/aqe",
+      "evidence": "skewedPartitionThresholdInBytes, default 256MB: the minimum size that a partition must exceed to be considered skewed. AQE treats a partition as skewed only when both of these conditions are true: (partition size > skewedPartitionFactor * median partition size) and (partition size > skewedPartitionThresholdInBytes)."
+    },
+    {
+      "family": "spark-ui-streaming-backlog-spill",
+      "objective": "troubleshooting.spark-ui",
+      "guide": "6.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A Structured Streaming job reads new JSON files from cloud storage, aggregates them and writes to a Delta table. After a two-day upstream outage, the first micro-batch after restart ran for hours; the Spark UI shows heavy spill on its aggregation stage, with the Max task duration close to the 75th percentile. Later micro-batches are normal. The data engineer wants future catch-ups to avoid this spill while restarting from the same checkpoint and keeping the current cluster. Which change fits?",
+      "options": [
+        {
+          "text": "Cap the data each micro-batch admits with a rate limit such as maxFilesPerTrigger",
+          "correct": true,
+          "why": "Oversized micro-batches can exceed a streaming stage's execution memory; limiting the input rate keeps each batch small enough to avoid spill, and a backlog is worked off over several batches."
+        },
+        {
+          "text": "Set spark.sql.shuffle.partitions to auto before restarting the query",
+          "average": true,
+          "why": "Auto-optimized shuffle helps batch queries, but for Structured Streaming the shuffle partition count can't be changed between restarts from the same checkpoint."
+        },
+        {
+          "text": "Lower the AQE skew join thresholds so the large tasks get split",
+          "why": "Task durations are even, so this is spill rather than skew, and AQE doesn't re-optimize streaming queries in any case."
+        },
+        {
+          "text": "Add a REBALANCE hint to the write into the Delta table",
+          "why": "REBALANCE splits skewed output partitions when writing a table; it doesn't reduce how much data the aggregation holds in memory per task."
+        }
+      ],
+      "in_practice": "Rate-limited catch-up turns one multi-hour, spill-heavy batch into a series of short batches, so a backlog clears predictably and the next scheduled run isn't blocked behind it.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/long-spark-stage-page",
+      "evidence": "Limit the streaming batch size. If the stage is part of a Structured Streaming query, limit the input rate so that large micro-batches don't cause spill."
+    },
+    {
+      "family": "layout-predictive-optimization-operations",
+      "objective": "troubleshooting.layout",
+      "guide": "6.4",
+      "difficulty": 1,
+      "type": "multiple",
+      "stem": "A platform team enables predictive optimization for a catalog of Unity Catalog managed Delta tables. Which two maintenance operations will Databricks then run on those tables automatically? (Choose two.)",
+      "options": [
+        {
+          "text": "VACUUM, to delete data files the table no longer references",
+          "correct": true,
+          "why": "Predictive optimization runs VACUUM to remove data files that are no longer referenced, which reduces storage costs; the retention window still follows delta.deletedFileRetentionDuration."
+        },
+        {
+          "text": "ANALYZE, to collect statistics that improve query performance",
+          "correct": true,
+          "why": "Predictive optimization runs ANALYZE to collect table statistics, and it also collects statistics when data is written to a managed table."
+        },
+        {
+          "text": "OPTIMIZE with ZORDER BY on the most-filtered columns",
+          "average": true,
+          "why": "Predictive optimization does run OPTIMIZE, but never with ZORDER; on Z-ordered tables it ignores the Z-ordered files, and liquid clustering is the layout it maintains."
+        },
+        {
+          "text": "REORG TABLE ... APPLY (PURGE) to rewrite files with deleted rows",
+          "why": "REORG isn't among the operations predictive optimization runs; those are OPTIMIZE, VACUUM, ANALYZE and REFRESH INDEX."
+        },
+        {
+          "text": "RESTORE TABLE to roll back accidental overwrites",
+          "why": "RESTORE is a manual recovery command for returning a table to an earlier version; predictive optimization performs maintenance, not rollbacks."
+        }
+      ],
+      "in_practice": "Handing VACUUM and ANALYZE to predictive optimization retires a fleet of scheduled maintenance jobs, and it runs them only where they help, so a team with thousands of tables stops paying for no-op runs.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization",
+      "evidence": "Predictive optimization automatically runs OPTIMIZE, VACUUM, and ANALYZE on Unity Catalog managed tables ... OPTIMIZE does not run ZORDER when executed by predictive optimization. On tables that use Z-order, predictive optimization ignores Z-ordered files."
+    },
+    {
+      "family": "layout-predictive-optimization-inheritance",
+      "objective": "troubleshooting.layout",
+      "guide": "6.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team owns the finance catalog, which holds Unity Catalog managed tables. Predictive optimization is off at the account level, and other teams' catalogs must stay that way. The team wants it on for every current and future table in finance except the finance.scratch schema, whose tables are rebuilt daily. What should the team run?",
+      "options": [
+        {
+          "text": "ALTER CATALOG finance ENABLE PREDICTIVE OPTIMIZATION, then ALTER SCHEMA finance.scratch DISABLE PREDICTIVE OPTIMIZATION",
+          "correct": true,
+          "why": "Predictive optimization is inherited: schemas and tables, including ones created later, take the catalog's setting, and an explicit DISABLE on a schema overrides the catalog for that schema."
+        },
+        {
+          "text": "ALTER TABLE ... ENABLE PREDICTIVE OPTIMIZATION on each table outside finance.scratch",
+          "average": true,
+          "why": "Enabling table by table covers today's tables, but tables created later inherit from their schema and catalog, which stay disabled, so new tables would be missed."
+        },
+        {
+          "text": "Enable predictive optimization for the account, then disable it on finance.scratch",
+          "why": "Every catalog inherits the account-level setting, so other teams' catalogs would also change unless each one were disabled explicitly."
+        },
+        {
+          "text": "A scheduled job that runs OPTIMIZE and VACUUM on every finance table outside scratch",
+          "why": "A scheduled maintenance job is manual upkeep that runs whether or not a table needs it, and it isn't predictive optimization at all."
+        }
+      ],
+      "in_practice": "Setting it at the catalog means new finance tables are maintained from day one without a ticket, while the daily-rebuilt scratch tables don't spend serverless compute on compaction that is thrown away overnight.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization",
+      "evidence": "Predictive optimization uses an inheritance model. When enabled for a catalog, schemas in that catalog inherit the setting, and tables within an enabled schema inherit it as well. You can explicitly enable or disable predictive optimization for a catalog, schema, or table to override this behavior."
+    },
+    {
+      "family": "layout-cluster-by-auto-replace",
+      "objective": "troubleshooting.layout",
+      "guide": "6.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer enabled automatic liquid clustering on the Unity Catalog managed table sales.orders, and predictive optimization picked clustering keys from its query history. A weekly job now rebuilds the table with CREATE OR REPLACE TABLE sales.orders AS SELECT .... After the first rebuild, DESCRIBE TABLE shows no clustering columns and clusterByAuto is no longer true. Which change keeps automatic clustering in place across rebuilds?",
+      "options": [
+        {
+          "text": "Add CLUSTER BY AUTO to the CREATE OR REPLACE TABLE statement",
+          "correct": true,
+          "why": "Replacing a table without CLUSTER BY AUTO turns automatic clustering off and drops the clustering columns; including CLUSTER BY AUTO in the replace keeps it on along with the keys already selected."
+        },
+        {
+          "text": "Run OPTIMIZE sales.orders FULL after each weekly rebuild",
+          "average": true,
+          "why": "OPTIMIZE FULL reclusters data on the table's current keys, but after the replace there are none and automatic clustering is off, so there is nothing to cluster by."
+        },
+        {
+          "text": "Re-enable predictive optimization on the sales schema after each rebuild",
+          "why": "The rebuild didn't change the schema's predictive optimization setting; what was lost is the table's own CLUSTER BY AUTO setting."
+        },
+        {
+          "text": "Schedule a weekly OPTIMIZE ... ZORDER BY on the old clustering keys",
+          "why": "Z-ordering isn't compatible with liquid clustering, and predictive optimization never runs ZORDER, so this adds manual upkeep without restoring automatic clustering."
+        }
+      ],
+      "in_practice": "Losing clustering is silent and costly: queries that skipped most files of a multi-terabyte table start scanning all of it, and the regression surfaces days later as slower dashboards.",
+      "source": "https://docs.databricks.com/aws/en/delta/clustering",
+      "evidence": "If an existing table has automatic liquid clustering enabled, running CREATE OR REPLACE table_name without CLUSTER BY AUTO turns off automatic clustering and does not preserve clustering columns. To preserve automatic liquid clustering and any previously selected columns, include CLUSTER BY AUTO in the replace statement."
+    },
+    {
+      "family": "layout-change-keys-optimize-full",
+      "objective": "troubleshooting.layout",
+      "guide": "6.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer changes the clustering keys of a liquid clustered table with ALTER TABLE events CLUSTER BY (region, event_date). Which command reclusters the data already in the table on the new keys?",
+      "options": [
+        {
+          "text": "OPTIMIZE events FULL",
+          "correct": true,
+          "why": "Changing keys affects only later OPTIMIZE runs and writes; OPTIMIZE ... FULL reclusters all existing records, and Databricks recommends it after enabling clustering or changing keys."
+        },
+        {
+          "text": "OPTIMIZE events",
+          "average": true,
+          "why": "Plain OPTIMIZE is incremental: it clusters data that needs clustering but doesn't rewrite files already clustered on the old keys, so most existing data keeps its old layout."
+        },
+        {
+          "text": "VACUUM events",
+          "why": "VACUUM deletes data files the table no longer references; it never rewrites live data into a new layout."
+        },
+        {
+          "text": "ANALYZE TABLE events COMPUTE STATISTICS",
+          "why": "ANALYZE collects statistics for the query optimizer; it doesn't move rows between files."
+        }
+      ],
+      "in_practice": "On a large table OPTIMIZE FULL can take hours, so teams run it once after a key change, for example over a weekend, and let incremental OPTIMIZE or predictive optimization keep up afterward.",
+      "source": "https://docs.databricks.com/aws/en/delta/clustering",
+      "evidence": "When you change clustering keys, subsequent OPTIMIZE and write operations use the new clustering approach, but existing data is not rewritten. ... Run OPTIMIZE <table_name> FULL when you enable clustering for the first time or change clustering keys."
+    },
+    {
+      "family": "compute-issues-library-new-session",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer installs a PyPI library on a running all-purpose cluster from its Libraries tab, and the status shows Installed. A notebook that was already attached to the cluster still raises ModuleNotFoundError on import. What must the engineer do?",
+      "options": [
+        {
+          "text": "Start a new notebook session, for example by detaching and reattaching",
+          "correct": true,
+          "why": "A notebook that was attached before a cluster library was installed doesn't see it right away; the notebook needs a new session to pick up the library."
+        },
+        {
+          "text": "Wait a few minutes for attached notebooks to pick it up automatically",
+          "average": true,
+          "why": "Attached notebooks don't pick up a new cluster library on their own; the session that existed before the install keeps its old environment."
+        },
+        {
+          "text": "Uninstall and reinstall the library from the Libraries tab",
+          "why": "Uninstalling a cluster library takes effect only after a cluster restart, and reinstalling doesn't change what the existing notebook session can see."
+        },
+        {
+          "text": "Switch the cluster's access mode from standard to dedicated",
+          "why": "Access mode decides which library sources and identities are supported; the library already installed, so the mode isn't what blocks the import."
+        }
+      ],
+      "in_practice": "Knowing this avoids needless restarts: reattaching one notebook takes seconds, while restarting a shared cluster interrupts every user and job running on it.",
+      "source": "https://docs.databricks.com/aws/en/libraries/cluster-libraries",
+      "evidence": "When you install a library on a cluster, a notebook already attached to that cluster will not immediately see the new library. You must start a new session for the notebook to see the new library."
+    },
+    {
+      "family": "compute-issues-notebook-library-override",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A shared all-purpose cluster has requests 2.28 installed as a compute-scoped library, and several teams' notebooks depend on it. A data engineer's new notebook needs requests 2.32 for an API client, and the other notebooks must keep 2.28. What should the engineer do?",
+      "options": [
+        {
+          "text": "Run %pip install requests==2.32 at the top of the new notebook",
+          "correct": true,
+          "why": "Notebook-scoped libraries installed with %pip take precedence over compute-scoped libraries and apply only to that notebook's session, so the other notebooks keep 2.28."
+        },
+        {
+          "text": "Install requests 2.32 as a second compute-scoped library",
+          "average": true,
+          "why": "A compute-scoped library applies to every notebook and job on the cluster, so adding a second version creates a cluster-wide conflict instead of isolating one notebook."
+        },
+        {
+          "text": "Run %pip uninstall requests to remove 2.28, then install 2.32",
+          "why": "%pip can't uninstall a library that was installed as a cluster library, and removing it would break the other teams' notebooks anyway."
+        },
+        {
+          "text": "Add a cluster init script that pip-installs requests 2.32",
+          "why": "An init script changes the environment for the whole cluster, and Databricks doesn't recommend installing libraries with init scripts because their precedence is unpredictable."
+        }
+      ],
+      "in_practice": "Notebook-scoped installs let one team trial a newer client library without a change request on a cluster that dozens of analysts share; pinning the exact version keeps the job reproducible.",
+      "source": "https://docs.databricks.com/aws/en/libraries/",
+      "evidence": "The following list orders precedence from highest to lowest. ... Notebook-scoped libraries (%pip install in notebooks). Compute-scoped libraries (using the UI, CLI, or API). Libraries included in Databricks Runtime. ... These libraries do not affect other notebooks running on the same compute."
+    },
+    {
+      "family": "compute-issues-init-script-logs",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A job cluster fails to start with INIT_SCRIPT_FAILURE: 'Cluster scoped init script /Volumes/ops/tools/setup.sh failed: Script exit status is non-zero'. Cluster log delivery is configured for the job's compute. A data engineer needs to find which command in the script failed. Where should the engineer look?",
+      "options": [
+        {
+          "text": "The .stderr.log files in the delivered init_scripts logs",
+          "correct": true,
+          "why": "Init script output is delivered to <log-path>/<cluster-id>/init_scripts with a subfolder per node, and the .stderr.log files hold the error output that names the failing command."
+        },
+        {
+          "text": "The driver logs on the Spark UI page of the cluster",
+          "average": true,
+          "why": "The init script failed during startup, before Spark was running, so the Spark UI has nothing about it; the script's own logs go to the log delivery destination."
+        },
+        {
+          "text": "The global init script settings in the admin console",
+          "why": "This error names a cluster-scoped script; a failing global init script surfaces as GLOBAL_INIT_SCRIPT_FAILURE instead."
+        },
+        {
+          "text": "The install status on the job cluster's Libraries tab",
+          "why": "The Libraries tab shows the install status of compute-scoped libraries, not the output of init scripts."
+        }
+      ],
+      "in_practice": "Reading stderr first usually turns a vague startup failure into a one-line cause, such as a package mirror blocked by the firewall, instead of hours of trial-and-error relaunches.",
+      "source": "https://docs.databricks.com/aws/en/compute/troubleshooting/cluster-error-codes",
+      "evidence": "At the log delivery destination, open <log-path>/<cluster-id>/init_scripts ... Open the node subdirectories ... Read the .stderr.log files for error output and the .stdout.log files for standard output."
+    },
+    {
+      "family": "compute-issues-oom-memory-per-core",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A nightly job runs on 8 workers, each with 4 cores and 16 GB of memory, and intermittently fails with ExecutorLostFailure ... Remote RPC client disassociated. The compute event log shows no spot instance losses or autoscaling events. Before rewriting code, a data engineer wants to confirm that executor memory is the cause. Which test does Databricks recommend?",
+      "options": [
+        {
+          "text": "Rerun on workers with 4 cores and 32 GB of memory each",
+          "correct": true,
+          "why": "These errors are generic, so Databricks suggests doubling the memory per core; the ratio of memory to cores matters, and if the job fails later or not at all, memory is likely the cause."
+        },
+        {
+          "text": "Rerun on 16 workers of the same 4-core, 16 GB type",
+          "average": true,
+          "why": "Doubling the worker count doubles total memory but leaves each core with 4 GB, so tasks that ran out of memory would fail the same way."
+        },
+        {
+          "text": "Rerun on workers with 8 cores and 32 GB of memory each",
+          "why": "A larger instance with twice the cores keeps the ratio at 4 GB per core, so it doesn't test whether the tasks need more memory."
+        },
+        {
+          "text": "Rerun with a driver node that has twice the memory",
+          "why": "The errors come from lost executors on the workers; a bigger driver doesn't change how much memory each executor's tasks get."
+        }
+      ],
+      "in_practice": "The test is cheap and settles the question: if 8 GB per core fixes the job, keeping the bigger type may cost less than a week of refactoring; if not, the team looks at partitions, broadcasts or UDFs.",
+      "source": "https://docs.databricks.com/aws/en/optimizations/spark-ui-guide/spark-memory-issues",
+      "evidence": "If you suspect a memory issue, verify it by doubling the memory per core to see whether it resolves the problem. For example, if the worker type has 4 cores and 16 GB of memory, switch to a worker type with 4 cores and 32 GB of memory. ... The ratio of memory to cores matters, not the total memory."
+    },
+    {
+      "family": "compute-issues-instance-capacity",
+      "objective": "troubleshooting.compute-issues",
+      "guide": "6.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A job cluster on AWS uses spot r5d.4xlarge workers pinned to the availability zone us-east-1d. It fails to start with AWS_INSUFFICIENT_INSTANCE_CAPACITY_FAILURE. Which change does Databricks recommend?",
+      "options": [
+        {
+          "text": "Use the auto availability zone setting or a different instance type",
+          "correct": true,
+          "why": "This code means AWS lacks capacity for that instance type in that zone; the fix is another or auto availability zone, a different instance type, or on-demand instead of spot."
+        },
+        {
+          "text": "Request a higher EC2 instance quota in AWS Service Quotas",
+          "average": true,
+          "why": "A quota increase addresses AWS_RESOURCE_QUOTA_EXCEEDED, where the account hits its limit; here AWS has no spare capacity for that type in that zone."
+        },
+        {
+          "text": "Expand the subnet's CIDR range to free more IP addresses",
+          "why": "Running out of subnet IP addresses produces AWS_INSUFFICIENT_FREE_ADDRESSES_IN_SUBNET_FAILURE, which is a different startup failure."
+        },
+        {
+          "text": "Check the cluster's init script logs for a failing command",
+          "why": "Init script problems surface as INIT_SCRIPT_FAILURE once instances are running; here the instances were never provisioned."
+        }
+      ],
+      "in_practice": "Pinning one zone and one spot type is a common cause of early-morning job failures; allowing an auto zone or flexible node types lets the load start on time instead of waiting for someone to edit the cluster.",
+      "source": "https://docs.databricks.com/aws/en/compute/troubleshooting/cluster-error-codes",
+      "evidence": "AWS does not have sufficient capacity for the requested instance type in the selected availability zone. ... Try launching in a different availability zone, use the auto availability zone setting, switch to a different instance type, or use on-demand instances instead of spot."
+    }
+  ]
+}

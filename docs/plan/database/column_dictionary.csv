@@ -1,0 +1,258 @@
+table,column,type,not_null_or_pk,declaration
+app.user_profiles,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.user_profiles,external_subject,text,True,external_subject text NOT NULL UNIQUE
+app.user_profiles,display_name,text,True,display_name text NOT NULL CHECK (length(display_name) BETWEEN 1 AND 60)
+app.user_profiles,timezone,text,True,timezone text NOT NULL DEFAULT 'Etc/UTC'
+app.user_profiles,daily_goal_minutes,integer,True,daily_goal_minutes integer NOT NULL DEFAULT 5 CHECK (daily_goal_minutes BETWEEN 5 AND 60)
+app.user_profiles,created_at,timestamptz,True,created_at timestamptz NOT NULL DEFAULT now()
+app.user_profiles,deleted_at,timestamptz,False,deleted_at timestamptz
+app.exams,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.exams,slug,text,True,slug text NOT NULL UNIQUE
+app.exams,provider,text,True,"provider text NOT NULL CHECK (provider IN ('aws','databricks','microsoft'))"
+app.exams,title,text,True,title text NOT NULL
+app.exams,status,text,True,"status text NOT NULL DEFAULT 'planned' CHECK (status IN ('planned','pilot','active','retired'))"
+app.exams,canonical_url,text,True,canonical_url text NOT NULL
+app.exam_versions,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.exam_versions,exam_id,uuid,True,exam_id uuid NOT NULL REFERENCES app.exams(id)
+app.exam_versions,version_label,text,True,version_label text NOT NULL
+app.exam_versions,effective_from,date,True,effective_from date NOT NULL
+app.exam_versions,effective_until,date,False,effective_until date
+app.exam_versions,question_count,integer,True,question_count integer NOT NULL CHECK (question_count > 0)
+app.exam_versions,duration_minutes,integer,True,duration_minutes integer NOT NULL CHECK (duration_minutes > 0)
+app.exam_versions,guide_url,text,True,guide_url text NOT NULL
+app.exam_versions,status,text,True,"status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','retired'))"
+app.domains,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.domains,exam_version_id,uuid,True,exam_version_id uuid NOT NULL REFERENCES app.exam_versions(id)
+app.domains,code,text,True,code text NOT NULL
+app.domains,title,text,True,title text NOT NULL
+app.domains,weight_percent,"numeric(5,2)",True,"weight_percent numeric(5,2) NOT NULL CHECK (weight_percent BETWEEN 0 AND 100)"
+app.domains,sort_order,integer,True,sort_order integer NOT NULL CHECK (sort_order > 0)
+app.objectives,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.objectives,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.objectives,domain_id,uuid,True,domain_id uuid NOT NULL
+app.objectives,code,text,True,code text NOT NULL
+app.objectives,title,text,True,title text NOT NULL
+app.units,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.units,exam_version_id,uuid,True,exam_version_id uuid NOT NULL REFERENCES app.exam_versions(id)
+app.units,title,text,True,title text NOT NULL
+app.units,sort_order,integer,True,sort_order integer NOT NULL CHECK (sort_order > 0)
+app.lessons,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.lessons,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.lessons,unit_id,uuid,True,unit_id uuid NOT NULL
+app.lessons,title,text,True,title text NOT NULL
+app.lessons,kind,text,True,"kind text NOT NULL DEFAULT 'learn' CHECK (kind IN ('learn','review','checkpoint'))"
+app.lessons,question_count,integer,True,question_count integer NOT NULL DEFAULT 5 CHECK (question_count BETWEEN 1 AND 50)
+app.lessons,sort_order,integer,True,sort_order integer NOT NULL CHECK (sort_order > 0)
+app.lessons,status,text,True,"status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','retired'))"
+app.lesson_objectives,lesson_id,uuid,True,lesson_id uuid NOT NULL
+app.lesson_objectives,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.lesson_objectives,objective_id,uuid,True,objective_id uuid NOT NULL
+app.question_families,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.question_families,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.question_families,objective_id,uuid,True,objective_id uuid NOT NULL
+app.question_families,family_key,text,True,family_key text NOT NULL
+app.question_families,difficulty,integer,True,difficulty integer NOT NULL DEFAULT 1 CHECK (difficulty BETWEEN 1 AND 3)
+app.question_versions,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.question_versions,family_id,uuid,True,family_id uuid NOT NULL
+app.question_versions,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.question_versions,revision,integer,True,revision integer NOT NULL CHECK (revision > 0)
+app.question_versions,prompt_markdown,text,True,prompt_markdown text NOT NULL CHECK (length(prompt_markdown) >= 10)
+app.question_versions,answer_type,text,True,"answer_type text NOT NULL DEFAULT 'single' CHECK (answer_type IN ('single','multiple'))"
+app.question_versions,source_url,text,True,source_url text NOT NULL
+app.question_versions,status,text,True,"status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','retired'))"
+app.question_versions,reviewed_by,uuid,False,reviewed_by uuid REFERENCES app.user_profiles(id)
+app.question_versions,reviewed_at,timestamptz,False,reviewed_at timestamptz
+app.question_versions,created_at,timestamptz,True,created_at timestamptz NOT NULL DEFAULT now()
+app.question_options,question_version_id,uuid,True,question_version_id uuid NOT NULL REFERENCES app.question_versions(id)
+app.question_options,option_key,text,True,option_key text NOT NULL CHECK (option_key ~ '^[A-Z]$')
+app.question_options,body,text,True,body text NOT NULL
+app.question_options,sort_order,integer,True,sort_order integer NOT NULL CHECK (sort_order > 0)
+private.question_explanations,question_version_id,uuid,True,question_version_id uuid PRIMARY KEY REFERENCES app.question_versions(id)
+private.question_explanations,rationale_markdown,text,True,rationale_markdown text NOT NULL
+private.question_explanations,reviewed_notes,text,False,reviewed_notes text
+private.question_explanations,updated_at,timestamptz,True,updated_at timestamptz NOT NULL DEFAULT now()
+private.correct_options,question_version_id,uuid,True,question_version_id uuid NOT NULL
+private.correct_options,option_key,text,True,option_key text NOT NULL
+app.lesson_question_pool,lesson_id,uuid,True,lesson_id uuid NOT NULL
+app.lesson_question_pool,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.lesson_question_pool,family_id,uuid,True,family_id uuid NOT NULL
+app.lesson_question_pool,sort_order,integer,True,sort_order integer NOT NULL CHECK (sort_order > 0)
+app.enrollments,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.enrollments,user_id,uuid,True,user_id uuid NOT NULL REFERENCES app.user_profiles(id)
+app.enrollments,exam_version_id,uuid,True,exam_version_id uuid NOT NULL REFERENCES app.exam_versions(id)
+app.enrollments,exam_date,date,False,exam_date date
+app.enrollments,status,text,True,"status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused','passed','archived'))"
+app.enrollments,started_at,timestamptz,True,started_at timestamptz NOT NULL DEFAULT now()
+app.enrollments,ended_at,timestamptz,False,ended_at timestamptz
+app.lesson_progress,enrollment_id,uuid,True,enrollment_id uuid NOT NULL
+app.lesson_progress,user_id,uuid,True,user_id uuid NOT NULL
+app.lesson_progress,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.lesson_progress,lesson_id,uuid,True,lesson_id uuid NOT NULL
+app.lesson_progress,state,text,True,"state text NOT NULL DEFAULT 'available' CHECK (state IN ('available','in_progress','completed','placed_out'))"
+app.lesson_progress,completed_at,timestamptz,False,completed_at timestamptz
+app.practice_sessions,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.practice_sessions,user_id,uuid,True,user_id uuid NOT NULL
+app.practice_sessions,enrollment_id,uuid,True,enrollment_id uuid NOT NULL
+app.practice_sessions,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.practice_sessions,lesson_id,uuid,False,lesson_id uuid
+app.practice_sessions,mode,text,True,"mode text NOT NULL CHECK (mode IN ('lesson','quick','weakest','missed','timed','custom','mock','review','checkpoint'))"
+app.practice_sessions,status,text,True,"status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','completed','expired','abandoned'))"
+app.practice_sessions,question_count,integer,True,question_count integer NOT NULL CHECK (question_count BETWEEN 1 AND 200)
+app.practice_sessions,client_session_id,uuid,True,client_session_id uuid NOT NULL
+app.practice_sessions,selection_config,jsonb,True,selection_config jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(selection_config)='object')
+app.practice_sessions,started_at,timestamptz,True,started_at timestamptz NOT NULL DEFAULT now()
+app.practice_sessions,deadline_at,timestamptz,False,deadline_at timestamptz
+app.practice_sessions,completed_at,timestamptz,False,completed_at timestamptz
+app.session_items,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.session_items,session_id,uuid,True,session_id uuid NOT NULL
+app.session_items,user_id,uuid,True,user_id uuid NOT NULL
+app.session_items,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.session_items,question_version_id,uuid,True,question_version_id uuid NOT NULL
+app.session_items,position,integer,True,position integer NOT NULL CHECK (position > 0)
+app.session_items,presented_at,timestamptz,False,presented_at timestamptz
+app.attempts,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.attempts,session_item_id,uuid,True,session_item_id uuid NOT NULL UNIQUE
+app.attempts,user_id,uuid,True,user_id uuid NOT NULL
+app.attempts,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.attempts,question_version_id,uuid,True,question_version_id uuid NOT NULL
+app.attempts,client_submission_id,uuid,True,client_submission_id uuid NOT NULL
+app.attempts,confidence,text,False,"confidence text CHECK (confidence IN ('unsure','somewhat','confident'))"
+app.attempts,reasoning_text,text,False,reasoning_text text
+app.attempts,submitted_at,timestamptz,True,submitted_at timestamptz NOT NULL DEFAULT now()
+app.attempts,graded_at,timestamptz,False,graded_at timestamptz
+app.attempts,is_correct,boolean,False,is_correct boolean
+app.attempts,first_seen_family,boolean,True,first_seen_family boolean NOT NULL DEFAULT false
+app.attempt_choices,attempt_id,uuid,True,attempt_id uuid NOT NULL
+app.attempt_choices,question_version_id,uuid,True,question_version_id uuid NOT NULL
+app.attempt_choices,option_key,text,True,option_key text NOT NULL
+app.question_exposures,user_id,uuid,True,user_id uuid NOT NULL REFERENCES app.user_profiles(id)
+app.question_exposures,family_id,uuid,True,family_id uuid NOT NULL
+app.question_exposures,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.question_exposures,first_seen_at,timestamptz,True,first_seen_at timestamptz NOT NULL DEFAULT now()
+app.question_exposures,last_seen_at,timestamptz,True,last_seen_at timestamptz NOT NULL DEFAULT now()
+app.question_exposures,answered_count,integer,True,answered_count integer NOT NULL DEFAULT 0 CHECK (answered_count >= 0)
+app.objective_progress,enrollment_id,uuid,True,enrollment_id uuid NOT NULL
+app.objective_progress,user_id,uuid,True,user_id uuid NOT NULL
+app.objective_progress,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.objective_progress,objective_id,uuid,True,objective_id uuid NOT NULL
+app.objective_progress,first_seen_total,integer,True,first_seen_total integer NOT NULL DEFAULT 0 CHECK (first_seen_total >= 0)
+app.objective_progress,first_seen_correct,integer,True,first_seen_correct integer NOT NULL DEFAULT 0 CHECK (first_seen_correct >= 0)
+app.objective_progress,total_attempts,integer,True,total_attempts integer NOT NULL DEFAULT 0 CHECK (total_attempts >= 0)
+app.objective_progress,last_practiced_at,timestamptz,False,last_practiced_at timestamptz
+app.review_queue,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.review_queue,enrollment_id,uuid,True,enrollment_id uuid NOT NULL
+app.review_queue,user_id,uuid,True,user_id uuid NOT NULL
+app.review_queue,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.review_queue,objective_id,uuid,True,objective_id uuid NOT NULL
+app.review_queue,source_attempt_id,uuid,False,source_attempt_id uuid
+app.review_queue,reason,text,True,"reason text NOT NULL CHECK (reason IN ('missed','spacing','checkpoint'))"
+app.review_queue,stage,integer,True,stage integer NOT NULL DEFAULT 0 CHECK (stage BETWEEN 0 AND 4)
+app.review_queue,due_at,timestamptz,True,due_at timestamptz NOT NULL
+app.review_queue,last_reviewed_at,timestamptz,False,last_reviewed_at timestamptz
+app.daily_study_days,user_id,uuid,True,user_id uuid NOT NULL REFERENCES app.user_profiles(id)
+app.daily_study_days,study_date,date,True,study_date date NOT NULL
+app.daily_study_days,timezone_snapshot,text,True,timezone_snapshot text NOT NULL
+app.daily_study_days,qualifying_session_id,uuid,True,qualifying_session_id uuid NOT NULL UNIQUE
+app.daily_study_days,earned_at,timestamptz,True,earned_at timestamptz NOT NULL DEFAULT now()
+app.streak_state,user_id,uuid,True,user_id uuid PRIMARY KEY REFERENCES app.user_profiles(id)
+app.streak_state,current_days,integer,True,current_days integer NOT NULL DEFAULT 0 CHECK (current_days >= 0)
+app.streak_state,longest_days,integer,True,longest_days integer NOT NULL DEFAULT 0 CHECK (longest_days >= 0)
+app.streak_state,last_study_date,date,False,last_study_date date
+app.streak_state,updated_at,timestamptz,True,updated_at timestamptz NOT NULL DEFAULT now()
+app.reward_ledger,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.reward_ledger,user_id,uuid,True,user_id uuid NOT NULL REFERENCES app.user_profiles(id)
+app.reward_ledger,reward_type,text,True,reward_type text NOT NULL DEFAULT 'xp' CHECK (reward_type='xp')
+app.reward_ledger,amount,integer,True,amount integer NOT NULL CHECK (amount > 0)
+app.reward_ledger,reason_code,text,True,"reason_code text NOT NULL CHECK (reason_code IN ('new_attempt','first_correct','lesson_complete','review_repeat','manual_adjustment'))"
+app.reward_ledger,source_type,text,True,"source_type text NOT NULL CHECK (source_type IN ('attempt','session','manual'))"
+app.reward_ledger,source_id,uuid,True,source_id uuid NOT NULL
+app.reward_ledger,idempotency_key,text,True,idempotency_key text NOT NULL
+app.reward_ledger,created_at,timestamptz,True,created_at timestamptz NOT NULL DEFAULT now()
+app.streak_freeze_ledger,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.streak_freeze_ledger,user_id,uuid,True,user_id uuid NOT NULL REFERENCES app.user_profiles(id)
+app.streak_freeze_ledger,delta,integer,True,"delta integer NOT NULL CHECK (delta IN (-1,1))"
+app.streak_freeze_ledger,reason,text,True,"reason text NOT NULL CHECK (reason IN ('earned','used','manual'))"
+app.streak_freeze_ledger,protected_date,date,False,protected_date date
+app.streak_freeze_ledger,idempotency_key,text,True,idempotency_key text NOT NULL
+app.streak_freeze_ledger,created_at,timestamptz,True,created_at timestamptz NOT NULL DEFAULT now()
+app.entitlements,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.entitlements,user_id,uuid,True,user_id uuid NOT NULL REFERENCES app.user_profiles(id)
+app.entitlements,feature_key,text,True,"feature_key text NOT NULL CHECK (feature_key IN ('full_bank','custom_quiz','mocks','ai_explain'))"
+app.entitlements,source,text,True,"source text NOT NULL CHECK (source IN ('preview','store','manual'))"
+app.entitlements,source_ref,text,True,source_ref text NOT NULL
+app.entitlements,starts_at,timestamptz,True,starts_at timestamptz NOT NULL
+app.entitlements,ends_at,timestamptz,True,ends_at timestamptz NOT NULL
+app.entitlements,revoked_at,timestamptz,False,revoked_at timestamptz
+app.entitlements,created_at,timestamptz,True,created_at timestamptz NOT NULL DEFAULT now()
+private.store_events,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+private.store_events,provider,text,True,"provider text NOT NULL CHECK (provider IN ('apple','google','manual'))"
+private.store_events,provider_event_id,text,True,provider_event_id text NOT NULL
+private.store_events,user_id,uuid,False,user_id uuid REFERENCES app.user_profiles(id)
+private.store_events,event_type,text,True,event_type text NOT NULL
+private.store_events,verified_at,timestamptz,True,verified_at timestamptz NOT NULL
+private.store_events,redacted_payload,jsonb,True,redacted_payload jsonb NOT NULL DEFAULT '{}'::jsonb
+app.notification_preferences,user_id,uuid,True,user_id uuid PRIMARY KEY REFERENCES app.user_profiles(id)
+app.notification_preferences,reminders_enabled,boolean,True,reminders_enabled boolean NOT NULL DEFAULT false
+app.notification_preferences,daily_local_time,time,True,daily_local_time time NOT NULL DEFAULT '21:00'
+app.notification_preferences,quiet_start,time,True,quiet_start time NOT NULL DEFAULT '23:00'
+app.notification_preferences,quiet_end,time,True,quiet_end time NOT NULL DEFAULT '08:00'
+app.notification_preferences,updated_at,timestamptz,True,updated_at timestamptz NOT NULL DEFAULT now()
+app.notification_jobs,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.notification_jobs,user_id,uuid,True,user_id uuid NOT NULL REFERENCES app.user_profiles(id)
+app.notification_jobs,kind,text,True,"kind text NOT NULL CHECK (kind IN ('daily_goal','streak_at_risk','circle_summary'))"
+app.notification_jobs,study_date,date,True,study_date date NOT NULL
+app.notification_jobs,scheduled_at,timestamptz,True,scheduled_at timestamptz NOT NULL
+app.notification_jobs,status,text,True,"status text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','cancelled','sent','failed'))"
+app.notification_jobs,dedupe_key,text,True,dedupe_key text NOT NULL UNIQUE
+app.notification_jobs,provider_message_id,text,False,provider_message_id text
+app.notification_jobs,sent_at,timestamptz,False,sent_at timestamptz
+app.study_circles,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.study_circles,owner_id,uuid,True,owner_id uuid NOT NULL REFERENCES app.user_profiles(id)
+app.study_circles,name,text,True,name text NOT NULL CHECK (length(name) BETWEEN 1 AND 60)
+app.study_circles,timezone,text,True,timezone text NOT NULL DEFAULT 'Etc/UTC'
+app.study_circles,weekly_target_days,integer,True,weekly_target_days integer NOT NULL DEFAULT 5 CHECK (weekly_target_days BETWEEN 1 AND 7)
+app.study_circles,status,text,True,"status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived'))"
+app.study_circles,created_at,timestamptz,True,created_at timestamptz NOT NULL DEFAULT now()
+app.circle_members,circle_id,uuid,True,circle_id uuid NOT NULL REFERENCES app.study_circles(id)
+app.circle_members,user_id,uuid,True,user_id uuid NOT NULL REFERENCES app.user_profiles(id)
+app.circle_members,role,text,True,"role text NOT NULL DEFAULT 'member' CHECK (role IN ('owner','member'))"
+app.circle_members,status,text,True,"status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','left','removed'))"
+app.circle_members,joined_at,timestamptz,True,joined_at timestamptz NOT NULL DEFAULT now()
+app.circle_members,left_at,timestamptz,False,left_at timestamptz
+app.circle_invites,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.circle_invites,circle_id,uuid,True,circle_id uuid NOT NULL
+app.circle_invites,inviter_id,uuid,True,inviter_id uuid NOT NULL
+app.circle_invites,token_hash,text,True,token_hash text NOT NULL UNIQUE
+app.circle_invites,expires_at,timestamptz,True,expires_at timestamptz NOT NULL
+app.circle_invites,revoked_at,timestamptz,False,revoked_at timestamptz
+app.circle_invites,use_count,integer,True,use_count integer NOT NULL DEFAULT 0 CHECK (use_count >= 0)
+app.circle_invites,max_uses,integer,True,max_uses integer NOT NULL DEFAULT 10 CHECK (max_uses BETWEEN 1 AND 30)
+app.circle_weeks,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.circle_weeks,circle_id,uuid,True,circle_id uuid NOT NULL REFERENCES app.study_circles(id)
+app.circle_weeks,starts_at,timestamptz,True,starts_at timestamptz NOT NULL
+app.circle_weeks,ends_at,timestamptz,True,ends_at timestamptz NOT NULL
+app.circle_weeks,timezone_snapshot,text,True,timezone_snapshot text NOT NULL
+app.circle_weeks,target_days,integer,True,target_days integer NOT NULL CHECK (target_days BETWEEN 1 AND 7)
+app.exam_outcomes,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.exam_outcomes,enrollment_id,uuid,True,enrollment_id uuid NOT NULL
+app.exam_outcomes,user_id,uuid,True,user_id uuid NOT NULL
+app.exam_outcomes,exam_version_id,uuid,True,exam_version_id uuid NOT NULL
+app.exam_outcomes,result,text,True,"result text NOT NULL CHECK (result IN ('passed','failed'))"
+app.exam_outcomes,taken_at,timestamptz,True,taken_at timestamptz NOT NULL
+app.exam_outcomes,verification_status,text,True,verification_status text NOT NULL DEFAULT 'self_reported'
+app.exam_outcomes,private_evidence_ref,text,False,private_evidence_ref text
+app.exam_outcomes,verified_by,uuid,False,verified_by uuid REFERENCES app.user_profiles(id)
+app.exam_outcomes,verified_at,timestamptz,False,verified_at timestamptz
+app.analytics_events,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+app.analytics_events,user_id,uuid,False,user_id uuid REFERENCES app.user_profiles(id)
+app.analytics_events,anonymous_id,uuid,False,anonymous_id uuid
+app.analytics_events,event_name,text,True,event_name text NOT NULL
+app.analytics_events,occurred_at,timestamptz,True,occurred_at timestamptz NOT NULL DEFAULT now()
+app.analytics_events,source_version,text,True,source_version text NOT NULL
+app.analytics_events,properties,jsonb,True,properties jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(properties)='object')
+private.content_audit,id,uuid,True,id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+private.content_audit,actor_id,uuid,True,actor_id uuid NOT NULL REFERENCES app.user_profiles(id)
+private.content_audit,question_version_id,uuid,True,question_version_id uuid NOT NULL REFERENCES app.question_versions(id)
+private.content_audit,action,text,True,"action text NOT NULL CHECK (action IN ('created','reviewed','published','retired'))"
+private.content_audit,recorded_at,timestamptz,True,recorded_at timestamptz NOT NULL DEFAULT now()
+private.content_audit,note,text,False,note text

@@ -1,0 +1,59 @@
+{
+  "product": "CertPath",
+  "working_title": true,
+  "version": "2.0-design",
+  "date": "2026-10-24",
+  "platforms": [
+    "iOS",
+    "Android"
+  ],
+  "pilot_exam": "Databricks Data Engineer Associate",
+  "lesson_questions": 5,
+  "default_daily_goal_minutes": 5,
+  "preview_days": 14,
+  "prices": {
+    "currency": "USD",
+    "monthly": 12.99,
+    "annual": 79.99,
+    "status": "Unvalidated illustrative pricing"
+  },
+  "xp": {
+    "new_attempt": 10,
+    "first_try_correct": 5,
+    "lesson_completion": 10,
+    "repeated_review": 2,
+    "weekly_max_study_days": 7
+  },
+  "baseline": {
+    "display_name": "Alex",
+    "streak": 3,
+    "xp": 260,
+    "due_reviews": 8,
+    "missed_questions": 12
+  },
+  "tokens": {
+    "background": "#F7F6FB",
+    "surface": "#FFFFFF",
+    "ink": "#24243A",
+    "muted": "#6F7085",
+    "primary": "#6750EE",
+    "primaryDark": "#4D37CE",
+    "primaryTint": "#EEEAFE",
+    "mint": "#DDF6EB",
+    "success": "#137B60",
+    "coral": "#E15D64",
+    "coralTint": "#FFF0EF",
+    "streak": "#F5A623",
+    "border": "#E9E7F3",
+    "radius": 20,
+    "spacing": [
+      4,
+      8,
+      12,
+      16,
+      24,
+      32
+    ],
+    "font": "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  }
+}

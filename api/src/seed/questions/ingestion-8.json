@@ -1,0 +1,567 @@
+{
+  "items": [
+    {
+      "family": "semi-structured-xml-rowtag-repeating-element",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A supplier delivers XML files to a Unity Catalog volume. Each file has a root <orders> element that wraps hundreds of <order> elements, and a data engineer needs one row per order in a bronze table. Which read_files call produces that?",
+      "options": [
+        {
+          "text": "read_files('/Volumes/supply/raw/orders', format => 'xml', rowTag => 'order')",
+          "correct": true,
+          "why": "The rowTag option names the XML element that maps to a row, so setting it to order returns one row per <order> element, each parsed as a top-level struct."
+        },
+        {
+          "text": "read_files('/Volumes/supply/raw/orders', format => 'xml', rowTag => 'orders')",
+          "average": true,
+          "why": "Pointing rowTag at the root element is the common slip: each whole <orders> wrapper becomes one row, so the engineer gets one row per file rather than one per order."
+        },
+        {
+          "text": "read_files('/Volumes/supply/raw/orders', format => 'xml', rootTag => 'orders')",
+          "why": "The rootTag option names the root element when writing XML. It doesn't tell the reader which element is a record, and XML reads require rowTag."
+        },
+        {
+          "text": "read_files('/Volumes/supply/raw/orders', format => 'xml', valueTag => 'order')",
+          "why": "The valueTag option names the field that holds an element's character data when it also has attributes or child elements; it doesn't choose the row element."
+        }
+      ],
+      "in_practice": "Getting rowTag right at ingestion avoids a later explode step: with ~500 orders per file, bronze lands at order grain directly, so downstream joins and counts work without reshaping.",
+      "source": "https://docs.databricks.com/aws/en/query/formats/xml",
+      "evidence": "You must specify the rowTag option to indicate the XML element that maps to a DataFrame Row. ... The rowTag element becomes the top-level struct."
+    },
+    {
+      "family": "semi-structured-json-multiline-documents",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A partner sends each customer profile as its own JSON file, pretty-printed so that one JSON object spans dozens of lines. When a data engineer reads the folder with read_files and format => 'json', the result is full of corrupt records instead of one row per profile. Which read_files option fixes the read?",
+      "options": [
+        {
+          "text": "multiLine => true",
+          "correct": true,
+          "why": "By default the JSON reader expects one complete object per line. Multi-line mode lets a single JSON object span several lines, so each pretty-printed profile parses as one record."
+        },
+        {
+          "text": "singleVariantColumn => 'raw'",
+          "average": true,
+          "why": "Storing each record in one VARIANT column helps with changing schemas, not with file layout: without multi-line mode the reader still expects one object per line."
+        },
+        {
+          "text": "charset => 'UTF-16'",
+          "why": "The character set controls how bytes are decoded, and it is detected automatically by default; it doesn't let a record span several lines."
+        },
+        {
+          "text": "rescuedDataColumn => '_rescued'",
+          "why": "The rescued data column captures values that don't fit the schema, but incomplete or malformed JSON is still treated as corrupt, so the split lines aren't repaired."
+        }
+      ],
+      "in_practice": "API exports and hand-edited configs are often pretty-printed. Setting multiLine at the reader keeps bronze at one row per document; each multi-line file is parsed as a whole, so a few very large files can slow a load.",
+      "source": "https://docs.databricks.com/aws/en/query/formats/json",
+      "evidence": "In multi-line mode, a single JSON object can span multiple lines. Enable multi-line mode to read JSON files where records are formatted across multiple lines."
+    },
+    {
+      "family": "semi-structured-variant-agg-merged-schema",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A bronze table, app.bronze.events, stores each event in a VARIANT column named raw, and events from different app versions carry different fields. Before defining a typed silver table, a data engineer wants one schema that merges the fields found across all rows. Which query returns it?",
+      "options": [
+        {
+          "text": "SELECT schema_of_variant_agg(raw) FROM app.bronze.events",
+          "correct": true,
+          "why": "schema_of_variant_agg is an aggregate that merges the schema of every VARIANT value in the group by field name, returning one DDL-format schema string for the whole table."
+        },
+        {
+          "text": "SELECT schema_of_variant(raw) FROM app.bronze.events",
+          "average": true,
+          "why": "schema_of_variant describes one value at a time, so this returns a schema per row, and the engineer would still have to merge thousands of results by hand."
+        },
+        {
+          "text": "SELECT typeof(raw) FROM app.bronze.events",
+          "why": "typeof reports the expression's own data type, so every row returns variant; it doesn't look at the fields stored inside the value."
+        },
+        {
+          "text": "DESCRIBE TABLE app.bronze.events",
+          "why": "DESCRIBE TABLE lists raw as a VARIANT column without describing any of the fields stored inside it."
+        }
+      ],
+      "in_practice": "Profiling the merged schema of a few million bronze events takes one query and shows every field ever sent, which turns the silver struct definition into a review task instead of guesswork across app releases.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/functions/schema_of_variant_agg",
+      "evidence": "Returns the combined schema of all VARIANT values in a group in DDL format. ... The schema of each VARIANT value is merged together by field name."
+    },
+    {
+      "family": "semi-structured-sharepoint-parse-documents",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A managed SharePoint connector pipeline lands PDFs and Word files in a Delta table, with each file's bytes in content.inline_content. A team building a retrieval-augmented generation (RAG) app needs the text, tables and layout extracted into a queryable column. Which built-in function does Databricks recommend applying to that column?",
+      "options": [
+        {
+          "text": "ai_parse_document(content.inline_content, map('version', '2.0'))",
+          "correct": true,
+          "why": "ai_parse_document extracts text, tables, layout and metadata from binary document content, and applying it to the connector's inline_content column is the recommended approach for RAG and similar workloads."
+        },
+        {
+          "text": "decode(content.inline_content, 'UTF-8')",
+          "average": true,
+          "why": "Decoding bytes as UTF-8 works for plain text files, but PDFs and Word documents are binary formats, so the result is unreadable rather than extracted text and tables."
+        },
+        {
+          "text": "ai_summarize(cast(content.inline_content AS STRING))",
+          "why": "ai_summarize condenses text it is given. Casting PDF or Word bytes to STRING yields unreadable characters, and a summary isn't the extracted text, tables and layout the team needs."
+        },
+        {
+          "text": "from_xml(cast(content.inline_content AS STRING), 'variant')",
+          "why": "from_xml parses a string that holds one well-formed XML record. PDF and Word files are binary formats, so their bytes cast to STRING aren't an XML record to parse."
+        }
+      ],
+      "in_practice": "Parsing inside the pipeline means each new contract or policy document becomes searchable shortly after it lands in SharePoint, instead of waiting for a separate weekly OCR batch.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/sharepoint-rag",
+      "evidence": "Databricks provides ai_parse_document, a built-in function that automatically extracts text, tables, layout information, metadata, and other structured signals from binary file content. You can apply ai_parse_document directly to the inline_content column produced by the SharePoint ingestion pipeline."
+    },
+    {
+      "family": "semi-structured-json-string-null-field",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A bronze table stores API responses as JSON strings in a STRING column named raw. One record is {\"coupon\": null, \"total\": 42.5}. What does SELECT raw:coupon return for that record?",
+      "options": [
+        {
+          "text": "A SQL NULL",
+          "correct": true,
+          "why": "When a JSON field exists with a null value, colon extraction from a JSON string returns a SQL NULL rather than the text null, so IS NULL and COALESCE work as expected."
+        },
+        {
+          "text": "The four-character string 'null'",
+          "average": true,
+          "why": "Because JSON-string extraction returns strings, many expect the literal text null, but Databricks maps a JSON null to a SQL NULL instead."
+        },
+        {
+          "text": "An empty string",
+          "why": "An empty string would be a real value; a JSON field holding null comes back as a SQL NULL, not as an empty string."
+        },
+        {
+          "text": "An error, because the field has no value",
+          "why": "Extracting a field that exists with a null value doesn't fail; the extraction simply returns a SQL NULL."
+        }
+      ],
+      "in_practice": "Because JSON nulls surface as SQL NULLs, silver logic can use COALESCE and IS NULL directly; a filter that tests for the string 'null' silently misses every cleared coupon.",
+      "source": "https://docs.databricks.com/aws/en/semi-structured/json",
+      "evidence": "When a JSON field exists with a null value, you will receive a SQL null value for that column, not a null text value."
+    },
+    {
+      "family": "semi-structured-struct-to-variant-object",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A silver table has a STRUCT column named device with the fields model, os and firmware. A data engineer wants to copy it into a VARIANT column of a new table, but CAST(device AS VARIANT) is rejected. Which expression converts the struct to VARIANT?",
+      "options": [
+        {
+          "text": "to_variant_object(device)",
+          "correct": true,
+          "why": "VARIANT stores objects, arrays and scalars. To store a STRUCT or MAP, Databricks provides to_variant_object, which turns the struct's fields into a variant object."
+        },
+        {
+          "text": "parse_json(device)",
+          "average": true,
+          "why": "parse_json is the usual way to create VARIANT values, but it takes a JSON STRING, not a STRUCT, so it doesn't accept this column."
+        },
+        {
+          "text": "schema_of_variant(device)",
+          "why": "schema_of_variant returns a STRING describing the schema of a VARIANT value; it neither accepts a struct nor produces a VARIANT."
+        },
+        {
+          "text": "try_variant_get(device, '$', 'variant')",
+          "why": "try_variant_get reads a path out of an existing VARIANT value, so it needs a VARIANT input rather than a struct."
+        }
+      ],
+      "in_practice": "Folding rarely queried structs into one VARIANT column keeps a wide silver table manageable when device payloads gain fields every quarter, while fields used in filters stay as typed columns.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/data-types/variant-type",
+      "evidence": "The type supports storing semi-structured data OBJECT, ARRAY, and scalar types. To store STRUCT and MAP use the to_variant_object function."
+    },
+    {
+      "family": "semi-structured-variant-enable-existing-table",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants to add VARIANT columns to an existing Delta table, sales.bronze.orders, which was created without any. Which statement enables VARIANT support on the table?",
+      "options": [
+        {
+          "text": "ALTER TABLE sales.bronze.orders SET TBLPROPERTIES ('delta.feature.variantType' = 'supported')",
+          "correct": true,
+          "why": "Delta tables need VARIANT support enabled explicitly. On an existing table you set the delta.feature.variantType table feature to supported, which upgrades the table's writer protocol."
+        },
+        {
+          "text": "ALTER TABLE sales.bronze.orders SET TBLPROPERTIES ('delta.enableVariant' = 'true')",
+          "average": true,
+          "why": "It mirrors the naming of properties such as delta.enableTypeWidening, but VARIANT support is a table feature enabled through delta.feature.variantType, not an enable flag."
+        },
+        {
+          "text": "ALTER TABLE sales.bronze.orders SET TBLPROPERTIES ('delta.columnMapping.mode' = 'name')",
+          "why": "Column mapping lets columns be renamed or dropped without rewriting data files; it doesn't add support for the VARIANT type."
+        },
+        {
+          "text": "ALTER TABLE sales.bronze.orders SET TBLPROPERTIES ('delta.enableTypeWidening' = 'true')",
+          "why": "Type widening lets a column's type widen, such as INT to BIGINT, without a rewrite; it doesn't add support for the VARIANT type."
+        }
+      ],
+      "in_practice": "The writer protocol upgrade is the real decision: confirm that every external Delta Lake client that writes to or reads the shared bronze table supports the feature before enabling it, or those syncs may break.",
+      "source": "https://docs.databricks.com/aws/en/tables/features/variant",
+      "evidence": "To enable support for VARIANT on an existing table, use the following syntax: ALTER TABLE table_name SET TBLPROPERTIES('delta.feature.variantType' = 'supported'). Enabling variant upgrades the table writer protocol."
+    },
+    {
+      "family": "semi-structured-variant-group-by-cast",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer stores clickstream events in a VARIANT column named raw. An analyst's dashboard query, SELECT raw:region, count(*) FROM web.bronze.clicks GROUP BY raw:region, fails with an error. The team needs event counts per region without changing the table. Which rewrite should the engineer suggest?",
+      "options": [
+        {
+          "text": "Cast the field to a scalar type, such as raw:region::string, and group by that expression",
+          "correct": true,
+          "why": "The VARIANT type can't be used for grouping, ordering, comparisons or set operations. Casting the extracted field to STRING gives an ordinary typed value that GROUP BY accepts."
+        },
+        {
+          "text": "Replace GROUP BY raw:region with GROUP BY ALL so Databricks picks the keys",
+          "average": true,
+          "why": "GROUP BY ALL only infers which select-list expressions to group by; it would still group by the VARIANT-typed raw:region and hit the same restriction."
+        },
+        {
+          "text": "Select DISTINCT raw:region in a subquery and join the counts back to it",
+          "why": "DISTINCT is subject to the same restriction as GROUP BY, because VARIANT values can't take part in grouping or comparisons."
+        },
+        {
+          "text": "Add raw as a liquid clustering key so the field can be grouped",
+          "why": "VARIANT columns can't be clustering keys, and clustering changes data layout for performance, not which types GROUP BY accepts."
+        }
+      ],
+      "in_practice": "Casting at query time fixes the dashboard today; if region drives many reports, promoting it to a typed silver column also enables data skipping and stops every query from repeating the cast.",
+      "source": "https://docs.databricks.com/aws/en/semi-structured/variant",
+      "evidence": "The VARIANT data type cannot be used for comparisons, grouping, ordering, and set operations. For a full list of limitations, see Limitations."
+    },
+    {
+      "family": "semi-structured-from-xml-to-variant",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's bronze table, erp.bronze.soap_calls, keeps each SOAP API response as an XML document in a STRING column named body. On Databricks Runtime 16.4, the team wants the responses stored in a VARIANT column in silver so analysts can query elements with the colon syntax. Which expression should the INSERT ... SELECT use?",
+      "options": [
+        {
+          "text": "from_xml(body, 'variant')",
+          "correct": true,
+          "why": "from_xml parses an XML string, and passing variant as the schema returns the record as a VARIANT value. Ingesting XML as VARIANT is supported on Databricks Runtime 16.4 and above."
+        },
+        {
+          "text": "parse_json(body)",
+          "average": true,
+          "why": "parse_json is the usual way to create VARIANT values, but it parses JSON text only, so XML input fails as a malformed record."
+        },
+        {
+          "text": "CAST(body AS VARIANT)",
+          "why": "Casting a STRING to VARIANT stores the whole document as one string value, so none of the XML elements become queryable fields."
+        },
+        {
+          "text": "schema_of_xml(body)",
+          "why": "schema_of_xml infers and returns a schema string from an XML record; it doesn't produce the parsed data itself."
+        }
+      ],
+      "in_practice": "Landing SOAP responses as VARIANT lets analysts query new elements the day the ERP adds them, while an XML string column would force every query to reparse the full document.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/variant",
+      "evidence": "If the target table already contains a column encoded as VARIANT, you can use from_xml to insert XML string records as VARIANT. ... SELECT FROM_XML(xml_string, 'variant') FROM source_data"
+    },
+    {
+      "family": "semi-structured-single-variant-no-rescue",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team switches an Auto Loader JSON stream from schema inference with the rescue evolution mode to the singleVariantColumn option, which writes each record to one VARIANT column. A teammate plans to keep alerting on the _rescued_data column to catch fields the vendor adds. How does ingestion behave after the switch?",
+      "options": [
+        {
+          "text": "No schema evolution occurs and no rescued data column exists; new fields stay inside each VARIANT value",
+          "correct": true,
+          "why": "With singleVariantColumn the whole record is stored as one VARIANT value, so there is no schema to evolve and rescuedDataColumn isn't supported. New fields are simply part of the stored record."
+        },
+        {
+          "text": "New fields keep landing in _rescued_data, while known fields go into the VARIANT column",
+          "average": true,
+          "why": "That is how rescue mode behaves with an inferred schema, but in single-variant mode the full record, new fields included, is stored in the VARIANT column."
+        },
+        {
+          "text": "The stream stops with an unknown-field error whenever the vendor adds a field",
+          "why": "Stopping on new columns is how schema evolution modes such as addNewColumns react; a single VARIANT column has no schema to change, so new fields cause no failure."
+        },
+        {
+          "text": "Each new field is added as a top-level column next to the VARIANT column",
+          "why": "Auto Loader adds no columns in single-variant mode, because no schema evolution occurs during ingestion."
+        }
+      ],
+      "in_practice": "The alert needs a new home: a scheduled schema_of_variant_agg check over recent bronze rows can flag new vendor fields without any risk of stopping the stream.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/variant",
+      "evidence": "Because the entire record is recorded as a single VARIANT column, no schema evolution occurs during ingestion and rescuedDataColumn is not supported."
+    },
+    {
+      "family": "semi-structured-sharepoint-single-workbook",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A finance team needs one SharePoint workbook, Monthly/Report-Oct.xlsx, loaded into a Unity Catalog table. Its document library holds hundreds of other files that must not be ingested. A Unity Catalog connection to SharePoint already exists. Which approach should the team's data engineer use?",
+      "options": [
+        {
+          "text": "Query the workbook's URL with read_files, using format => 'excel' and the SharePoint connection",
+          "correct": true,
+          "why": "The SQL and Spark APIs can target a site, subsite, library, folder or single file, so read_files on the file's URL with the excel format loads just that workbook."
+        },
+        {
+          "text": "Create a managed SharePoint connector pipeline and select only that workbook in its settings",
+          "average": true,
+          "why": "The managed connector is the usual default for SharePoint, but it doesn't support individual file selection; it ingests every file in the configured folder, drive, subsite or site."
+        },
+        {
+          "text": "Create a foreign catalog over the SharePoint site with Lakehouse Federation",
+          "why": "Lakehouse Federation exposes external databases as foreign catalogs; SharePoint files are read through the SharePoint connector or the SQL and Spark APIs."
+        },
+        {
+          "text": "Run COPY INTO on the library URL with FILEFORMAT = BINARYFILE",
+          "why": "Binary file ingestion stores each file's raw bytes rather than parsing the spreadsheet into rows and columns."
+        }
+      ],
+      "in_practice": "Targeting the one file keeps the job small and auditable: the table refreshes from a single workbook instead of parsing hundreds of unrelated documents on every run.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/sharepoint",
+      "evidence": "Granular ingestion: Ingest a specific site, a sub-site, a document library, a folder, or a single file ... Read a specific Excel file from SharePoint ... format => \"excel\""
+    },
+    {
+      "family": "semi-structured-binaryfile-glob-partitions",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A retail team stores product photos in a Unity Catalog volume under folders such as /Volumes/media/raw/photos/region=emea/date=2026-10-01/, next to JSON sidecar files. A data engineer loads the photos with spark.read.format(\"binaryFile\") into a Delta table; only .jpg files may be loaded, and region and date must remain as columns. Which reader option should the engineer set?",
+      "options": [
+        {
+          "text": ".option(\"pathGlobFilter\", \"*.jpg\")",
+          "correct": true,
+          "why": "pathGlobFilter loads only files whose paths match the glob pattern while keeping partition discovery, so region and date still appear as columns."
+        },
+        {
+          "text": ".option(\"recursiveFileLookup\", \"true\")",
+          "average": true,
+          "why": "Recursive lookup does search nested folders, but it ignores partition discovery, so region and date are lost, and it doesn't exclude the JSON sidecars."
+        },
+        {
+          "text": ".option(\"ignoreCorruptFiles\", \"true\")",
+          "why": "The binary file source reads any file's bytes, so the JSON sidecars aren't corrupt and this option wouldn't filter them out."
+        },
+        {
+          "text": ".option(\"modifiedAfter\", \"2026-10-01T00:00:00\")",
+          "why": "modifiedAfter filters files by modification time, not by name, so sidecars written in the same window would still be loaded."
+        }
+      ],
+      "in_practice": "Filtering by glob at read time keeps sidecars out of a table of multi-megabyte images, and keeping region and date as discovered columns lets downstream jobs prune by folder instead of parsing paths.",
+      "source": "https://docs.databricks.com/aws/en/query/formats/binary",
+      "evidence": "To load files with paths matching a given glob pattern while keeping the behavior of partition discovery, you can use the pathGlobFilter option. If you want to ignore partition discovery and recursively search files under the input directory, use the recursiveFileLookup option."
+    },
+    {
+      "family": "semi-structured-sharepoint-connector-limits-plan",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 2,
+      "type": "multiple",
+      "stem": "A data engineer sets up the managed SharePoint connector to ingest an HR document library of PDFs into a Unity Catalog table for a retrieval app. Some scanned contracts exceed 300 MB, and in SharePoint several files are visible only to HR managers. Which two steps should the engineer plan? (Choose two.)",
+      "options": [
+        {
+          "text": "Add a row_filter on the length column so files larger than 100 MB are skipped",
+          "correct": true,
+          "why": "Binary ingestion loads each file into memory as one record, so files over 100 MB can fail the update. A row_filter on length in table_configuration excludes them."
+        },
+        {
+          "text": "Control access with Unity Catalog grants on the table, since SharePoint file ACLs aren't ingested",
+          "correct": true,
+          "why": "The connector doesn't ingest file-level access control lists from SharePoint, so who can read the restricted files is decided by the privileges on the destination table in Unity Catalog."
+        },
+        {
+          "text": "Set the table's scd_type to SCD_TYPE_2 so every contract revision is kept",
+          "average": true,
+          "why": "Keeping history sounds prudent, but the connector doesn't support SCD type 2, and setting the scd_type field throws an error; storage mode is set with storage_mode instead."
+        },
+        {
+          "text": "Switch the table to APPEND_ONLY storage mode so large files load in parts",
+          "why": "Unstructured binary ingestion supports only SCD_TYPE_1 storage mode, and no storage mode splits a large file into parts."
+        },
+        {
+          "text": "Select the small PDFs one by one in the pipeline's file list",
+          "why": "The connector doesn't support individual file selection; it ingests every file in the configured folder, drive, subsite or site."
+        }
+      ],
+      "in_practice": "Skipping oversized scans keeps a nightly sync from failing on a single 300 MB file, and table privileges in Unity Catalog decide who can read sensitive HR documents once they land in the lakehouse.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/sharepoint-limits",
+      "evidence": "files larger than 100 MB can cause the update to fail ... To prevent this, exclude large files using a row_filter on the length column in table_configuration. ... The connector does not support ingesting file-level access control lists (ACLs) from SharePoint."
+    },
+    {
+      "family": "semi-structured-variant-roundtrip-not-exact",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A payments team receives signed JSON webhooks, and auditors verify each one by recomputing an HMAC over the exact payload text. To save storage, a data engineer proposes keeping only parse_json(body) in a VARIANT column and rebuilding the payload with to_json when auditors ask. Which design should the team adopt?",
+      "options": [
+        {
+          "text": "Keep the original body STRING as well, because to_json(parse_json(body)) may not match the source text",
+          "correct": true,
+          "why": "parse_json and to_json are logical inverses but not exact ones: whitespace isn't perfectly preserved, key order can change and trailing zeros in numbers may be truncated, so a rebuilt payload can fail the HMAC check."
+        },
+        {
+          "text": "Store only the VARIANT column, because to_json returns exactly the text that was parsed",
+          "average": true,
+          "why": "VARIANT keeps the data's meaning, not its exact characters. The round trip can drop whitespace, reorder keys and trim trailing zeros, which changes the bytes the HMAC was computed over."
+        },
+        {
+          "text": "Store only the VARIANT column and pass to_json options that preserve formatting",
+          "why": "to_json ignores its options when the input is a VARIANT, so no option can restore the original whitespace or key order."
+        },
+        {
+          "text": "Store a STRUCT built with from_json, which keeps the original text of each payload",
+          "why": "from_json parses the text into typed fields; like VARIANT, it keeps values rather than the exact source characters, so it can't reproduce the signed text."
+        }
+      ],
+      "in_practice": "Raw strings cost more to query but are the system of record for signed payloads; keeping the STRING in bronze for audit and VARIANT in silver for analysis trades a little storage for verifiable evidence.",
+      "source": "https://docs.databricks.com/aws/en/semi-structured/variant-json-diff",
+      "evidence": "While parse_json(json_string_column) is the logical inverse of to_json(variant_column), the following conversion rules describe why it is not the exact inverse: Whitespace is not perfectly preserved. Ordering of keys is arbitrary. Trailing zeros in numbers might be truncated."
+    },
+    {
+      "family": "semi-structured-variant-null-vs-missing",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A CRM system sends customer PATCH events, which a data engineer stores in a VARIANT column named raw. A payload with \"email\": null means the customer cleared their email, while a payload without an email key means it didn't change. The compliance team needs only the events that explicitly cleared the email. Which filter returns them?",
+      "options": [
+        {
+          "text": "WHERE is_variant_null(raw:email)",
+          "correct": true,
+          "why": "An explicit JSON null is stored as a variant null, and is_variant_null returns true only for it. A missing key yields a SQL NULL instead, for which is_variant_null returns false."
+        },
+        {
+          "text": "WHERE raw:email IS NULL",
+          "average": true,
+          "why": "IS NULL tests for a SQL NULL, which is what a missing path returns. An explicit JSON null is a variant null stored in the data, so this filter returns the unchanged events instead of the cleared ones."
+        },
+        {
+          "text": "WHERE is_variant_null(raw)",
+          "why": "This checks whether the whole document is a variant null, which is false for every PATCH payload, so it returns no events at all."
+        },
+        {
+          "text": "WHERE raw:email = parse_json('null')",
+          "why": "The VARIANT type can't be used in comparisons, so an equality test on raw:email isn't a valid way to detect the null."
+        }
+      ],
+      "in_practice": "Telling 'cleared' apart from 'not sent' matters for privacy requests: treating both as NULL would either erase data customers never touched or miss the deletions they asked for.",
+      "source": "https://docs.databricks.com/aws/en/semi-structured/variant",
+      "evidence": "SQL NULL: SQL NULLs indicate that the value is missing. ... Variant NULL: Variant NULLs indicate that the variant explicitly contains a NULL value. These are not the same as SQL NULLs, because the NULL value is stored in the data."
+    },
+    {
+      "family": "semi-structured-rescued-failfast-mismatch",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer loads partner JSON files with read_files, using a provided schema in which price is DECIMAL(10,2), rescuedDataColumn => '_rescued_data' and mode => 'FAILFAST', expecting any bad value to stop the load. A file arrives in which some records have price set to \"N/A\", yet the load succeeds. What explains this?",
+      "options": [
+        {
+          "text": "With a rescued data column, type mismatches are rescued, and FAILFAST fails only on malformed JSON",
+          "correct": true,
+          "why": "When rescuedDataColumn is set, data type mismatches don't throw in FAILFAST mode or drop records in DROPMALFORMED mode; the value is captured in _rescued_data. Only incomplete or malformed JSON fails the read."
+        },
+        {
+          "text": "The 'N/A' values were cast to NULL and discarded, because modes apply only to schema inference",
+          "average": true,
+          "why": "The parser mode isn't limited to inference, and the values aren't lost: with a rescued data column, the original price text is kept in _rescued_data."
+        },
+        {
+          "text": "The mismatched records were written to badRecordsPath instead of failing the load",
+          "why": "No badRecordsPath was configured, and even when one is, data type mismatches aren't treated as bad records; only incomplete or malformed JSON is stored there."
+        },
+        {
+          "text": "FAILFAST checks only the first record of each file, so later records weren't validated",
+          "why": "FAILFAST applies to every record parsed; the load succeeded because type mismatches are rescued, not because records were skipped."
+        }
+      ],
+      "in_practice": "Pair the rescued column with a check, such as an expectation that _rescued_data is NULL: the load keeps every row for replay, and the bad-price rows are still caught before they reach finance reports.",
+      "source": "https://docs.databricks.com/aws/en/query/formats/json",
+      "evidence": "When used together with rescuedDataColumn, the following rules apply: Data type mismatches do not cause records to be dropped in DROPMALFORMED mode or throw an error in FAILFAST mode. Only corrupt records—that is, incomplete or malformed JSON—are dropped or throw errors."
+    },
+    {
+      "family": "semi-structured-sharepoint-append-only-edits",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "An operations team keeps one small inventory.csv file in a SharePoint document library and edits it in place every day. A data engineer set up a managed SharePoint connector pipeline that parses the library's CSV files into a Delta table. A week later, the table still holds only the rows from the file's first version. What explains this?",
+      "options": [
+        {
+          "text": "CSV files are ingested only in APPEND_ONLY mode, which picks up new files but not updates to existing ones",
+          "correct": true,
+          "why": "For CSV, JSON, XML and Excel files the connector supports only APPEND_ONLY storage mode, which captures newly added files; updates and deletes to files already ingested aren't picked up."
+        },
+        {
+          "text": "The table uses SCD type 1, which keeps only the first version of each file's rows",
+          "average": true,
+          "why": "SCD type 1 would overwrite rows with the latest version rather than keep the first, and the connector offers SCD_TYPE_1 only for unstructured binary ingestion, not for parsed CSV."
+        },
+        {
+          "text": "Schema evolution is off by default, so rows from the edited file are rejected",
+          "why": "Schema evolution is configurable with schema_evolution_mode and governs new columns; here the edited file isn't read again at all, because append-only mode ignores updates."
+        },
+        {
+          "text": "Files over 100 MB are skipped, and the daily edits pushed the CSV past that size",
+          "why": "The 100 MB concern applies to unstructured binary ingestion, where large files can fail an update; it doesn't explain why a small CSV's edits never appear."
+        }
+      ],
+      "in_practice": "If owners must edit in place, agree that each day's export is saved as a new file, or load that one file with a separate batch read; otherwise silver quietly serves week-old stock levels.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/sharepoint-limits",
+      "evidence": "Structured ingestion (CSV, JSON, XML, EXCEL, and other formats) supports only APPEND_ONLY storage mode. ... APPEND_ONLY storage mode captures only newly added files. Updates and deletes to existing files are not ingested."
+    },
+    {
+      "family": "semi-structured-file-managed-external-source",
+      "objective": "ingestion.semi-structured",
+      "guide": "2.7",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A legal team keeps signed contracts as PDFs in a SharePoint document library. A data engineer must build a Unity Catalog table with one row per contract and a FILE column (Beta) so that later steps can parse each document. To avoid duplicate storage, an architect asks for FILE EXTERNAL references that point at the SharePoint files without copying them. How should the engineer proceed?",
+      "options": [
+        {
+          "text": "Store the column as FILE MANAGED, copying each contract into managed storage",
+          "correct": true,
+          "why": "Files from sources outside volumes, such as SharePoint, must be ingested and stored as FILE MANAGED; the table then governs the copies, and deleting rows makes their files eligible for cleanup."
+        },
+        {
+          "text": "Store FILE EXTERNAL references to the SharePoint URLs through the connection",
+          "average": true,
+          "why": "FILE EXTERNAL only references files that already exist in a Unity Catalog volume, and Databricks doesn't support FILE EXTERNAL references for files stored outside volumes, such as in SharePoint."
+        },
+        {
+          "text": "Register the SharePoint site as an external location, then use FILE EXTERNAL",
+          "why": "External locations govern cloud object storage paths, not SharePoint sites, and FILE EXTERNAL still requires the files to sit in a Unity Catalog volume."
+        },
+        {
+          "text": "Keep each contract's SharePoint URL in a STRING column instead of a FILE",
+          "why": "A URL string is only text: it carries no governed file reference, so it doesn't meet the requirement for a FILE column that later steps can read through the table."
+        }
+      ],
+      "in_practice": "Managed copies cost storage, but they keep the table and its files in sync and put file access under the table's permissions, which is what a compliance review of contract data usually expects.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/file",
+      "evidence": "FILE MANAGED stores copies of files in Unity Catalog-managed storage ... Files from sources outside of volumes, such as SharePoint, Google Drive, or SFTP, must be ingested and stored as FILE MANAGED. FILE EXTERNAL references files that already exist in a Unity Catalog volume. Databricks doesn't support storing FILE EXTERNAL references for files stored outside volumes."
+    }
+  ]
+}

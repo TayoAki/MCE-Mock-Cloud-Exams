@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+
+# Expo
+.expo/
+web-build/
+ios/
+android/
+expo-env.d.ts
+*.tsbuildinfo
+
+# Vite
+admin/dist/
+
+# Question factory: scraped docs and unreviewed drafts
+api/question-factory/.cache/
+api/question-factory/drafts/

@@ -1,0 +1,17 @@
+{
+  "cli": {
+    "version": ">= 25.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api-production-7c3cf.up.railway.app/v1"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

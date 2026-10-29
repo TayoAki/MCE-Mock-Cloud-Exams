@@ -1,0 +1,734 @@
+{
+  "items": [
+    {
+      "family": "git-share-link-prefilled-clone",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants a new teammate to start on the team's repository with the same repository URL and Git provider settings the engineer used, but in a Git folder of the teammate's own. What is the quickest way to hand over that setup from the Git folders UI?",
+      "options": [
+        {
+          "text": "Use Share, then Copy link to create Git folder, and send the teammate the link",
+          "correct": true,
+          "why": "Copy link to create Git folder produces a URL that opens the Create Git folder dialog pre-populated with the engineer's configuration, and the teammate clicks Create Git folder to clone into their own workspace folder."
+        },
+        {
+          "text": "Share the engineer's own Git folder with the teammate and grant Can Edit",
+          "average": true,
+          "why": "Sharing the engineer's folder gives both people one working copy, so one person's Git operations, such as a branch switch, change the branch for the other. Each team member should have their own Git folder."
+        },
+        {
+          "text": "Send the teammate the workspace URL of the engineer's Git folder",
+          "why": "That link opens the engineer's own folder rather than a pre-filled clone dialog, and working there would put two people in one Git folder."
+        },
+        {
+          "text": "Add the teammate's Git credential to the engineer's Git folder settings",
+          "why": "A Git folder's credential setting chooses which of the owner's credentials the folder uses; it doesn't create a folder for another user or share the clone settings."
+        }
+      ],
+      "in_practice": "Onboarding links remove copy-paste mistakes in repository URLs and provider choices, and they steer every developer into a personal Git folder, which avoids the branch collisions that shared folders cause.",
+      "source": "https://docs.databricks.com/aws/en/repos/git-operations-with-repos",
+      "evidence": "To share your Git folder configuration with a collaborator: Click Share. Click Copy link to create Git folder. Send the URL to your collaborator. When your collaborator opens the URL, they see a dialog pre-populated with your Git folder configuration."
+    },
+    {
+      "family": "git-https-url-not-ssh",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer copies the repository's SSH clone URL, `git@github.com:acme/sales-etl.git`, into the Create Git folder dialog. Which URL form do Databricks Git folders accept for this repository?",
+      "options": [
+        {
+          "text": "The HTTPS URL, such as `https://github.com/acme/sales-etl.git`",
+          "correct": true,
+          "why": "Git folders support only HTTPS, not SSH. The Create Git folder dialog expects an HTTPS repository URL, and the Git credential stored under Linked accounts authenticates over HTTPS."
+        },
+        {
+          "text": "The SSH URL, after adding an SSH key under Linked accounts",
+          "average": true,
+          "why": "Git folders don't support SSH at all, so there is no SSH key setting; Linked accounts holds personal access tokens or OAuth links that work over HTTPS."
+        },
+        {
+          "text": "The SSH URL, with a personal access token appended to it",
+          "why": "Appending a token doesn't change the protocol, and Git folders reach the Git provider only over HTTPS."
+        },
+        {
+          "text": "Either form, as long as the repository is public",
+          "why": "Public repositories can be cloned without credentials, but they are still reached over HTTPS; SSH isn't supported for any repository."
+        }
+      ],
+      "in_practice": "Teams that use SSH locally often trip over this on day one; putting the HTTPS URL and the Linked accounts token step in the onboarding guide saves each new engineer a failed clone.",
+      "source": "https://docs.databricks.com/aws/en/repos/limits",
+      "evidence": "SSH support: Git folders support only HTTPS, not SSH."
+    },
+    {
+      "family": "git-secret-scan-before-commit",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "While testing an S3 read, a data engineer pastes an AWS access key ID that starts with `AKIA` into a notebook cell in a Databricks Git folder, then opens the Git dialog to commit and push. What does the Git folder do with this change?",
+      "options": [
+        {
+          "text": "It scans the change for exposed credentials and warns before the commit",
+          "correct": true,
+          "why": "Git folders automatically scan code for exposed credentials before commits and warn when they detect patterns such as AWS access key IDs starting with AKIA, so the engineer can remove the key first."
+        },
+        {
+          "text": "Nothing, because credential scanning happens only in the Git provider",
+          "average": true,
+          "why": "Git folders run their own secrets detection before the commit, so the warning comes in Databricks instead of from the provider after the key has already been pushed."
+        },
+        {
+          "text": "It masks the key as `[REDACTED]` in the committed file automatically",
+          "why": "Secrets detection warns about the credential; it doesn't rewrite the file, so taking the key out is still the engineer's job."
+        },
+        {
+          "text": "It holds the commit until a workspace admin approves it",
+          "why": "There's no admin approval step; the documented behavior is a warning that lets the engineer fix the code before committing."
+        }
+      ],
+      "in_practice": "A key that reaches a remote repository has to be treated as leaked and rotated, often with a history cleanup; catching it before the commit turns an incident into a one-line switch to a secret scope.",
+      "source": "https://docs.databricks.com/aws/en/repos/repos-setup",
+      "evidence": "Secrets detection: Git folders automatically scan code for exposed credentials before commits. It warns you if it detects: AWS access key IDs starting with AKIA"
+    },
+    {
+      "family": "git-commit-email-attribution",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's commits from a Databricks Git folder reach GitHub, but they aren't linked to the engineer's GitHub profile and don't count in the engineer's contribution history. The engineer's Git credential under Linked accounts was created long ago with only a username and a personal access token. What should the engineer change?",
+      "options": [
+        {
+          "text": "Enter the engineer's real email in the credential's Git provider email field",
+          "correct": true,
+          "why": "The email on the Git credential becomes the author and committer email for commits from Git folders. With no email set, Databricks uses the Git username as the email, which can prevent proper attribution in the provider."
+        },
+        {
+          "text": "Regenerate the personal access token with an extra scope for the user's email",
+          "average": true,
+          "why": "Token scopes control what the token may access in the repository; the author email on commits comes from the email set on the Git credential."
+        },
+        {
+          "text": "Commit from a notebook's branch button instead of the Git folder browser",
+          "why": "Both entry points open the same Git dialog and use the same credential, so the author identity doesn't change."
+        },
+        {
+          "text": "Create a new branch before each Commit & Push so commits are attributed",
+          "why": "The branch has no effect on attribution; commits on any branch use the email from the Git credential."
+        }
+      ],
+      "in_practice": "Attribution matters beyond credit: code owners, audit reviews and blame lookups all depend on commits mapping to a real account, and fixing one field avoids months of anonymous history.",
+      "source": "https://docs.databricks.com/aws/en/repos/repos-setup",
+      "evidence": "Email: Becomes the author email (GIT_AUTHOR_EMAIL and GIT_COMMITTER_EMAIL) for all commits. If you don't specify an email address, Databricks uses your Git username as the email. This can prevent proper commit attribution in your Git provider."
+    },
+    {
+      "family": "git-classic-pat-workflow-scope",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer creates a GitHub classic personal access token to add as a Git credential in Databricks. The repository has GitHub Actions workflows under `.github/workflows`, and the engineer will edit and push them from a Git folder along with the notebooks. Which scopes should the token include?",
+      "options": [
+        {
+          "text": "The `repo` scope and the `workflow` scope",
+          "correct": true,
+          "why": "For a classic token, Databricks says to select the repo scope and, if the repository uses GitHub Actions workflows, the workflow scope too; GitHub requires that scope to update workflow files."
+        },
+        {
+          "text": "The `repo` scope alone, which covers every file in the repository",
+          "average": true,
+          "why": "The repo scope covers the repository's code, but Databricks guidance adds the workflow scope for repositories that use GitHub Actions workflows."
+        },
+        {
+          "text": "The `workflow` scope alone, which includes the repository contents",
+          "why": "Without the repo scope the token can't clone or push the repository's code, so Git folder operations would fail."
+        },
+        {
+          "text": "The `read:org` scope and the `repo` scope",
+          "why": "Organization read access doesn't add the workflow permission that pushing changes to Actions workflow files needs."
+        }
+      ],
+      "in_practice": "A missing scope shows up as a push failure halfway through a change; minting the token with the right scopes once, or linking the Databricks GitHub app, keeps engineers from cycling through tokens.",
+      "source": "https://docs.databricks.com/aws/en/repos/get-access-tokens-from-git-provider",
+      "evidence": "Select the repo scope. If your repository uses GitHub Action workflows, also select the workflow scope. Click Generate token. Copy the token and enter it in Databricks under Settings > Linked accounts."
+    },
+    {
+      "family": "git-gitignore-committed-file",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "Months ago a data engineer committed a 700 MB sample CSV to the team's repository, and the Databricks Git folder's working branch is now close to the 1 GB limit. The engineer adds the CSV's name to `.gitignore` and runs Commit & Push, but the repository is no smaller. What explains this?",
+      "options": [
+        {
+          "text": "`.gitignore` affects only untracked files, so the committed CSV stays in history",
+          "correct": true,
+          "why": ".gitignore works only for untracked files. Adding a committed file to it doesn't remove the file from Git history or reduce repository size; that takes a history rewrite with a tool such as git filter-repo."
+        },
+        {
+          "text": "`.gitignore` takes effect only after the next Pull refreshes the Git folder",
+          "average": true,
+          "why": "A Pull changes nothing here: ignore rules never remove a file that is already committed, from the branch or from history."
+        },
+        {
+          "text": "Git folders don't read `.gitignore` and rely on workspace exclusions",
+          "why": "Git folders do support .gitignore files; the rules simply apply to untracked files only."
+        },
+        {
+          "text": "The CSV must also be dropped from the Git folder's sparse checkout cone",
+          "why": "Sparse checkout limits which directories are cloned into the workspace; it doesn't remove committed content from the repository's history."
+        }
+      ],
+      "in_practice": "A large file committed by mistake keeps costing clone time and branch headroom until history is rewritten, so teams that keep data files out of Git from the start avoid a disruptive force-push later.",
+      "source": "https://docs.databricks.com/aws/en/repos/limits",
+      "evidence": ".gitignore works only for untracked files. Adding an already-committed file to .gitignore doesn't remove it from Git history or reduce repository size."
+    },
+    {
+      "family": "git-deleted-remote-branch-lingers",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team deletes merged feature branches in GitHub to keep the repository tidy. A week after `feature-orders` was merged and deleted there, a data engineer still sees it in the branch dropdown of the engineer's Databricks Git folder. What explains this, and how is it removed for good?",
+      "options": [
+        {
+          "text": "Local branches can stay up to 30 days after the remote is deleted; delete the Git folder",
+          "correct": true,
+          "why": "Branches are deleted in the Git provider. The Git folder's local copy of a deleted remote branch can remain for up to 30 days, and deleting the repository removes it completely."
+        },
+        {
+          "text": "The deletion didn't reach Databricks; delete the branch from the Git dialog's kebab menu",
+          "average": true,
+          "why": "Git folders don't delete branches; that is done in the Git provider. The local copy simply lingers for up to 30 days unless the repository is deleted."
+        },
+        {
+          "text": "The dropdown is cached until a Pull prunes branches missing from the remote",
+          "why": "Pull brings remote changes into the current branch; the documented way to remove a lingering local branch completely is to delete the repository."
+        },
+        {
+          "text": "GitHub keeps deleted branches restorable, so Git folders keep listing them",
+          "why": "What GitHub retains doesn't drive the dropdown; the Git folder keeps its own local branch for up to 30 days after the remote branch is deleted."
+        }
+      ],
+      "in_practice": "Knowing about the lag stops engineers from resuming work on a branch that no longer exists remotely; a quick check in GitHub first avoids a push that quietly recreates a branch the team retired.",
+      "source": "https://docs.databricks.com/aws/en/repos/limits",
+      "evidence": "Local branches can remain in the associated Git folder for up to 30 days after the remote branch is deleted. To remove a local branch completely, delete the repository. Deleting branches: To delete a branch, you must work in your Git provider."
+    },
+    {
+      "family": "git-discard-recoverability",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer has two uncommitted changes in a Databricks Git folder: edits to the existing notebook `transform` and a brand-new notebook `quality_checks`. To clean up, the engineer discards both in the Git dialog, then realizes both were still needed. Neither had been pushed. What can the engineer get back?",
+      "options": [
+        {
+          "text": "Only `quality_checks`, from Trash; the edits to `transform` are gone",
+          "correct": true,
+          "why": "Discarding a new file in the Git folder dialog moves it to the Trash folder, but discarding a modified file throws the edits away with no way to recover them."
+        },
+        {
+          "text": "Both, from Trash, because every discard in the Git dialog moves files there",
+          "average": true,
+          "why": "Only new files go to Trash when discarded; discarded edits to an existing file aren't kept anywhere."
+        },
+        {
+          "text": "Both, from the commit history in the remote repository",
+          "why": "The remote holds only what was committed and pushed, so it has the old version of transform but neither the discarded edits nor the new notebook."
+        },
+        {
+          "text": "Neither, because a discard deletes files without a trace",
+          "why": "The new notebook isn't lost: discarding a new file sends it to the Trash folder, where the engineer can restore it."
+        }
+      ],
+      "in_practice": "Because discarded edits can't be recovered, small and frequent commits to a feature branch act as a safety net; committing every half hour beats an afternoon of rewriting a transformation from memory.",
+      "source": "https://docs.databricks.com/aws/en/repos/errors-troubleshooting",
+      "evidence": "Discard a new file with the Git folder dialog | Yes, from the Trash folder | Discard a modified file with the Git folder dialog | No, the file is gone"
+    },
+    {
+      "family": "git-detached-head-create-branch",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer has uncommitted edits in a Databricks Git folder on branch `fix-dates` when a teammate deletes `fix-dates` in GitHub. Because the edits conflict with `main`, the Git folder ends up in a detached head state with the edits applied to a snapshot of `main`. The engineer must keep the edits and get them reviewed. What should the engineer do?",
+      "options": [
+        {
+          "text": "Click Create branch to branch from the current commit, then Commit & Push",
+          "correct": true,
+          "why": "In a detached head state Git doesn't track changes on any branch. The recovery is Create branch from the current commit (or Select branch), then commit and push to keep the changes."
+        },
+        {
+          "text": "Click Commit & Push right away, which recreates `fix-dates` on the remote",
+          "average": true,
+          "why": "The head points at a commit, not at fix-dates, so work done there isn't on any branch; a branch has to be created or selected before committing."
+        },
+        {
+          "text": "Reset to `main` from the kebab menu, which reattaches the head",
+          "why": "Reset is a hard reset: it discards uncommitted changes, which would throw away the edits the engineer needs to keep."
+        },
+        {
+          "text": "Delete the Git folder and clone the repository again",
+          "why": "A fresh clone starts from the remote, which never received the uncommitted edits, so they would be lost."
+        }
+      ],
+      "in_practice": "Detached heads usually follow someone tidying branches in the provider; agreeing that only merged branches get deleted, and committing work in progress, keeps a cleanup from costing a developer their changes.",
+      "source": "https://docs.databricks.com/aws/en/repos/errors-troubleshooting",
+      "evidence": "Git doesn't track changes made in this state on any branch. To recover from this state: Click Create branch to create a branch from the current commit, or Select branch to check out an existing branch. Commit and push to keep your changes."
+    },
+    {
+      "family": "git-sparse-checkout-new-folder",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team's monorepo is too large for a full Git folder, so a data engineer cloned it with sparse checkout and the cone pattern `pipelines/sales`. The engineer then creates the folder `pipelines/shared_utils` with helper notebooks, and Commit & Push fails with an error. Which change lets the engineer commit the new folder?",
+      "options": [
+        {
+          "text": "Add `pipelines/shared_utils` to the cone patterns in the Git folder's settings",
+          "correct": true,
+          "why": "A new folder outside the cone pattern causes an error on commit and push. Editing the cone patterns (Settings > Advanced > Cone patterns) to include the folder fixes it."
+        },
+        {
+          "text": "Turn off sparse checkout mode for this Git folder, then commit again",
+          "average": true,
+          "why": "Sparse checkout can't be disabled once a Git folder is created with it, and a full clone of this monorepo is what the team was avoiding in the first place."
+        },
+        {
+          "text": "Add `!pipelines/shared_utils` to the cone patterns so it isn't excluded",
+          "why": "Cone pattern syntax doesn't support exclusions with !, and the folder isn't excluded anyway; it just isn't included."
+        },
+        {
+          "text": "Pull the latest `main` first so the remote knows about the new folder",
+          "why": "Pulling doesn't change which directories the Git folder works with; the cone patterns decide that."
+        }
+      ],
+      "in_practice": "Sparse checkout keeps monorepo clones inside Git folder limits, but each new area of the repository needs a pattern update; teams often publish their standard cone patterns next to the repository layout.",
+      "source": "https://docs.databricks.com/aws/en/repos/git-operations-with-repos",
+      "evidence": "Including a new folder outside of the cone pattern results in an error during the commit and push operation. To fix it, edit the cone pattern to include the new folder you're trying to commit and push."
+    },
+    {
+      "family": "bundle-config-variable-overrides-json",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants to keep a few variable values for a bundle's `dev` target in a JSON file inside the bundle project, instead of in `databricks.yml` or on the command line. Where does the Databricks CLI read such a file from?",
+      "options": [
+        {
+          "text": "`.databricks/bundle/dev/variable-overrides.json`",
+          "correct": true,
+          "why": "Values can be provided in .databricks/bundle/<target>/variable-overrides.json as a JSON object of variable names and values, including complex variables. The CLI checks it before the variables mappings in targets."
+        },
+        {
+          "text": "`variables.json`, placed next to `databricks.yml`",
+          "average": true,
+          "why": "The CLI doesn't read a variables.json at the bundle root; the supported file sits under .databricks/bundle/<target>/ and is named variable-overrides.json."
+        },
+        {
+          "text": "`targets/dev.json`, placed next to `databricks.yml`",
+          "why": "Target values go in the targets mapping of the configuration or in the per-target variable-overrides.json file, not in a targets/<name>.json file."
+        },
+        {
+          "text": "`~/.databrickscfg`, under a profile named `dev`",
+          "why": "Configuration profiles hold the CLI's connection and authentication settings, not values for bundle variables."
+        }
+      ],
+      "in_practice": "The .databricks folder is normally kept out of Git, so the overrides file suits local values such as a personal cluster ID; shared configuration stays clean and nobody commits their sandbox settings.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/variables",
+      "evidence": "Provide the variable's value within the .databricks/bundle/<target>/variable-overrides.json file ... to provide values for the variables named my_cluster_id and my_notebook_path for the dev target, create a file .databricks/bundle/dev/variable-overrides.json"
+    },
+    {
+      "family": "bundle-config-run-as-per-target",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's bundle deploys the same jobs to three targets. The jobs must run as the engineer's own user in `dev`, as one service principal in `staging` and as a different service principal in `prod`. Where should these run identities be set?",
+      "options": [
+        {
+          "text": "In a `run_as` mapping inside each target",
+          "correct": true,
+          "why": "run_as can be set at the top level or within a target, so each target can run the same job definitions as a different user or service principal, separate from the identity that deploys."
+        },
+        {
+          "text": "In each target's `permissions`, granting `CAN_RUN`",
+          "average": true,
+          "why": "Permissions decide who may view, run or manage the deployed resources; they don't set the identity a job runs as."
+        },
+        {
+          "text": "In each target's `workspace` mapping, as `client_id`",
+          "why": "client_id authenticates the deployment to the workspace; run_as is what separates the run identity from the deploying identity."
+        },
+        {
+          "text": "In `mode: production`, which picks a service principal",
+          "why": "Production mode applies validations and recommends a service principal, but the identity still has to be set with run_as."
+        }
+      ],
+      "in_practice": "Per-target run identities give each environment least-privilege data access: a prod service principal can read prod tables that no developer account touches, and a dev credential can't drive prod workloads.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/run-as",
+      "evidence": "The run_as setting can be configured as a top-level mapping to apply to resources, or within a target deployment mapping in a bundle configuration file. The development mode is configured to run as an individual user, and the staging and production modes are configured to run using two different service principals."
+    },
+    {
+      "family": "bundle-config-validate-output-json",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Before a release, an engineer wants to see the value each custom variable will resolve to for the `prod` target, after defaults and the target's overrides apply. Which command shows this without changing the workspace?",
+      "options": [
+        {
+          "text": "`databricks bundle validate -t prod --output json`",
+          "correct": true,
+          "why": "bundle validate checks that substitutions and variables are specified and parsed correctly, and --output json prints the configuration a deployment would use, including each variable's resolved value."
+        },
+        {
+          "text": "`databricks bundle deploy -t prod`, then reading the job settings",
+          "average": true,
+          "why": "That shows the values only after they are deployed, which changes the prod workspace; validate shows them beforehand."
+        },
+        {
+          "text": "`databricks bundle generate job -t prod` for each job",
+          "why": "bundle generate writes configuration for an existing workspace job into the bundle; it doesn't report resolved variable values."
+        },
+        {
+          "text": "`databricks bundle open -t prod` for each resource",
+          "why": "bundle open opens a deployed resource in the browser, so it can't show values for a deployment that hasn't happened yet."
+        }
+      ],
+      "in_practice": "Running validate with JSON output in the pull request check lets reviewers diff the resolved prod values, catching a wrong catalog name before a nightly job starts writing to dev data.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/variables",
+      "evidence": "To ensure your substitutions and variables are correctly specified and parsed by Declarative Automation Bundles, run databricks bundle validate. To view values that will be used when you deploy a bundle, use the --output json option"
+    },
+    {
+      "family": "bundle-config-dashboard-dataset-catalog",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's bundle deploys one dashboard, defined by a single `.lvdash.json` file, to `dev` and `prod`. Its datasets must read from `dev_catalog.sales` in dev and `prod_catalog.sales` in prod. Which dashboard resource fields should take their values from per-target variables?",
+      "options": [
+        {
+          "text": "`dataset_catalog` and `dataset_schema`",
+          "correct": true,
+          "why": "The dashboard resource's dataset_catalog and dataset_schema fields set one catalog and schema for the dashboard's datasets at deployment, so per-target variable values point the same dashboard at each environment's data."
+        },
+        {
+          "text": "`catalog` and `schema`, as on a pipeline resource",
+          "average": true,
+          "why": "Those are pipeline settings; a dashboard resource sets the catalog and schema for its datasets with dataset_catalog and dataset_schema."
+        },
+        {
+          "text": "`file_path`, pointing at one JSON file per target",
+          "why": "A file per target duplicates the dashboard definition, which is exactly what per-target variables are meant to avoid."
+        },
+        {
+          "text": "`warehouse_id` and `parent_path`",
+          "why": "These choose the warehouse that runs the queries and the workspace folder that holds the dashboard; they don't change which catalog and schema the datasets read."
+        }
+      ],
+      "in_practice": "Promoting one dashboard definition through targets means a layout fix is made once; teams that copy dashboards per environment often find dev and prod drifting apart within a few releases.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/examples",
+      "evidence": "You can define a single catalog and schema for the datasets within a dashboard when deploying it with Declarative Automation Bundles using the dataset_catalog and dataset_schema fields of the dashboard resource."
+    },
+    {
+      "family": "bundle-config-target-permissions-can-run",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer adds a `permissions` mapping to a bundle's `prod` target so that it applies to every job and pipeline in the bundle. The support group must be able to run them but not edit them. Which permission level should the entry use?",
+      "options": [
+        {
+          "text": "`CAN_RUN`",
+          "correct": true,
+          "why": "Permissions set at the top level or in a target apply to all of the bundle's resources and accept only CAN_VIEW, CAN_RUN and CAN_MANAGE, so CAN_RUN is the level for running without editing."
+        },
+        {
+          "text": "`CAN_MANAGE_RUN`",
+          "average": true,
+          "why": "CAN_MANAGE_RUN is valid in an individual job's own permissions, but it isn't one of the levels allowed in a top-level or target permissions mapping."
+        },
+        {
+          "text": "`CAN_MANAGE`",
+          "why": "CAN_MANAGE gives full control of the resources, including editing them, which is more than the support group should have."
+        },
+        {
+          "text": "`CAN_VIEW`",
+          "why": "CAN_VIEW lets the group see the resources but not run them."
+        }
+      ],
+      "in_practice": "Granting run rights through the target keeps prod access consistent for every job the bundle adds later, so a new job never ships without support access and waits on a manual permissions ticket.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/permissions",
+      "evidence": "You can define permissions to apply to all supported resources defined in resources using the top-level permissions mapping. Allowed top-level permission levels are CAN_VIEW, CAN_MANAGE, and CAN_RUN."
+    },
+    {
+      "family": "bundle-config-pipeline-cluster-label",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's bundle defines a Lakeflow Spark Declarative Pipeline whose top-level `clusters` entry sets `node_type_id: i3.xlarge`. For `prod`, the engineer wants that same cluster with `num_workers: 6` and the node type unchanged. How must the cluster entry under the prod target identify which settings to join with?",
+      "options": [
+        {
+          "text": "By repeating the same `label`, such as `default`",
+          "correct": true,
+          "why": "For pipelines, the label in the cluster settings identifies which top-level cluster settings join with the target's. Settings only at the top level, like node_type_id, are kept, and num_workers is added."
+        },
+        {
+          "text": "By repeating the same `job_cluster_key`",
+          "average": true,
+          "why": "job_cluster_key joins job cluster settings for jobs; pipeline cluster settings are matched by label."
+        },
+        {
+          "text": "By position, since the first entries of each list join",
+          "why": "Joining isn't positional; the target's entry joins the top-level entry that has the same label."
+        },
+        {
+          "text": "By the pipeline `name`, which joins all its clusters",
+          "why": "The pipeline key selects which pipeline is overridden; within its clusters list, each entry is matched by label."
+        }
+      ],
+      "in_practice": "Scaling prod up from the same definition keeps dev cheap, for example 1 worker in dev and 6 in prod, while guaranteeing both environments run the same node type and Spark settings.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/overrides",
+      "evidence": "For Lakeflow pipelines, use label within the cluster settings of a pipeline definition to identify cluster settings in a top-level resources mapping to join with the cluster settings in a targets mapping"
+    },
+    {
+      "family": "bundle-config-permissions-combine",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's bundle gives the `analysts` group `CAN_VIEW` in a job's own `permissions` under the top-level `resources` mapping. The `prod` target's `resources` mapping adds `CAN_MANAGE_RUN` for the `oncall` group on that same job. What permissions does the job get in a prod deployment?",
+      "options": [
+        {
+          "text": "`CAN_VIEW` for `analysts` and `CAN_MANAGE_RUN` for `oncall`",
+          "correct": true,
+          "why": "Permissions declared for a resource in the top-level resources mapping are combined with those declared for the same resource in a target, so the prod job gets both entries."
+        },
+        {
+          "text": "Only `CAN_MANAGE_RUN` for `oncall`, as the target list replaces it",
+          "average": true,
+          "why": "The target's list doesn't replace the job's top-level permissions; the two lists are combined."
+        },
+        {
+          "text": "Only `CAN_VIEW` for `analysts`, as top-level permissions win",
+          "why": "Neither list takes precedence over the other here; both entries are applied to the job."
+        },
+        {
+          "text": "None, as validation rejects permissions declared in two places",
+          "why": "The overlap rule forbids the same principal in both the top-level permissions mapping and a resource's permissions; different groups across resource and target lists are combined."
+        }
+      ],
+      "in_practice": "Adding environment-only grants in the target, such as on-call run rights in prod, keeps the shared job definition minimal and puts the prod-only access in one place for review.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/permissions",
+      "evidence": "Any permissions that are declared for a resource in the top-level resources mapping are combined with any permissions that are declared for that same resources mapping in an individual target."
+    },
+    {
+      "family": "bundle-config-shared-variables-include",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team keeps two bundles, `job_bundle` and `pipeline_bundle`, in one repository, next to a `shared/variables.yml` file that declares `cluster_id` with its default. Both bundles must use that single declaration so the value changes in one place. What should each bundle's `databricks.yml` add?",
+      "options": [
+        {
+          "text": "An `include` entry of `../shared/*.yml`",
+          "correct": true,
+          "why": "Configuration files other than databricks.yml become part of a bundle only through include, and its globs can reach outside the bundle folder, so both bundles load the same variables declaration."
+        },
+        {
+          "text": "A `sync` mapping with `paths: [../shared]`",
+          "average": true,
+          "why": "sync.paths uploads files to the workspace on deploy; it doesn't load YAML into the bundle configuration, so ${var.cluster_id} would stay undeclared."
+        },
+        {
+          "text": "A `cluster_id` variable with `lookup` set to `shared`",
+          "why": "A lookup resolves a named workspace object, such as a cluster, to its ID; it doesn't read declarations from another file."
+        },
+        {
+          "text": "A `bundle.name` of `shared` in both bundles",
+          "why": "The bundle name identifies each bundle's deployment; it doesn't pull configuration in from other files."
+        }
+      ],
+      "in_practice": "A shared variables file means a cluster or warehouse change reaches every bundle in one pull request, instead of a hunt through each project's YAML for copies that have drifted.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/sharing",
+      "evidence": "compute settings and variables could be defined in a configuration file in a shared location ... include: - resources/*.yml - ../shared/*.yml ... existing_cluster_id: ${var.cluster_id} # defined in ../shared/variables.yml"
+    },
+    {
+      "family": "bundle-config-dev-cluster-id-override",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "While iterating, a data engineer wants every job in a bundle deployed to `dev` to run on the engineer's running all-purpose cluster instead of the job clusters each job defines. Deployments to `prod` must keep the job clusters, and the job definitions shouldn't be edited. What should the engineer configure?",
+      "options": [
+        {
+          "text": "`cluster_id` in the `dev` target, which uses `mode: development`",
+          "correct": true,
+          "why": "In development mode, cluster_id (or --cluster-id on deploy) overrides every cluster definition in the bundle with one existing cluster. The override is development-only, so prod keeps its job clusters."
+        },
+        {
+          "text": "A `lookup` variable for the cluster, used as each job's `existing_cluster_id`",
+          "average": true,
+          "why": "That means editing every job's compute settings, and prod would then need its own value to bring the job clusters back."
+        },
+        {
+          "text": "`cluster_id` in the `prod` target as well, set to a job cluster policy",
+          "why": "The cluster_id override is supported only for a target in development mode; production mode doesn't allow overriding cluster definitions."
+        },
+        {
+          "text": "The `jobs_max_concurrent_runs` preset, so all runs share one cluster",
+          "why": "That preset limits how many runs of each job can overlap; it doesn't change which compute the jobs use."
+        }
+      ],
+      "in_practice": "Reusing a warm all-purpose cluster in dev saves a cluster start on every test run, while prod keeps isolated, right-sized job clusters defined once in the shared configuration.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/deployment-modes",
+      "evidence": "Enables the use of --cluster-id <cluster-id> in related calls to the bundle deploy command, which overrides any and all existing cluster definitions that are already specified in the related bundle configuration file. Instead of using --cluster-id <cluster-id> ... you can set the cluster_id mapping here"
+    },
+    {
+      "family": "bundle-config-host-multiple-profiles",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's bundle sets `workspace.host` in the `prod` target. On the engineer's laptop, `.databrickscfg` has two profiles with that host, `prod-admin` and `prod-reader`, so `databricks bundle validate -t prod` can't pick one. Teammates and CI use different profile names. How should the engineer choose the profile?",
+      "options": [
+        {
+          "text": "Pass `--profile prod-admin` (or `-p`) on the bundle command",
+          "correct": true,
+          "why": "Setting host makes the CLI look for a .databrickscfg profile with a matching host; when several match, --profile or -p picks one and keeps that choice out of the shared configuration."
+        },
+        {
+          "text": "Add `workspace.profile: prod-admin` to the `prod` target",
+          "average": true,
+          "why": "That works on this laptop, but it hard-codes a profile name that teammates and CI don't have; Databricks recommends host plus --profile because it keeps the configuration portable."
+        },
+        {
+          "text": "Rename one of the two profiles to `DEFAULT` on the laptop",
+          "why": "The DEFAULT profile is used only when no -p option and no profile or host mapping is given; with host set, the CLI still matches profiles by host."
+        },
+        {
+          "text": "Set `mode: production`, which selects the admin profile",
+          "why": "Deployment modes apply default behaviors to a target; they don't choose an authentication profile."
+        }
+      ],
+      "in_practice": "Keeping profile names out of databricks.yml lets one file deploy from a laptop with OAuth profiles and from CI with environment variables, so the bundle doesn't break as it moves between them.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/settings",
+      "evidence": "Setting the host mapping instructs the Databricks CLI to find a matching profile in your .databrickscfg file and then use that profile's fields to determine which Databricks authentication type to use. If multiple profiles with a matching host field exist, then you must use the --profile option on bundle commands to specify a profile to use."
+    },
+    {
+      "family": "bundle-config-lookup-duplicate-name",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's bundle declares a variable with `lookup: cluster: 'shared-etl'` and uses it as `existing_cluster_id`. Deploys to `dev` still work, but `databricks bundle deploy -t test` now fails while resolving that variable. Yesterday an admin in the test workspace cloned the `shared-etl` cluster for an experiment and kept its name. What explains the failure?",
+      "options": [
+        {
+          "text": "The lookup now matches two clusters with that name, which is an error",
+          "correct": true,
+          "why": "With lookup, the variable takes the ID of the object with the given name. An error occurs if no object has that name or if more than one does, so the clone made the name ambiguous in test."
+        },
+        {
+          "text": "The cloned cluster is stopped, and lookups need running clusters",
+          "average": true,
+          "why": "A lookup resolves a name to an ID; the documented failures are no object with that name or more than one, not a cluster's state."
+        },
+        {
+          "text": "Lookups resolve warehouses and policies, but not all-purpose clusters",
+          "why": "cluster is a supported lookup type, along with cluster_policy, warehouse, job, pipeline and others."
+        },
+        {
+          "text": "The test target needs `type: complex` to hold the resolved ID",
+          "why": "A resolved ID is a single string; type: complex is for variables whose value is a map or list, such as a whole cluster definition."
+        }
+      ],
+      "in_practice": "Lookups trade hard-coded IDs for a naming contract; teams that reserve the names of shared compute in each workspace avoid deploy failures caused by an innocent clone.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/variables",
+      "evidence": "If a lookup is defined for a variable, the ID of the object with the specified name is used as the value of the variable. An error occurs if an object with the specified name does not exist, or if there is more than one object with the specified name."
+    },
+    {
+      "family": "bundle-config-source-linked-workspace-dev",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team deploys its bundle to the `dev` target (`mode: development`) from the bundle editor in the workspace. The dev job runs notebooks straight from the Git folder, so edits made after the last deploy show up in the next run, and nothing is copied to `${workspace.file_path}`. CI deploys to dev with the CLI and doesn't do this. The team wants workspace deploys to use deployed copies too. What should the team set?",
+      "options": [
+        {
+          "text": "The `source_linked_deployment: false` preset in the `dev` target",
+          "correct": true,
+          "why": "Deploying to a development target from the workspace makes resources reference the workspace source files and skips syncing to ${workspace.file_path}. The source_linked_deployment preset set to false turns that off; CLI deploys ignore it."
+        },
+        {
+          "text": "A `workspace.file_path` for `dev` outside the Git folder",
+          "average": true,
+          "why": "In a source-linked deployment, syncing to the file path is skipped, so a different path changes nothing; the preset is what controls the behavior."
+        },
+        {
+          "text": "`sync.paths: [.]` in the `dev` target so the files upload",
+          "why": "Sync settings choose which files a deployment uploads, but resources keep pointing at the workspace source while source-linked deployment is on."
+        },
+        {
+          "text": "The `pipelines_development: false` preset in the `dev` target",
+          "why": "That preset controls whether pipelines are deployed in development mode; it doesn't affect where job tasks read their files."
+        }
+      ],
+      "in_practice": "Source-linked dev deployments make iteration fast, but a half-finished edit can then affect a scheduled dev run; teams that want dev to mirror what CI deploys turn the preset off.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/workspace-deploy",
+      "evidence": "By default, when you deploy a bundle to a development target through the workspace, resources created during deployment reference source files in the workspace instead of their workspace copies. File synchronization to ${workspace.file_path} is skipped. To disable this behavior ... set the source_linked_deployment deployment mode preset to false."
+    },
+    {
+      "family": "bundle-config-dev-mode-lock-reenable",
+      "objective": "cicd.bundle-config",
+      "guide": "5.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A platform team deploys every pull request's bundle to one shared `ci-dev` target that uses `mode: development` and a fixed `workspace.root_path`. When two pull requests deploy at the same moment, one deployment sometimes overwrites files the other is still uploading, and nothing stops the second deploy from starting. The team wants to keep the other development mode behaviors. What should the team set?",
+      "options": [
+        {
+          "text": "`bundle.deployment.lock.enabled: true` for the `ci-dev` target",
+          "correct": true,
+          "why": "Development mode disables the deployment lock because conflicts are unlikely when each developer deploys alone. Setting bundle.deployment.lock.enabled to true re-enables it, so a second deploy can't start while the first holds the lock."
+        },
+        {
+          "text": "The `--force-lock` option on every CI deploy command",
+          "average": true,
+          "why": "Forcing the lock takes it over even when another deployment holds it, the opposite of making deploys wait; in development mode the lock is also disabled to begin with."
+        },
+        {
+          "text": "`mode: production` on the `ci-dev` target",
+          "why": "Production mode leaves the lock on, but it drops development behaviors such as paused schedules and name prefixes and adds production validations the team doesn't want."
+        },
+        {
+          "text": "The `jobs_max_concurrent_runs: 1` preset on `ci-dev`",
+          "why": "That preset limits concurrent runs of each deployed job; it has no effect on two deployments running at once."
+        }
+      ],
+      "in_practice": "A shared CI target trades per-developer isolation for fewer folders to manage; with the lock on, a colliding pipeline fails fast and can retry instead of leaving the target with a mix of two pull requests' files.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/deployment-modes",
+      "evidence": "Disables the deployment lock for faster iteration. This lock prevents deployment conflicts which are unlikely to occur in dev mode. Re-enable the lock by setting bundle.deployment.lock.enabled to true."
+    },
+    {
+      "family": "git-private-server-proxy",
+      "objective": "cicd.git",
+      "guide": "5.1",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A company hosts its Git repositories on GitHub Enterprise Server inside its corporate network, and the server can't be reached from the public internet. What must a workspace admin set up so that data engineers can create Databricks Git folders from these repositories?",
+      "options": [
+        { "text": "A Git server proxy that forwards Git commands to the private server", "correct": true, "why": "By default, Git folders sync only with repositories reachable on the internet. For a private or firewalled Git server, the Git server proxy routes Git commands from the workspace through a proxy cluster in the compute plane to the server." },
+        { "text": "A personal access token for each engineer under Linked accounts", "average": true, "why": "Engineers do need a Git credential, but a token only proves who they are; it gives Databricks no network path to a server that isn't on the internet, so clones still fail." },
+        { "text": "The repository's SSH clone URL in place of its HTTPS URL", "why": "Switching the URL scheme doesn't make the server reachable, and the proxy setup itself expects the private Git server to have HTTPS transport enabled." },
+        { "text": "A workspace IP access list entry for the Git server's address", "why": "IP access lists control which networks may connect to the workspace; they don't route Git folder traffic out to a private server." }
+      ],
+      "in_practice": "The proxy is a long-running single-node cluster, so it adds DBUs and should be kept up by a scheduled job. Once it's enabled, all Git folder traffic in the workspace, public repositories included, routes through it.",
+      "source": "https://docs.databricks.com/aws/en/repos/git-proxy",
+      "evidence": "By default, Git folders can only synchronize with repositories accessible on the internet. If you host a private Git server or your Git server is behind a firewall, you must use Git server proxy with Git folders. Your Git server must be accessible from your Databricks compute plane."
+    }
+  ]
+}

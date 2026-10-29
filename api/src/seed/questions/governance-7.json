@@ -1,0 +1,536 @@
+{
+  "items": [
+    {
+      "family": "filters-masks-create-table-inline-mask",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is creating the new table `hr.core.people` with columns `name` and `ssn`. The SQL UDF `hr.util.ssn_mask` already exists, and `ssn` must be masked from the moment the table exists, with no follow-up statement. Which statement does this?",
+      "options": [
+        {
+          "text": "CREATE TABLE hr.core.people (name STRING, ssn STRING MASK hr.util.ssn_mask)",
+          "correct": true,
+          "why": "The MASK clause can be written into the column definition of CREATE TABLE, so the column is protected as soon as the table is created and no ALTER TABLE step is needed."
+        },
+        {
+          "text": "CREATE TABLE hr.core.people (name STRING, ssn STRING), then ALTER TABLE … ALTER COLUMN ssn SET MASK hr.util.ssn_mask",
+          "average": true,
+          "why": "Creating the table and then running SET MASK does mask the column, but it takes two statements and the table exists unmasked between them, which the requirement rules out."
+        },
+        {
+          "text": "CREATE TABLE hr.core.people (name STRING, ssn STRING) WITH COLUMN MASK hr.util.ssn_mask ON (ssn)",
+          "why": "There is no table-level WITH COLUMN MASK … ON clause; that shape belongs to WITH ROW FILTER, while a mask is declared on the column itself."
+        },
+        {
+          "text": "CREATE TABLE hr.core.people (name STRING, ssn STRING) TBLPROPERTIES ('mask.ssn' = 'hr.util.ssn_mask')",
+          "why": "Table properties don't attach masks; Unity Catalog enforces a mask declared with the MASK clause or set with ALTER COLUMN … SET MASK."
+        }
+      ],
+      "in_practice": "Declaring the mask in CREATE TABLE closes the window in which a new table sits unprotected, which matters when a pipeline starts loading production rows minutes after the DDL runs.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "evidence": "Apply the new function to a table as a column mask. You can add the column mask when you create the table or later. Create the users table and apply the column mask in a single step: CREATE TABLE users ( name STRING, ssn STRING MASK ssn_mask);"
+    },
+    {
+      "family": "filters-masks-catalog-explorer-add-filter",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer prefers the UI and has already registered a row filter function in Unity Catalog. Where in Catalog Explorer does the engineer attach that function to the table `retail.core.orders`?",
+      "options": [
+        {
+          "text": "On the table's Overview tab, under Row filter, by clicking Add filter",
+          "correct": true,
+          "why": "Catalog Explorer adds a row filter from the table's Overview tab: under Row filter, click Add filter, choose the function's catalog, schema and function, then map table columns to its parameters."
+        },
+        {
+          "text": "On the table's Permissions tab, by clicking Grant and picking the function",
+          "average": true,
+          "why": "The Permissions tab grants privileges such as SELECT to principals; it doesn't attach a filter function, and a grant alone can't change which rows a user sees."
+        },
+        {
+          "text": "On the table's Details tab, by adding a row_filter table property",
+          "why": "Table properties don't attach a filter; the row filter is its own part of the table definition, which Catalog Explorer edits from the Overview tab."
+        },
+        {
+          "text": "In the workspace admin settings, by adding a rule under Security",
+          "why": "Workspace admin settings don't hold per-table row filters; a filter is Unity Catalog table metadata managed by the table owner or a user with MANAGE."
+        }
+      ],
+      "in_practice": "The UI flow suits a one-off change by a table owner; teams that manage many tables usually script the same change with ALTER TABLE … SET ROW FILTER so it is reviewed and repeatable.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "evidence": "On the Overview tab, under Row filter, click Add filter. On the Add row filter dialog, select the catalog and schema that contain the filter function, then select the function."
+    },
+    {
+      "family": "filters-masks-mask-return-type",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is writing a SQL UDF to use as a column mask on the DECIMAL(12,2) column `base_pay`, so that only members of the `payroll` group see real amounts. Which rule must the function's return type follow?",
+      "options": [
+        {
+          "text": "It must be castable to the masked column's data type",
+          "correct": true,
+          "why": "The column mask clause requires the function's return type to be castable to the data type of the masked column, because the result replaces the column's value in every query."
+        },
+        {
+          "text": "It must be STRING, so masked values can show text like '***'",
+          "average": true,
+          "why": "Masks on text columns often return '***', but that isn't a rule; for a DECIMAL column, return something that fits the type, such as NULL or a rounded amount."
+        },
+        {
+          "text": "It must be BOOLEAN, like the return type of a row filter",
+          "why": "BOOLEAN is the required return type of a row filter, which decides whether a row is kept; a mask returns the value shown in place of the column."
+        },
+        {
+          "text": "It can be any type, and the column's type changes to match it",
+          "why": "Applying a mask never changes the column's declared type; the function's result has to fit that type."
+        }
+      ],
+      "in_practice": "Returning NULL or a rounded figure for a numeric column keeps dashboards that sum or average base_pay running for masked users instead of failing on a type they can't use.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-column-mask",
+      "evidence": "The first parameter of the SQL UDF maps 1:1 with the masked column. The return type of the function must be castable to the data type of the masked column."
+    },
+    {
+      "family": "filters-masks-old-runtime-fails-secure",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's legacy job runs on a cluster with Databricks Runtime 11.3 LTS and reads `sales.core.orders`, which has just been given a row filter. What does the job get when it reads the table?",
+      "options": [
+        {
+          "text": "No data, because runtimes below 12.2 LTS fail securely on such tables",
+          "correct": true,
+          "why": "Runtimes below 12.2 LTS don't support row filters or column masks, and they fail securely: reading a protected table from them returns no data rather than unfiltered rows."
+        },
+        {
+          "text": "Every row, because older runtimes ignore the row filter",
+          "average": true,
+          "why": "Assuming an old runtime simply skips the filter is the risky guess, but Databricks fails closed on unsupported runtimes, so the job gets no data and nothing leaks."
+        },
+        {
+          "text": "Only the filtered rows, because Unity Catalog filters on any runtime",
+          "why": "Enforcing a row filter needs runtime support, which starts at 12.2 LTS; an older runtime can't apply the filter, so it returns nothing."
+        },
+        {
+          "text": "Only the filtered rows, after the query moves to a SQL warehouse",
+          "why": "Nothing reroutes a query from a runtime below 12.2 LTS; the job must move to supported compute, such as a SQL warehouse or standard access mode on 12.2 LTS or above."
+        }
+      ],
+      "in_practice": "Failing closed protects the data but can look like an empty-source bug: a nightly job that suddenly writes zero rows right after a filter is added is often running on an unsupported runtime.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+      "evidence": "Databricks Runtime versions below 12.2 LTS do not support row filters or column masks. These runtimes fail securely, meaning that if you try to access tables from these runtimes, no data is returned."
+    },
+    {
+      "family": "filters-masks-no-filter-on-views",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs ALTER VIEW sales.rpt.orders_v SET ROW FILTER sales.sec.region_filter ON (region) so that analysts querying the view see only their own region's rows, and the statement fails. Which approach gives the view's output row-level security?",
+      "options": [
+        {
+          "text": "Rebuild the view with an is_account_group_member() check in its WHERE clause",
+          "correct": true,
+          "why": "Row filters and column masks can't be applied to a view. A dynamic view gets the same effect by putting the group check, such as is_account_group_member(), into the view's own definition."
+        },
+        {
+          "text": "Attach the same filter to the view through Catalog Explorer instead",
+          "average": true,
+          "why": "Catalog Explorer changes the same metadata as SQL, so it can't attach a row filter to a view either; the restriction is on the object type, not the tool."
+        },
+        {
+          "text": "Grant SELECT on the view only to the groups allowed to see each region",
+          "why": "A grant decides whether someone can query the view at all; it can't return different rows to different groups."
+        },
+        {
+          "text": "Run ALTER VIEW … SET MASK on the view's region column instead",
+          "why": "Column masks can't be applied to a view either, and a mask changes values rather than removing rows."
+        }
+      ],
+      "in_practice": "A dynamic view adds an object to maintain, so it fits best when the view is already the layer analysts query and the base tables stay private to them.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+      "evidence": "Limitations: You cannot apply row-level security or column masks to a view. Dynamic views: a view built from one or more base tables, managed using SQL logic in the view definition."
+    },
+    {
+      "family": "filters-masks-replace-function-updates-filter",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's row filter function `ops.sec.queue_filter` is applied to `ops.core.tickets`. Members of a new group, `queue_auditors`, must now see every row as well. How should the engineer change the filter's logic?",
+      "options": [
+        {
+          "text": "Run CREATE OR REPLACE FUNCTION ops.sec.queue_filter with the new logic",
+          "correct": true,
+          "why": "The documented way to modify a row filter is CREATE OR REPLACE FUNCTION on the filter function; the table keeps referencing the function by name, so queries pick up the new logic."
+        },
+        {
+          "text": "Drop the row filter, create a new function and run SET ROW FILTER again",
+          "average": true,
+          "why": "Dropping and reapplying works, but it adds steps and leaves the table unfiltered between DROP ROW FILTER and the new SET ROW FILTER."
+        },
+        {
+          "text": "Run ALTER TABLE ops.core.tickets ADD ROW FILTER with a second function",
+          "why": "There is no ADD ROW FILTER, and a table can have only one row filter, so new rules belong in the existing function's logic."
+        },
+        {
+          "text": "Grant SELECT on ops.core.tickets to the queue_auditors group",
+          "why": "SELECT lets the group query the table, but the row filter still decides which rows they see, so they would get only the filtered rows."
+        }
+      ],
+      "in_practice": "Replacing the function in place keeps the table protected throughout the change, and when several tables share one filter function, a single statement updates all of them.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "evidence": "Modify a row filter: CREATE OR REPLACE FUNCTION <function_name> (<parameter_name> <parameter_type>, ...) RETURN {filter clause whose output must be a boolean};"
+    },
+    {
+      "family": "filters-masks-session-user-row-filter",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is writing a row filter for `crm.core.accounts` so that each account manager sees only rows whose `manager_email` column matches their own login email. Which function should the filter compare `manager_email` with?",
+      "options": [
+        {
+          "text": "session_user()",
+          "correct": true,
+          "why": "session_user() returns the current user's email address, so RETURN manager_email = session_user() keeps only the rows that belong to whoever runs the query."
+        },
+        {
+          "text": "is_account_group_member(manager_email)",
+          "average": true,
+          "why": "is_account_group_member() checks membership of a named account group; passing an email treats it as a group name, so it never compares the row with the user's login."
+        },
+        {
+          "text": "current_recipient('email')",
+          "why": "current_recipient() reads properties of an OpenSharing recipient in shared views; it doesn't identify a workspace user querying a table."
+        },
+        {
+          "text": "current_catalog()",
+          "why": "current_catalog() returns the name of the session's current catalog, which says nothing about who is running the query."
+        }
+      ],
+      "in_practice": "A session_user() filter needs no group per person, so it scales to thousands of account managers, and reassigning an account becomes a data update to manager_email rather than a permissions change.",
+      "source": "https://docs.databricks.com/aws/en/views/dynamic",
+      "evidence": "Unity Catalog introduces the following functions, which allow you to dynamically limit which users can access a row, column, or record in a view: session_user(): Returns the current user's email address."
+    },
+    {
+      "family": "filters-masks-struct-field-mask",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer manages `crm.core.customers`, whose `profile` column is a STRUCT<tier: STRING, tax_id: STRING>. Analysts need `profile.tier`, but `profile.tax_id` must be hidden from everyone outside the `tax_team` account group, and the column's type must stay the same for downstream jobs. Which approach meets these requirements?",
+      "options": [
+        {
+          "text": "A mask on profile that rebuilds it with named_struct(), keeping tier and redacting tax_id",
+          "correct": true,
+          "why": "A column mask on a STRUCT column can rebuild the value with named_struct(), copying the public field and replacing the sensitive one for users outside tax_team, while returning the same STRUCT type."
+        },
+        {
+          "text": "A mask on profile that returns the string 'REDACTED' for users outside tax_team",
+          "average": true,
+          "why": "Replacing the whole value hides tier too, and a STRING result can't stand in for a STRUCT column; the mask should return the column's own STRUCT type."
+        },
+        {
+          "text": "A row filter that hides rows with a non-null tax_id from users outside tax_team",
+          "why": "A row filter removes whole rows, so analysts would lose tier for most customers instead of seeing it with only tax_id hidden."
+        },
+        {
+          "text": "Move tax_id out of the STRUCT into a separate table that only tax_team can read",
+          "why": "Splitting the data changes the profile column's type and breaks downstream jobs, which the requirement rules out; a mask protects the field in place."
+        }
+      ],
+      "in_practice": "Masking one field inside a STRUCT keeps nested schemas intact for consumers, and returning the exact STRUCT type avoids confusing schema-mismatch errors in later INSERT, MERGE and UPDATE operations.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "evidence": "To mask nested fields, create a masking function that reconstructs the STRUCT using named_struct(), replacing sensitive field values conditionally while keeping other fields intact."
+    },
+    {
+      "family": "filters-masks-literal-filter-argument",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer wrote one row filter function, `sec.util.region_gate(region STRING, viewer_group STRING)`, which returns TRUE when the user belongs to `viewer_group` or the row's region is 'PUBLIC'. Three tables need it, each trusting a different group, such as `emea_viewers` for `sales.core.emea_orders`. How should the engineer bind the group for each table?",
+      "options": [
+        {
+          "text": "Pass it as a literal: SET ROW FILTER sec.util.region_gate ON (region, 'emea_viewers')",
+          "correct": true,
+          "why": "The ROW FILTER clause accepts constant literals as well as column names, so each table can bind the same function to its own group string."
+        },
+        {
+          "text": "Create a copy of the function for each table with the group name hard-coded",
+          "average": true,
+          "why": "Copies work, but they multiply the functions to review and patch; a literal argument lets one function serve every table."
+        },
+        {
+          "text": "Add a viewer_group column to each table and pass it in ON (region, viewer_group)",
+          "why": "Storing the same group name in every row wastes space and lets anyone who can update rows change who may see them, when a literal does the job."
+        },
+        {
+          "text": "Have each user set a session variable with the group name before querying",
+          "why": "A value the querying user chooses can't be part of a table's protection; the filter's arguments are bound when SET ROW FILTER runs."
+        }
+      ],
+      "in_practice": "One parameterized function for many tables means one body to review and fix, while each table's ALTER statement still records exactly which group it trusts.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-row-filter",
+      "evidence": "ROW FILTER func_name ON ( [ column_name | constant_literal [, ...] ] ). constant_literal: Specifies a constant parameter with the type matching a function parameter. The following types are supported: STRING, numeric, BOOLEAN, INTERVAL, NULL."
+    },
+    {
+      "family": "filters-masks-mv-filter-invoker-context",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's Lakeflow Spark Declarative Pipeline is owned by an admin service principal and publishes the materialized view `sales.gold.regional_revenue` with a row filter that calls is_account_group_member() so each region group sees only its own rows. A security reviewer worries that, because the pipeline runs with the owner's rights, every analyst will see all regions. How should the engineer respond?",
+      "options": [
+        {
+          "text": "When analysts query the view, the filter's group checks run as the querying analyst",
+          "correct": true,
+          "why": "When a materialized view or streaming table is queried, functions that check user context are evaluated with the invoker's context, so each analyst's group membership decides which rows they see."
+        },
+        {
+          "text": "The reviewer is right, because the filter is evaluated once at refresh as the owner",
+          "average": true,
+          "why": "The owner's rights apply while the pipeline refreshes the view; queries against the published view evaluate user-context functions as the person running them."
+        },
+        {
+          "text": "The filter is ignored on materialized views, so a dynamic view is needed instead",
+          "why": "Materialized views accept row filters, and pipelines can publish them with filters and masks; the view type doesn't disable the filter."
+        },
+        {
+          "text": "The filter works only if the pipeline is changed to run as each analyst",
+          "why": "A pipeline runs as one owner or run-as identity and doesn't need to change; per-user evaluation happens at query time."
+        }
+      ],
+      "in_practice": "One pipeline can publish a single governed gold view for every region instead of a copy per region, while each analyst still sees only their slice at query time.",
+      "source": "https://docs.databricks.com/aws/en/ldp/unity-catalog",
+      "evidence": "Query: When querying a materialized view or streaming table, functions that check user context (such as CURRENT_USER and IS_MEMBER) are evaluated using the invoker's user context. This approach enforces user-specific data security and access controls based on the current user's context."
+    },
+    {
+      "family": "filters-masks-path-based-read-blocked",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer maintains a PySpark ETL step on standard access mode compute (Databricks Runtime 15.4 LTS) that loads `fin.core.payments` through its storage path with spark.read.format('delta').load('s3://fin-lake/payments/'). Once a mask was set on the `card_number` column, the step began failing, yet the engineer can still query the table by name in the SQL editor. What change fixes the step?",
+      "options": [
+        {
+          "text": "Read the table by name, for example spark.table('fin.core.payments')",
+          "correct": true,
+          "why": "Path-based access to the files of a table with row filters or column masks isn't supported; reading through the Unity Catalog table name lets Databricks apply the mask."
+        },
+        {
+          "text": "Grant the step's user READ FILES on the table's external location",
+          "average": true,
+          "why": "READ FILES would open the raw files, which is exactly what the mask must prevent; path-based reads of protected tables aren't supported whatever the grants."
+        },
+        {
+          "text": "Load the path with the Delta Lake API, DeltaTable.forPath()",
+          "why": "Delta Lake APIs aren't supported on tables with row filters or column masks either, so this hits the same restriction."
+        },
+        {
+          "text": "Drop the mask before the step runs and set it again afterwards",
+          "why": "Toggling the mask exposes raw card numbers to every user while the step runs, which defeats the purpose of masking."
+        }
+      ],
+      "in_practice": "Moving jobs from storage paths to table names is a common first step when masks arrive: every read then goes through Unity Catalog, so one mask covers notebooks, jobs and dashboards alike.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+      "evidence": "Delta Lake APIs are not supported. ... Path-based access to files in tables with policies is not supported."
+    },
+    {
+      "family": "filters-masks-unsupported-time-travel-clone",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 2,
+      "type": "multiple",
+      "stem": "A data engineer adds a table-level row filter to `fin.core.ledger`. The team's runbooks use several operations on this table. Which two of them will stop working while the filter is in place? (Choose two.)",
+      "options": [
+        {
+          "text": "Querying last week's state with VERSION AS OF",
+          "correct": true,
+          "why": "Time travel isn't supported with table-level row filters or column masks, so VERSION AS OF and TIMESTAMP AS OF queries on the table stop working."
+        },
+        {
+          "text": "Creating a test copy with SHALLOW CLONE",
+          "correct": true,
+          "why": "Deep and shallow clones aren't supported on tables that have row filters or column masks, so cloning the table for testing is blocked."
+        },
+        {
+          "text": "Rebuilding it nightly with CREATE OR REPLACE TABLE … AS SELECT",
+          "average": true,
+          "why": "Replacing the table is supported, and the existing row filter is retained through the replace even when the statement doesn't mention it."
+        },
+        {
+          "text": "Querying it from a serverless SQL warehouse",
+          "why": "A SQL warehouse is a supported way to read tables with row filters; the filter is applied as each row is fetched."
+        },
+        {
+          "text": "Granting SELECT on it to another account group",
+          "why": "Grants work as usual; the filter only adds a restriction on top of the access that SELECT gives."
+        }
+      ],
+      "in_practice": "Check runbooks before adding a filter: audit queries that use VERSION AS OF and dev refreshes that use SHALLOW CLONE need another path, such as ABAC policies, which support time travel in Beta.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+      "evidence": "Time travel isn't supported with table-level row filters or column masks. ... Deep and shallow clones are not supported on tables that have row-level security or column masks."
+    },
+    {
+      "family": "filters-masks-error-safe-try-divide",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer applies a column mask to margin_pct on fin.core.accounts. For users outside the finance group, the mask UDF recomputes a rounded margin from the revenue and cost columns using the / operator, and the workspace runs with ANSI mode on. Queries that filter the table by region now scan far more data than before. Which change to the mask follows the Databricks performance guidance?",
+      "options": [
+        {
+          "text": "Compute the margin with try_divide instead of the / operator",
+          "correct": true,
+          "why": "Expressions that can throw errors, such as ANSI division, stop the SQL compiler from pushing operations down, because an error like division by zero could reveal values before masking. try_divide never throws, so filters can be pushed down again."
+        },
+        {
+          "text": "Declare the mask UDF DETERMINISTIC",
+          "average": true,
+          "why": "DETERMINISTIC matters for Python UDFs the optimizer can't inspect. This SQL division is already deterministic; what blocks pushdown is that it can throw a division-by-zero error."
+        },
+        {
+          "text": "Look the margin up from a mapping table inside the mask",
+          "why": "Databricks recommends simple CASE expressions over mapping tables or subqueries in masks, so a lookup adds work to every query rather than removing it."
+        },
+        {
+          "text": "Pass every column of the table to the mask so it can reuse them",
+          "why": "Databricks can't optimize away columns passed as UDF arguments, even unused ones, so extra arguments make the mask more expensive, not less."
+        }
+      ],
+      "in_practice": "On a large fact table, an error-safe mask lets region and date filters prune files before masking runs, so dashboards read a slice instead of the whole table. try_divide returns NULL for a zero cost, which the report should label rather than hide.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks",
+      "evidence": "Use deterministic expressions that cannot throw errors. Expressions that can throw errors (such as ANSI division) prevent the SQL compiler from pushing operations down in the query plan, because errors like \"division by zero\" could reveal information about values before filtering or masking. Use deterministic expressions that never throw errors, such as try_divide."
+    },
+    {
+      "family": "filters-masks-generated-column-blocks-mask",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer who owns `crm.core.leads` is adding column masks. ALTER TABLE … ALTER COLUMN phone SET MASK crm.sec.redact succeeds, but the same statement for `email` fails, although both columns are STRING. The table also defines `email_domain STRING GENERATED ALWAYS AS (substring_index(email, '@', -1))`. What is the cause?",
+      "options": [
+        {
+          "text": "email is read by a generated column, and such columns can't take a mask",
+          "correct": true,
+          "why": "Column masks can't be applied to columns that generated columns reference, because the generated value would reveal what the mask hides; email_domain reads email, so the mask is refused."
+        },
+        {
+          "text": "The redact function's return type doesn't fit the email column",
+          "average": true,
+          "why": "The same function was just applied to phone, another STRING column, so its types fit; the difference is the generated column that reads email."
+        },
+        {
+          "text": "The engineer also needs MODIFY on the table to mask a second column",
+          "why": "Setting a mask on an existing column doesn't change the schema, so the owner needs nothing extra; the phone mask succeeding shows privileges are fine."
+        },
+        {
+          "text": "A table can have only one column mask at a time",
+          "why": "The limit is one mask per column, not per table; masks on phone and email could coexist if email weren't referenced by a generated column."
+        }
+      ],
+      "in_practice": "Derived columns like email_domain are often added for convenience long before masking is planned; the fix is to redesign the table so generated and masked columns don't overlap, ideally before a compliance deadline forces it.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-column-mask",
+      "evidence": "Limitations: Column masks cannot be applied to columns that are referenced by generated columns. See Generated columns and column masks."
+    },
+    {
+      "family": "filters-masks-dedicated-write-merge",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A platform team's scheduled notebook adds new patients to `health.core.patients`, whose `ssn` column has a mask. It runs on dedicated access mode (formerly single user) compute with Databricks Runtime 16.4 LTS, and serverless is enabled for the workspace. SELECT statements on the table succeed, but INSERT INTO health.core.patients SELECT * FROM health.stage.new_patients fails. What should the team change so the load works on this cluster?",
+      "options": [
+        {
+          "text": "Rewrite the load as MERGE INTO … WHEN NOT MATCHED THEN INSERT",
+          "correct": true,
+          "why": "On dedicated compute with Databricks Runtime 16.3 and above, INSERT, UPDATE and DELETE on tables with row filters or column masks aren't supported, but MERGE is, and it can insert the new rows."
+        },
+        {
+          "text": "Grant MODIFY on health.core.patients to the notebook's run-as principal",
+          "average": true,
+          "why": "The failure comes from the statement type, not a privilege: on dedicated compute, INSERT into a masked table isn't supported at any privilege level, while MERGE INTO is."
+        },
+        {
+          "text": "Downgrade the cluster to Databricks Runtime 15.4 LTS",
+          "why": "Runtimes 15.4 through 16.2 support only reads of such tables on dedicated compute, so a downgrade would rule out writes entirely."
+        },
+        {
+          "text": "Disable serverless compute so the cluster writes the table itself",
+          "why": "Dedicated compute relies on serverless compute to enforce masks; without it the cluster couldn't use the table at all, let alone write to it."
+        }
+      ],
+      "in_practice": "Merging from a staging table also makes the load safe to rerun without duplicating patients; for very large sources, write the staging data to a Unity Catalog table first to avoid driver out-of-memory errors.",
+      "source": "https://docs.databricks.com/aws/en/compute/single-user-fgac",
+      "evidence": "In Databricks Runtime 16.3 and above, write table operations such as INSERT, DELETE, and UPDATE are not supported, but can be done using MERGE, which is supported."
+    },
+    {
+      "family": "filters-masks-dynamic-view-probing-risk",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer must restrict `hr.core.salaries` so each manager sees only their own reports' rows. A teammate proposes a dynamic view instead of a row filter, because dynamic views fully support predicate pushdown and run faster. The security lead rejects the view for this highly sensitive table. Which reason supports the security lead's choice?",
+      "options": [
+        {
+          "text": "Dynamic views lack the SecureView barrier, so crafted predicates can probe filtered rows",
+          "correct": true,
+          "why": "Row filters sit behind a SecureView barrier that keeps predicates with side effects from crossing the policy; dynamic views lack it, so a user can craft predicates that infer facts about rows they can't see."
+        },
+        {
+          "text": "Dynamic views require managers to hold SELECT on the base table",
+          "average": true,
+          "why": "Users of a dynamic view don't need SELECT on the base table, and Databricks recommends not granting it; the view's weakness here is probing, not grants."
+        },
+        {
+          "text": "Dynamic views can mask columns but can't filter rows by group",
+          "why": "Dynamic views can filter rows, for example with a WHERE clause built on is_account_group_member(); row-level logic is a documented use."
+        },
+        {
+          "text": "Dynamic views can't be queried from SQL warehouses",
+          "why": "A SQL warehouse is a supported compute for reading dynamic views, just as it is for tables with row filters."
+        }
+      ],
+      "in_practice": "The trade-off is real: a row filter can cost some partition pruning, but on salary data a side-channel leak costs far more than a slower query, while dynamic views remain a good fit for curated or joined sharing layers.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/abac-vs-rls-cm",
+      "evidence": "Vulnerability to probing: Because they lack a SecureView barrier, they don't protect against probing attacks, where a user crafts a predicate with side effects to infer information about filtered rows."
+    },
+    {
+      "family": "filters-masks-udf-references-protected-table",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer masks `claims.core.visits.diagnosis` with a UDF that returns the value only when EXISTS (SELECT 1 FROM claims.sec.clinician_access a WHERE a.clinician = session_user()). To keep the access list private, the engineer had earlier given `clinician_access` its own row filter so each clinician sees only their own entry. Setting up and testing the mask ends in an error instead of masked results. What is the cause?",
+      "options": [
+        {
+          "text": "The mask reads a table that has its own active row filter, which isn't supported",
+          "correct": true,
+          "why": "Row filters and column masks can't reference tables that also have active row filters or column masks, so a mask that looks up clinician_access fails while that table keeps its filter."
+        },
+        {
+          "text": "Clinicians lack SELECT on clinician_access, so the lookup fails for them",
+          "average": true,
+          "why": "Filter and mask functions read other tables with their owner's rights, so callers don't need SELECT on the lookup table; withholding SELECT is how such a table is usually kept private."
+        },
+        {
+          "text": "EXISTS subqueries aren't allowed inside a column mask function",
+          "why": "Mapping-table lookups with EXISTS are a documented pattern for row-level and column-level security; the subquery itself isn't the problem."
+        },
+        {
+          "text": "session_user() returns the function owner inside a mask, so nothing matches",
+          "why": "Functions that check user context, such as session_user(), run as the invoker, so the lookup compares the querying clinician's email."
+        }
+      ],
+      "in_practice": "Keep policy lookup tables unfiltered and private by withholding SELECT rather than stacking policies on them; a small, simple lookup table also broadcasts efficiently at query time.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+      "evidence": "Row filters and column masks cannot reference tables that also have active row filters or column masks. In ABAC configurations, you can work around this by excluding the policy function owner from the referenced table's policy."
+    }
+  ]
+}

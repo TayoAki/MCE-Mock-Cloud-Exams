@@ -1,0 +1,1068 @@
+{
+  "items": [
+    {
+      "family": "jdbc-rest-remote-query-ctas-land",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team has a JDBC Unity Catalog connection named legacy_jdbc to an in-house database that Lakehouse Federation doesn't support. A SQL task on a serverless SQL warehouse, scheduled by a Lakeflow Job, must land the source's open orders in a Unity Catalog table each night. Which statement does this?",
+      "options": [
+        {
+          "text": "CREATE OR REPLACE TABLE bronze.open_orders AS SELECT * FROM remote_query('legacy_jdbc', query => 'SELECT * FROM open_orders')",
+          "correct": true,
+          "why": "The remote_query table-valued function runs the query on the external database through the connection and returns a table, so a CREATE TABLE AS SELECT lands the result in a governed Unity Catalog table in one SQL statement."
+        },
+        {
+          "text": "CREATE OR REPLACE TABLE bronze.open_orders AS SELECT * FROM legacy_jdbc.public.open_orders",
+          "average": true,
+          "why": "Treating the connection like a foreign catalog is the common guess, but foreign catalogs aren't supported with JDBC connections, so there is no three-level name to select from."
+        },
+        {
+          "text": "COPY INTO bronze.open_orders FROM 'jdbc:legacy://db-host/open_orders' FILEFORMAT = JDBC",
+          "why": "COPY INTO loads files from cloud object storage or volumes; it has no JDBC file format and can't read a database table."
+        },
+        {
+          "text": "CREATE OR REFRESH STREAMING TABLE bronze.open_orders AS SELECT * FROM STREAM read_files('jdbc:legacy://db-host/open_orders')",
+          "why": "read_files reads files in cloud storage or volumes, so pointing it at a JDBC URL doesn't query the database."
+        }
+      ],
+      "in_practice": "Keeping the extract in one SQL statement lets a SQL-only team own the nightly load in a Lakeflow Job: a run that lands a few million rows needs no notebook, and the connection keeps database credentials out of the job definition.",
+      "source": "https://docs.databricks.com/aws/en/query-federation/remote-queries",
+      "evidence": "The remote_query function runs a query on the remote database and returns the results as a table that you can use in Databricks SQL queries. ... The remote_query function supports connections to the following connection types: ... JDBC"
+    },
+    {
+      "family": "jdbc-rest-spark-jdbc-append-overwrite-only",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 1,
+      "type": "multiple",
+      "stem": "A data engineer's Lakeflow Job pushes results from Unity Catalog to an operational PostgreSQL database with df.write.format('jdbc') through a JDBC Unity Catalog connection. Which two kinds of write can the Spark JDBC data source perform on the external table? (Choose two.)",
+      "options": [
+        {
+          "text": "Append new rows to an existing table",
+          "correct": true,
+          "why": "The Spark JDBC data source supports appending to an external table, which is what a write with mode('append') does."
+        },
+        {
+          "text": "Overwrite the entire table with the DataFrame",
+          "correct": true,
+          "why": "Overwriting the whole table is supported: the data source replaces the table's contents rather than editing individual rows in place."
+        },
+        {
+          "text": "Update only the rows whose keys changed",
+          "average": true,
+          "why": "Row-level updates are the tempting assumption for a sync job, but the Spark JDBC data source doesn't run UPDATE statements against the external database."
+        },
+        {
+          "text": "Delete the rows that match a filter condition",
+          "why": "DELETE is arbitrary DML, which the Spark JDBC data source doesn't support, so it can't remove selected rows in the external table."
+        },
+        {
+          "text": "Merge rows by primary key as an upsert",
+          "why": "There is no MERGE or upsert write in the Spark JDBC data source; it supports only appending to or overwriting whole tables."
+        }
+      ],
+      "in_practice": "When a CRM needs row-level changes, teams usually append to a staging table and let the database merge it, which keeps a nightly push of ~50,000 changed scores fast without overwriting a 10-million-row table.",
+      "source": "https://docs.databricks.com/aws/en/connect/jdbc-connection",
+      "evidence": "The Spark JDBC data source does not support arbitrary DML statements, such as UPDATE or DELETE, against the external database. It supports reading data and appending or overwriting entire tables, not row-level modifications."
+    },
+    {
+      "family": "jdbc-rest-migrate-to-databricks-connection",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is migrating a notebook that reads Oracle with spark.read.format('jdbc') and the url, user and password options to a JDBC Unity Catalog connection named ora_jdbc. Which change to the reader options does Databricks recommend?",
+      "options": [
+        {
+          "text": "Remove url, user and password, and add .option('databricks.connection', 'ora_jdbc')",
+          "correct": true,
+          "why": "The migration steps are to remove the URL and credentials from the Spark options and add databricks.connection; the connection then supplies the URL and credentials, hidden from the user."
+        },
+        {
+          "text": "Keep url, remove user and password, and add .option('databricks.connection', 'ora_jdbc')",
+          "average": true,
+          "why": "Dropping only the credentials looks like enough, but the URL and host can't be included in the Spark options when a connection is used; the connection defines them."
+        },
+        {
+          "text": "Keep all three options and add databricks.connection as a fallback",
+          "why": "Options defined on the connection can't be set again at query time, and url is never allowed there, so keeping them doesn't work as a fallback."
+        },
+        {
+          "text": "Move user and password into spark.conf and keep url in the reader",
+          "why": "This still puts the URL in code and keeps the credentials outside Unity Catalog, which the connection is meant to hold and govern."
+        }
+      ],
+      "in_practice": "Moving credentials into the connection means rotating a database password is one change to the connection instead of edits to every notebook and job that reads the source.",
+      "source": "https://docs.databricks.com/aws/en/connect/jdbc-connection",
+      "evidence": "Remove the URL and credentials from the options in the Spark Data Source API. Add the databricks.connection in the options in the Spark Data Source API. Create a JDBC connection with the corresponding URL and credentials. ... URL and host cannot be included in the Spark Data Source API."
+    },
+    {
+      "family": "jdbc-rest-custom-schema-read-types",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer reads an Oracle table over JDBC in a scheduled notebook. The default type mapping brings the account_id column into Spark as a type that a downstream join can't use, and the engineer wants it read as DECIMAL(38, 0) while every other column keeps its default mapping. Which read option does this?",
+      "options": [
+        {
+          "text": ".option('customSchema', 'account_id DECIMAL(38, 0)')",
+          "correct": true,
+          "why": "customSchema sets the Spark SQL types used when reading from JDBC, and it accepts a partial list, so the named column gets the custom type while the others keep the default mapping."
+        },
+        {
+          "text": ".option('createTableColumnTypes', 'account_id DECIMAL(38, 0)')",
+          "average": true,
+          "why": "The name sounds right, but createTableColumnTypes is a write option that sets the database column types when Spark creates a table in the external database."
+        },
+        {
+          "text": ".option('inferSchema', 'true')",
+          "why": "inferSchema belongs to file sources such as CSV; the JDBC source takes its types from the database through its type mapping, which customSchema overrides."
+        },
+        {
+          "text": ".option('mergeSchema', 'true')",
+          "why": "mergeSchema controls schema merging for file and Delta sources; it doesn't change how JDBC column types map to Spark types."
+        }
+      ],
+      "in_practice": "Fixing types at read time keeps the bronze schema stable and saves a cast in every downstream query, so joins on account_id work the same in every job that uses the table.",
+      "source": "https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html",
+      "evidence": "customSchema: The custom schema to use for reading data from JDBC connectors. For example, \"id DECIMAL(38, 0), name STRING\". You can also specify partial fields, and the others use the default type mapping."
+    },
+    {
+      "family": "jdbc-rest-refresh-foreign-catalog-job",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer manages a Lakehouse Federation foreign catalog named pg_sales over a PostgreSQL database whose schema changes in a weekly release. So that queries don't pay for a metadata refresh at run time, the engineer wants a Lakeflow Job to refresh the catalog's metadata after each release. Which SQL statement should the job run?",
+      "options": [
+        {
+          "text": "REFRESH FOREIGN CATALOG pg_sales",
+          "correct": true,
+          "why": "REFRESH FOREIGN refreshes the metadata of a foreign catalog, schema or table on demand, and Databricks suggests scheduling it in a Lakeflow Job so that queries run on already-refreshed metadata."
+        },
+        {
+          "text": "REFRESH TABLE pg_sales.public.orders",
+          "average": true,
+          "why": "REFRESH TABLE is the familiar command, but it invalidates Spark's cached data and metadata for one table rather than syncing a foreign catalog's metadata from the source."
+        },
+        {
+          "text": "MSCK REPAIR TABLE pg_sales.public.orders",
+          "why": "MSCK REPAIR TABLE recovers partition metadata for tables over file storage; it doesn't refresh the metadata a foreign catalog mirrors from a database."
+        },
+        {
+          "text": "ANALYZE TABLE pg_sales.public.orders COMPUTE STATISTICS",
+          "why": "ANALYZE TABLE collects statistics for the query optimizer; it isn't the command for refreshing a foreign catalog's metadata."
+        }
+      ],
+      "in_practice": "Refreshing right after a release moves the metadata sync off the critical path, so the first dashboard query of the morning doesn't wait on a full refresh of a catalog with hundreds of tables.",
+      "source": "https://docs.databricks.com/aws/en/query-federation/database-federation",
+      "evidence": "To improve performance for workloads where you want to avoid metadata refresh during query execution. ... Schedule a periodic metadata refresh using a Lakeflow Job with the REFRESH FOREIGN SQL command. For example: -- Refresh an entire catalog REFRESH FOREIGN CATALOG some_catalog;"
+    },
+    {
+      "family": "jdbc-rest-explain-formatted-pushdown",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer suspects that a slow query on a MySQL foreign catalog pulls far more rows from MySQL than it needs. Which command shows the query that Databricks will send to the remote database?",
+      "options": [
+        {
+          "text": "EXPLAIN FORMATTED followed by the query",
+          "correct": true,
+          "why": "EXPLAIN FORMATTED shows the query that will be sent to the remote database, so the engineer can see which filters actually reach MySQL."
+        },
+        {
+          "text": "DESCRIBE CONNECTION on the MySQL connection",
+          "average": true,
+          "why": "DESCRIBE CONNECTION shows the connection's details, such as its options, but nothing about how a particular query is translated and pushed down."
+        },
+        {
+          "text": "DESCRIBE HISTORY on the foreign table",
+          "why": "DESCRIBE HISTORY lists the versions of a Delta table; a foreign table lives in MySQL and has no Delta history to show."
+        },
+        {
+          "text": "SHOW CREATE TABLE on the foreign table",
+          "why": "SHOW CREATE TABLE returns a table definition, not the remote query generated for a specific SELECT."
+        }
+      ],
+      "in_practice": "Checking the pushed-down query first often explains a slow federated read in minutes: a filter that stays in Databricks can mean pulling 300 million rows over the network instead of 3 million.",
+      "source": "https://docs.databricks.com/aws/en/query-federation/performance-recommendations",
+      "evidence": "To see which query will be sent to the remote database, run the EXPLAIN FORMATTED command. The actual query might differ from the query in the EXPLAIN FORMATTED output because of adaptive query execution."
+    },
+    {
+      "family": "jdbc-rest-connections-not-network-policy",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A security architect reviews a plan to create Unity Catalog connections for a vendor's REST API and a partner database, and asks whether those connections also limit which external hosts Databricks compute can reach. What is accurate?",
+      "options": [
+        {
+          "text": "No; connections govern credentials and settings, while network policies govern network access",
+          "correct": true,
+          "why": "Unity Catalog connections store and govern the URL, host, port, options and credentials, but they don't enforce network restrictions; network policies control outbound and inbound access."
+        },
+        {
+          "text": "Yes; compute can reach only hosts that have a Unity Catalog connection",
+          "average": true,
+          "why": "It's tempting to treat connections as an allowlist, but they don't enforce network restrictions, so limiting egress needs network rules."
+        },
+        {
+          "text": "Yes, but only HTTP connections restrict outbound traffic",
+          "why": "No connection type, HTTP included, enforces network restrictions; network policies are the separate layer for that."
+        },
+        {
+          "text": "No; connections hold only endpoints, and credentials stay in secret scopes",
+          "why": "Connections hold authentication credentials as well as endpoints, which is how they keep secrets out of notebook code."
+        }
+      ],
+      "in_practice": "Treating the two layers separately avoids a false sense of security: credentials are governed per connection, while a separate egress policy stops a notebook from sending data to an unapproved host.",
+      "source": "https://docs.databricks.com/aws/en/connect/uc-connections",
+      "evidence": "Unity Catalog connections govern credentials and connection configuration (URL, host, port, options). ... Network policies govern network access. ... Unity Catalog connections do not enforce network restrictions."
+    },
+    {
+      "family": "jdbc-rest-predicates-parallel-read",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's Lakeflow Job reads a 120-million-row customers table from SQL Server with spark.read.jdbc. The table has no evenly distributed numeric, date or timestamp column, but its rows split cleanly across eight values of a region_code column. How can the engineer read the table in eight parallel partitions?",
+      "options": [
+        {
+          "text": "Pass predicates with eight WHERE clauses, one for each region_code value",
+          "correct": true,
+          "why": "The predicates argument takes a list of WHERE clause expressions, each defining one partition of the DataFrame, so the eight regions are fetched in parallel."
+        },
+        {
+          "text": "Call .repartition(8) on the DataFrame after the read",
+          "average": true,
+          "why": "Repartitioning is the usual reflex, but the JDBC read still runs as one query in one task; the shuffle only spreads the rows afterward."
+        },
+        {
+          "text": "Set column='region_code' with lowerBound='A' and upperBound='Z'",
+          "why": "The partition column used with lowerBound and upperBound must be numeric, date or timestamp, so a string code like region_code doesn't qualify."
+        },
+        {
+          "text": "Raise fetchsize to eight times the driver's default",
+          "why": "fetchsize sets how many rows come back per round trip; it doesn't split the read into parallel queries."
+        }
+      ],
+      "in_practice": "Splitting on a business key with a small, known set of values gives balanced partitions without guessing bounds, and eight concurrent queries can shorten a long single-task extract several-fold if the database handles eight connections.",
+      "source": "https://docs.databricks.com/aws/en/pyspark/reference/classes/dataframereader/jdbc",
+      "evidence": "predicates list, optional A list of WHERE clause expressions, each defining one partition of the DataFrame. Ignored if column is specified."
+    },
+    {
+      "family": "jdbc-rest-http-connection-manage-injection",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer built a PySpark custom data source for a partner's REST API. It reads with .option('databricks.connection', 'partner_api') so that Unity Catalog injects the bearer token stored in an HTTP connection, and no credentials appear in code. Which privilege must the Lakeflow Job's service principal hold on partner_api for credential injection to work?",
+      "options": [
+        {
+          "text": "MANAGE on the connection",
+          "correct": true,
+          "why": "Only users with the MANAGE permission on the HTTP connection can trigger credential injection, so the job's service principal needs MANAGE, not just the right to use the connection."
+        },
+        {
+          "text": "USE CONNECTION on the connection",
+          "average": true,
+          "why": "USE CONNECTION is the usual privilege for connections, but injecting an HTTP connection's credentials into a PySpark data source requires MANAGE."
+        },
+        {
+          "text": "CREATE CONNECTION on the metastore",
+          "why": "CREATE CONNECTION lets a principal create new connections; it doesn't grant the use of an existing connection's credentials."
+        },
+        {
+          "text": "READ VOLUME on the volume with the job's code",
+          "why": "Volume privileges control access to files; they don't grant the use of an HTTP connection's credentials."
+        }
+      ],
+      "in_practice": "Credential injection lets a team rotate the partner's token in one connection while dozens of jobs keep running, and granting MANAGE only to the job's service principal keeps that power off individual users.",
+      "source": "https://docs.databricks.com/aws/en/pyspark/datasources",
+      "evidence": "Before implementing the data source, create an HTTP connection named my_weather_api in Unity Catalog and give users or groups MANAGE permission to it. Only users with the MANAGE permission on the connection can trigger credential injection."
+    },
+    {
+      "family": "jdbc-rest-uc-secret-read-secret",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's notebook, run by Lakeflow Jobs in two workspaces attached to the same metastore, calls a vendor's REST API with an API key. Security wants the key governed by Unity Catalog privileges and audited like other data assets, instead of maintaining a secret scope in each workspace. Which approach meets this?",
+      "options": [
+        {
+          "text": "Store it as a Unity Catalog secret, grant READ SECRET, and read it with dbutils.secrets.get(catalog=..., schema=..., key=...)",
+          "correct": true,
+          "why": "Unity Catalog secrets are securables named catalog.schema.secret, governed by Unity Catalog privileges and available across the workspaces on a metastore; READ SECRET lets dbutils retrieve the value with redaction."
+        },
+        {
+          "text": "Store it in a secret scope in each workspace and read it with dbutils.secrets.get(scope=..., key=...)",
+          "average": true,
+          "why": "Secret scopes keep the key out of code, but they're workspace-level objects, so each workspace needs its own copy and the key isn't governed by Unity Catalog privileges."
+        },
+        {
+          "text": "Store it in a file in a Unity Catalog volume and grant READ VOLUME to the job",
+          "why": "A volume file isn't a secret store: anyone with READ VOLUME can read the plain value, and nothing redacts it in notebook output."
+        },
+        {
+          "text": "Read it from the Unity Catalog secrets REST API with include_value=true",
+          "why": "Values returned by the REST API aren't subject to secret redaction, so Databricks recommends dbutils for reading secrets in notebooks and jobs."
+        }
+      ],
+      "in_practice": "One governed secret per vendor key means a rotation happens once for every workspace, and access reviews use the same grants and audit logs as the tables that the vendor's data lands in.",
+      "source": "https://docs.databricks.com/aws/en/security/secrets/unity-catalog-secrets",
+      "evidence": "Unity Catalog secrets use the three-level namespace (catalog.schema.secret) and are available across the workspaces attached to a metastore. Unity Catalog privileges govern them. ... To read a secret value, you must have READ SECRET on the secret or on a parent catalog or schema."
+    },
+    {
+      "family": "jdbc-rest-federation-and-predicate-pushdown",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly job reads orders from a MySQL foreign catalog with WHERE customer_name ILIKE '%smith%'. Because ILIKE can't be translated for MySQL, the remote database returns all 300 million rows. The job only needs the last week's orders, and order_date is indexed in MySQL. Which change cuts the rows fetched over the network?",
+      "options": [
+        {
+          "text": "Join a date filter to the ILIKE filter with AND, such as AND order_date > '2026-10-20'",
+          "correct": true,
+          "why": "When a filter mixes pushable and non-pushable parts joined by AND, the pushable date comparison still goes to MySQL, so only recent rows travel and Databricks applies ILIKE to that subset."
+        },
+        {
+          "text": "Join a date filter to the ILIKE filter with OR so either part can be pushed",
+          "average": true,
+          "why": "OR is the tempting rewrite, but with OR a row can qualify on the name test alone, so the date part can't limit what MySQL returns and the whole filter stays in Databricks."
+        },
+        {
+          "text": "Raise fetchSize so the rows arrive in larger batches",
+          "why": "fetchSize changes how many rows come back per round trip, not how many rows the remote query returns."
+        },
+        {
+          "text": "Move the ILIKE filter into a common table expression",
+          "why": "Wrapping the predicate in a CTE doesn't make ILIKE translatable for MySQL, so the remote query still returns every row."
+        }
+      ],
+      "in_practice": "Pairing a cheap, pushable range filter with an expensive text match can turn a 300-million-row transfer into a few million rows, which shortens the job and takes load off the production database.",
+      "source": "https://docs.databricks.com/aws/en/query-federation/performance-recommendations",
+      "evidence": "If a predicate cannot be pushed down, the query executed on the remote database engine excludes the predicate, so filtering has to be done using Databricks Runtime. However, if a certain part of the filter cannot be pushed down, another part of the filter can still be pushed down if they are joined by the AND operator."
+    },
+    {
+      "family": "jdbc-rest-native-dialect-identifier-quoting",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer queries SQL Server through a JDBC Unity Catalog connection with remote_query and passes query => 'SELECT TOP 100 * FROM dbo.`Order Details`'. SQL Server rejects the statement. Which change fixes it?",
+      "options": [
+        {
+          "text": "Quote the table name with brackets: dbo.[Order Details]",
+          "correct": true,
+          "why": "The query string runs in the source database's native SQL dialect, so identifiers with spaces or special characters need that database's quoting, which is brackets for SQL Server."
+        },
+        {
+          "text": "Keep the backticks, because Databricks translates the query before sending it",
+          "average": true,
+          "why": "Backticks are Databricks SQL quoting, but the query string is passed to SQL Server in its own dialect, as written, without translation."
+        },
+        {
+          "text": "Wrap the name in IDENTIFIER('dbo.Order Details')",
+          "why": "IDENTIFIER is a Databricks SQL clause; SQL Server doesn't recognize it inside a query that runs in its own dialect."
+        },
+        {
+          "text": "Put the table name in single quotes: dbo.'Order Details'",
+          "why": "Single quotes make a string literal in SQL Server, not an identifier, so the FROM clause is still invalid."
+        }
+      ],
+      "in_practice": "Writing remote queries in the source's dialect lets teams reuse existing, tested SQL; a short note in the job's README on each source's quoting rules saves repeated failed runs.",
+      "source": "https://docs.databricks.com/aws/en/connect/jdbc-connection",
+      "evidence": "The query string runs in the source database's native SQL dialect, so quote any identifiers (database, schema, table, and column names) that contain special characters, spaces, or reserved words using that database's syntax. For example, use brackets [...] for SQL Server"
+    },
+    {
+      "family": "jdbc-rest-connection-unsupported-in-pipelines",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer reads an ERP database in a notebook with spark.read.format('jdbc').option('databricks.connection', 'erp_jdbc') and lands the result in a bronze table. To refresh bronze with the rest of the medallion flow, the engineer copies the code into a Lakeflow Spark Declarative Pipeline, and the pipeline update fails although the notebook still works. What should the engineer do?",
+      "options": [
+        {
+          "text": "Move the JDBC read to a notebook task that runs before the pipeline in a Lakeflow Job",
+          "correct": true,
+          "why": "JDBC Unity Catalog connections don't support Lakeflow pipelines, so the read belongs in a notebook task; the job then runs the pipeline, which picks up the bronze table the notebook wrote."
+        },
+        {
+          "text": "Grant the pipeline's run-as identity USE CONNECTION on erp_jdbc",
+          "average": true,
+          "why": "A missing privilege is the usual suspect, but the same connection works from the notebook; the limitation is that Lakeflow pipelines aren't supported with JDBC connections."
+        },
+        {
+          "text": "Create a foreign catalog on erp_jdbc and have the pipeline read it",
+          "why": "Foreign catalogs aren't supported with JDBC connections, so the connection can't be mirrored as a catalog for the pipeline to read."
+        },
+        {
+          "text": "Run the pipeline on classic compute in dedicated access mode",
+          "why": "The limitation applies to Lakeflow pipelines whatever compute they run on, so changing the access mode doesn't make the connection usable there."
+        }
+      ],
+      "in_practice": "Splitting extract and transform into two tasks of one job also isolates failures: if the ERP is down, the job retries the extract task without rerunning the pipeline or touching its downstream tables.",
+      "source": "https://docs.databricks.com/aws/en/connect/jdbc-connection",
+      "evidence": "Lakeflow pipelines is not supported. ... Foreign catalogs are not supported with JDBC connections."
+    },
+    {
+      "family": "jdbc-rest-driver-memory-lower-fetchsize",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer reads a wide CRM table through a JDBC Unity Catalog connection whose externalOptionsAllowList includes fetchSize. To cut round trips, the engineer set .option('fetchSize', '500000'). The read now fails with out-of-memory errors in the JDBC driver, even after moving to a cluster with a much larger driver node. Which change addresses the cause?",
+      "options": [
+        {
+          "text": "Lower fetchSize, because the JDBC driver has a 400 MiB memory limit",
+          "correct": true,
+          "why": "With a JDBC Unity Catalog connection, the JDBC driver is limited to 400 MiB of memory, and Databricks advises a smaller fetchSize when that limit is reached, because each round trip then buffers fewer rows."
+        },
+        {
+          "text": "Pick an even larger driver node so the JDBC driver gets more memory",
+          "average": true,
+          "why": "More hardware is the instinctive fix, but the JDBC driver works within its own 400 MiB limit, which is why the larger node didn't help."
+        },
+        {
+          "text": "Define fetchSize on the connection instead of in the reader",
+          "why": "Moving the same value onto the connection still buffers 500,000 rows per round trip, so the driver hits the same memory limit."
+        },
+        {
+          "text": "Replace the dbtable option with an equivalent query option",
+          "why": "dbtable and query only change how the source data is specified; rows per round trip still follow fetchSize."
+        }
+      ],
+      "in_practice": "Tuning fetchSize is a balance: too low means many round trips, too high exhausts the driver's memory on wide rows. Testing a few values against a sample night usually finds a setting that is both fast and stable.",
+      "source": "https://docs.databricks.com/aws/en/connect/jdbc-connection",
+      "evidence": "The memory limit for the JDBC driver is 400 MiB. Consider using a smaller fetchSize if the limit is reached."
+    },
+    {
+      "family": "jdbc-rest-remote-query-view-delegation",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team reads an in-house inventory database through a JDBC Unity Catalog connection named inv_jdbc. Store analysts need current stock levels at query time, but only the sku, store_id and on_hand columns, and security won't grant them USE CONNECTION, which would let them run any query against the source. Which approach meets these requirements?",
+      "options": [
+        {
+          "text": "A view over remote_query, owned by a principal with USE CONNECTION, shared with SELECT",
+          "correct": true,
+          "why": "Wrapping remote_query in a view delegates access: analysts need only SELECT on the view, the connection check uses the view owner's privileges, and the view's query limits which columns they see."
+        },
+        {
+          "text": "Grant USE CONNECTION on inv_jdbc to the analysts' group",
+          "average": true,
+          "why": "USE CONNECTION is the direct route, but it would let analysts call remote_query with any query they like, which is exactly what security wants to prevent."
+        },
+        {
+          "text": "A nightly CTAS table from remote_query, with SELECT granted to analysts",
+          "why": "A nightly copy is governed, but it can be up to a day old, while the analysts need current stock levels at query time."
+        },
+        {
+          "text": "A foreign catalog on inv_jdbc, with SELECT granted on its tables",
+          "why": "Foreign catalogs aren't supported with JDBC connections, so there are no tables in a catalog to grant SELECT on."
+        }
+      ],
+      "in_practice": "A delegating view turns a powerful connection grant into a narrow, auditable data product: lineage shows which views read the source, and revoking one view doesn't touch other teams' access.",
+      "source": "https://docs.databricks.com/aws/en/query-federation/remote-queries",
+      "evidence": "You can delegate access to remote data without granting users direct USE CONNECTION privileges by wrapping the remote_query function in a view. ... The view owner must have USE CONNECTION privilege on the connection. When users query the view, the connection access check is performed using the view owner's privileges, not the querying user's privileges."
+    },
+    {
+      "family": "jdbc-rest-federated-view-parallel-read",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer loads a 900-million-row MySQL table through a Lakehouse Federation foreign catalog. To expose only active orders, the engineer created a Databricks view over the foreign table and queried it with WITH ('numPartitions' 16, 'partitionColumn' 'order_id', 'lowerBound' 1, 'upperBound' 900000000), but the read isn't parallelized. Which approach supports parallel reads of the filtered rows?",
+      "options": [
+        {
+          "text": "Create the view in MySQL and query it through the foreign catalog with the options",
+          "correct": true,
+          "why": "Parallel reads aren't supported on a Databricks-created view that references a federated table, but a view created in the source database can be queried through the foreign catalog with the partitioning options."
+        },
+        {
+          "text": "Raise numPartitions on the Databricks view from 16 to 64",
+          "average": true,
+          "why": "More partitions seem like the lever, but no partition count applies while the options target a Databricks view over a federated table."
+        },
+        {
+          "text": "Add a fetchSize option so executors read batches in parallel",
+          "why": "fetchSize makes the connector read in batches, but not in parallel, so it doesn't split the read across executors."
+        },
+        {
+          "text": "Partition on the status column instead of order_id",
+          "why": "The partition column should be numeric and evenly distributed, and changing it doesn't lift the restriction on Databricks-created views."
+        }
+      ],
+      "in_practice": "Pushing the filter into a source-side view lets 16 executors each fetch a slice of active orders, which can turn a multi-hour single-stream load into one that fits the nightly window.",
+      "source": "https://docs.databricks.com/aws/en/query-federation/performance-recommendations",
+      "evidence": "Parallel reads are not supported when querying a Databricks-created view that references a federated table. Create the view in the source database instead. To use parallel reads with a view, create the view in the source database rather than in Databricks."
+    },
+    {
+      "family": "choosing-on-prem-database-direct-connect",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is evaluating a Lakeflow Connect database connector for a SQL Server database that runs in the company's on-premises data center. Which statement about connecting the connector to that database is accurate?",
+      "options": [
+        {
+          "text": "It can reach the database over a private link such as AWS Direct Connect",
+          "correct": true,
+          "why": "Lakeflow Connect connectors for on-premises databases can connect through services such as AWS Direct Connect, so an on-premises source can still use managed ingestion."
+        },
+        {
+          "text": "Database connectors support only databases hosted in a public cloud",
+          "average": true,
+          "why": "Managed connectors look cloud-only because they run on Databricks compute, but on-premises databases are supported over private network services like AWS Direct Connect."
+        },
+        {
+          "text": "The database must first be exposed to the public internet",
+          "why": "Exposing the database publicly isn't required; a private connection such as AWS Direct Connect provides the network path."
+        },
+        {
+          "text": "On-premises sources must go through a Partner Connect partner",
+          "why": "Partner Connect is one option for third-party tools, not a requirement; Lakeflow Connect database connectors can reach on-premises databases directly over a private link."
+        }
+      ],
+      "in_practice": "Reusing an existing Direct Connect link lets an on-premises system join the same governed, managed ingestion as cloud sources, instead of a separate export-and-upload process that someone has to babysit.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/",
+      "evidence": "Connectors for cloud databases can connect to the source using Private Link. ... Connectors for on-premises databases can connect using services like AWS Direct Connect and Azure ExpressRoute."
+    },
+    {
+      "family": "choosing-api-bounded-materialized-view",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer adds daily foreign-exchange rates from a small public REST API to a Lakeflow Spark Declarative Pipeline. No managed connector exists, and the full response is a few hundred rows that can be pulled once per pipeline update. Which pattern does Databricks suggest?",
+      "options": [
+        {
+          "text": "A materialized view whose function calls the API and returns a DataFrame",
+          "correct": true,
+          "why": "For small-to-medium, bounded payloads pulled once per run, Databricks suggests a materialized view that calls the API; the pipeline reruns it fully and idempotently on each update."
+        },
+        {
+          "text": "A streaming table over a custom Python data source that tracks offsets",
+          "average": true,
+          "why": "A custom stream reader is meant for high-volume or streaming APIs that need checkpointed offsets; for a few hundred rows it adds code without any benefit."
+        },
+        {
+          "text": "A streaming table that reads the API URL with Auto Loader",
+          "why": "Auto Loader ingests files from cloud storage or volumes; it can't call an HTTP endpoint."
+        },
+        {
+          "text": "A COPY INTO statement with the API URL as its source",
+          "why": "COPY INTO loads files from cloud storage locations, not responses from a REST endpoint."
+        }
+      ],
+      "in_practice": "Re-pulling a bounded payload on every update keeps the logic simple and self-healing: a missed day is fixed by the next run, with no offset state to repair.",
+      "source": "https://docs.databricks.com/aws/en/ldp/api-ingestion",
+      "evidence": "Periodic pulls as a materialized view | Payloads are small to medium and pulled once per pipeline run, such as reference data, daily FX rates, or a paginated but boundable API."
+    },
+    {
+      "family": "choosing-community-connector-no-sla",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer finds no Lakeflow Connect managed connector for a payments SaaS the company uses, but a community connector (Beta) for it appears in the Add data UI. What should the engineer weigh before relying on it in production?",
+      "options": [
+        {
+          "text": "The community maintains it, and no Databricks SLA backs it",
+          "correct": true,
+          "why": "Community connectors are open source and built and maintained by the community; Databricks doesn't maintain them, they aren't backed by Databricks SLAs, and forward compatibility isn't guaranteed."
+        },
+        {
+          "text": "Databricks maintains it with the same SLA as managed connectors",
+          "average": true,
+          "why": "Appearing in the Add data UI makes it look first-party, but Databricks doesn't maintain community connectors or back them with SLAs."
+        },
+        {
+          "text": "It writes to workspace storage outside Unity Catalog",
+          "why": "Community connectors need a Unity Catalog-enabled workspace and a connection, and they write to a catalog and schema you choose."
+        },
+        {
+          "text": "It supports only full snapshots, never incremental reads",
+          "why": "Each community connector handles authentication, schema discovery and incremental reads, so incremental ingestion isn't ruled out."
+        }
+      ],
+      "in_practice": "A team can pilot a community connector quickly, but production use calls for an owner who tracks the repository's changes and a fallback plan if an update breaks the pipeline.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/community-connectors",
+      "evidence": "Community connectors are open-source connectors that extend Lakeflow Connect to sources without managed connector support. The community builds and maintains them. ... Databricks doesn't maintain community connectors. They're not backed by Databricks SLAs and don't guarantee forward compatibility."
+    },
+    {
+      "family": "choosing-partner-connect-provisioned-resources",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 1,
+      "type": "multiple",
+      "stem": "A workspace admin uses Partner Connect to connect a data ingestion partner to a Unity Catalog-enabled workspace and selects a catalog for the partner to write to. Which two resources does Partner Connect create in the workspace? (Choose two.)",
+      "options": [
+        {
+          "text": "A SQL warehouse, named <PARTNER>_ENDPOINT by default",
+          "correct": true,
+          "why": "Partner Connect creates a SQL warehouse for the partner to load through, named <PARTNER>_ENDPOINT unless the admin changes the name."
+        },
+        {
+          "text": "A service principal named <PARTNER>_USER, with a personal access token",
+          "correct": true,
+          "why": "Partner Connect creates a <PARTNER>_USER service principal and a personal access token for it, and grants it USE CATALOG and CREATE SCHEMA on the chosen catalog."
+        },
+        {
+          "text": "A Unity Catalog connection that stores the partner's credentials",
+          "average": true,
+          "why": "Connections hold credentials Databricks uses to reach external systems; with Partner Connect, the partner reaches Databricks with the service principal's token instead."
+        },
+        {
+          "text": "A Lakeflow Connect ingestion pipeline for each partner source",
+          "why": "The partner runs its own syncs and loads through the SQL warehouse; Partner Connect doesn't create Lakeflow Connect pipelines."
+        },
+        {
+          "text": "A new catalog owned by the partner",
+          "why": "The admin selects an existing catalog, and the service principal receives privileges on it; no new catalog is created."
+        }
+      ],
+      "in_practice": "Knowing what gets created matters for cost and audits: the partner's SQL warehouse shows up on the bill, and every table it writes is owned by a service principal that admins must grant others access to.",
+      "source": "https://docs.databricks.com/aws/en/partner-connect/ingestion",
+      "evidence": "Partner Connect creates the following resources in your workspace: A SQL warehouse named <PARTNER>_ENDPOINT by default. ... A Databricks service principal named <PARTNER>_USER. A Databricks personal access token that is associated with the <PARTNER>_USER service principal."
+    },
+    {
+      "family": "choosing-google-drive-managed-connector",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer must ingest spreadsheets and PDFs that business teams keep in a Google Drive folder into Delta tables, keep those tables in sync with the folder, and keep maintenance as low as possible. No custom parsing or transformation is needed during ingestion. Which option fits?",
+      "options": [
+        {
+          "text": "The managed Google Drive connector in Lakeflow Connect",
+          "correct": true,
+          "why": "The managed Google Drive connector is the fully managed, low-maintenance option: it ingests files into Delta tables and keeps them in sync with the source."
+        },
+        {
+          "text": "Auto Loader through the SQL and Spark APIs for Google Drive",
+          "average": true,
+          "why": "The SQL and Spark APIs can read Google Drive too, but they suit pipelines that need complex transformations and leave more of the management and maintenance to the team."
+        },
+        {
+          "text": "A nightly notebook that downloads each file with %sh curl",
+          "why": "Hand-written download code must track changes, retries and deletions itself, which is the opposite of low maintenance."
+        },
+        {
+          "text": "A Lakehouse Federation foreign catalog over the Drive folder",
+          "why": "Lakehouse Federation targets external databases and catalogs, not file storage services such as Google Drive."
+        }
+      ],
+      "in_practice": "Letting the managed connector own syncing and retries frees the team from babysitting a scraper; the trade-off is less control over parsing, which matters only if files need custom handling on the way in.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/google-drive-source-setup",
+      "evidence": "Managed Google Drive connector | A fully managed, low-maintenance connector for enterprise applications that ingests data into Delta tables and keeps them in sync with the source. ... while giving you greater responsibility for managing and maintaining your pipelines."
+    },
+    {
+      "family": "choosing-rabbitmq-managed-streaming",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer must continuously ingest messages from RabbitMQ classic queues into Unity Catalog streaming tables. The team accepts Beta features but doesn't want to write or maintain Structured Streaming code. Which option fits?",
+      "options": [
+        {
+          "text": "The managed RabbitMQ connector in Lakeflow Connect (Beta)",
+          "correct": true,
+          "why": "The managed RabbitMQ connector streams classic-queue messages into streaming tables and handles authentication, decoding, acknowledgement and the pipeline lifecycle, so no Structured Streaming code is needed."
+        },
+        {
+          "text": "A Structured Streaming job with a custom RabbitMQ source",
+          "average": true,
+          "why": "A custom Structured Streaming source can work, but it's exactly the code the team wants to avoid writing and maintaining."
+        },
+        {
+          "text": "Auto Loader reading from the queue's exchange",
+          "why": "Auto Loader ingests files from cloud storage; a RabbitMQ queue isn't a file location it can list."
+        },
+        {
+          "text": "A scheduled COPY INTO from the queue",
+          "why": "COPY INTO loads files from cloud storage, not messages from a message broker."
+        }
+      ],
+      "in_practice": "A managed connector moves broker details such as acknowledgements off the team; its at-least-once delivery means downstream tables should tolerate an occasional duplicate message.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/rabbitmq",
+      "evidence": "The managed RabbitMQ connector in Lakeflow Connect allows you to stream messages from RabbitMQ classic queues into streaming tables in Databricks. The connector provides at-least-once delivery semantics and handles authentication, message decoding, acknowledgement, and pipeline lifecycle management, so you don't need to write Structured Streaming code directly."
+    },
+    {
+      "family": "choosing-federation-table-level-governance",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team needs read-only, in-place access to an operational PostgreSQL database for ad hoc reporting, without copying data. Governance requires granting analysts SELECT on individual tables. A teammate proposes a JDBC Unity Catalog connection because it hides the credentials. What should the team use?",
+      "options": [
+        {
+          "text": "Lakehouse Federation, with a foreign catalog over the database",
+          "correct": true,
+          "why": "Query federation provides table-level access control through a foreign catalog, and Databricks recommends it over a JDBC connection whenever the database is supported, as PostgreSQL is."
+        },
+        {
+          "text": "A JDBC Unity Catalog connection queried with Spark or remote_query",
+          "average": true,
+          "why": "A JDBC connection does hide credentials, but it governs access only at the connection level, so it can't grant SELECT table by table."
+        },
+        {
+          "text": "A Lakeflow Connect PostgreSQL connector into streaming tables",
+          "why": "A managed connector copies the data into Delta tables, while the requirement is in-place, ad hoc access without moving data."
+        },
+        {
+          "text": "A PySpark custom data source registered for PostgreSQL",
+          "why": "A custom data source is meant for systems without built-in support, and it brings no Unity Catalog table-level grants."
+        }
+      ],
+      "in_practice": "Table-level grants on a foreign catalog let a team expose 20 reporting tables to analysts while keeping payroll tables hidden, with Unity Catalog lineage and no ETL to build first.",
+      "source": "https://docs.databricks.com/aws/en/connect/jdbc-connection",
+      "evidence": "Query federation provides fine-grained access controls and governance at table-level using a foreign catalog. JDBC Unity Catalog connection provides governance only at the connection level. ... If your database is supported, Databricks recommends using query federation instead of a JDBC connection."
+    },
+    {
+      "family": "choosing-custom-connector-private-api",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team must ingest records from a proprietary internal API that no managed or community connector supports. The team wants a Lakeflow Connect pipeline with incremental reads, accepts Beta features, and won't publish the connector code outside the company. Which approach fits?",
+      "options": [
+        {
+          "text": "Build a custom connector and run it in the team's own workspace",
+          "correct": true,
+          "why": "Custom connectors (Beta) let a team build, deploy and run a connector for an unsupported source in its own workspace, without registering it with the community or contributing it to a shared repository."
+        },
+        {
+          "text": "Contribute the connector to the community repository first",
+          "average": true,
+          "why": "Contributing is optional: a custom connector runs in your own workspace without being published, so the code can stay private."
+        },
+        {
+          "text": "Request a Partner Connect trial for the internal API",
+          "why": "Partner Connect sets up trials with select technology partners; it doesn't provide connectors for a company's proprietary internal API."
+        },
+        {
+          "text": "Use a query-based connector with the API offset as the cursor",
+          "why": "Query-based connectors query database tables with a cursor column; they can't call an HTTP API."
+        }
+      ],
+      "in_practice": "A custom connector gives an internal API the same pipeline experience as managed sources, with schema discovery, incremental offsets and scheduling, while the source code stays in the company's own repository.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/custom-connectors",
+      "evidence": "Custom connectors let you ingest data from a source that Lakeflow Connect doesn't support with a managed connector. You build and test your connector, then deploy and run it in your own Databricks workspace. You don't need to register it with the community or contribute it to any shared repository to use it."
+    },
+    {
+      "family": "choosing-partner-connect-hevo-cluster-manual",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team wants Hevo Data, an ingestion partner featured in Partner Connect, to load data through an existing all-purpose cluster rather than a SQL warehouse. How should the team connect Hevo Data to the workspace?",
+      "options": [
+        {
+          "text": "Connect Hevo Data manually with the cluster's connection details",
+          "correct": true,
+          "why": "Partner Connect supports only SQL warehouses for Hevo Data, so connecting through a cluster means following the manual connection steps in Hevo's documentation."
+        },
+        {
+          "text": "Use Partner Connect and select the cluster on the Hevo Data tile",
+          "average": true,
+          "why": "Partner Connect is the quick path, but for Hevo Data it supports only SQL warehouses, so a cluster isn't an option there."
+        },
+        {
+          "text": "Create a Unity Catalog connection of type Hevo Data",
+          "why": "Hevo Data isn't a Unity Catalog connection type; the partner connects to Databricks, not the other way round."
+        },
+        {
+          "text": "Load the data with a Lakeflow Connect managed Hevo Data connector",
+          "why": "Hevo Data is a third-party ingestion platform, not a Lakeflow Connect source, so there is no managed Hevo connector."
+        }
+      ],
+      "in_practice": "Checking a partner's Partner Connect support up front avoids a half-configured trial; the manual path takes a few more steps but lets the team reuse a cluster it already sizes and pays for.",
+      "source": "https://docs.databricks.com/aws/en/partners/ingestion/hevo",
+      "evidence": "You can connect to Hevo Data using a Databricks SQL warehouse (formerly Databricks SQL endpoints) or a Databricks cluster. ... Partner Connect only supports SQL warehouses for Hevo Data. To connect using a cluster, do so manually."
+    },
+    {
+      "family": "choosing-google-drive-service-account",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer sets up the managed Google Drive connector to ingest a finance department's shared folder. The engineer planned OAuth U2M with a personal Google account, but the content belongs to the department rather than one person, and ingestion must keep working if the engineer changes roles. Which authentication method fits?",
+      "options": [
+        {
+          "text": "An OAuth service account",
+          "correct": true,
+          "why": "Both OAuth U2M methods authenticate as one person's Google account and ingest only what that account can access; an OAuth service account covers content that isn't tied to an individual."
+        },
+        {
+          "text": "OAuth U2M: Databricks-managed, as it needs no Google Cloud app",
+          "average": true,
+          "why": "Skipping app registration is convenient, but this method still signs in as an individual, so access follows that person's account."
+        },
+        {
+          "text": "OAuth U2M: Custom-managed with the engineer's own Google Cloud app",
+          "why": "Bringing your own app gives control over app ownership and rate limits, yet it still authenticates as an individual Google account."
+        },
+        {
+          "text": "A bearer token stored in a Unity Catalog HTTP connection",
+          "why": "The Google Drive connector supports OAuth U2M and OAuth service account authentication; an HTTP connection's bearer token isn't one of its methods."
+        }
+      ],
+      "in_practice": "Tying ingestion to a service account avoids an outage when the pipeline creator's account is disabled or loses access, and it keeps access reviews focused on one governed identity.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/google-drive-source-setup",
+      "evidence": "Both OAuth U2M methods authenticate as an individual Google account, so the connector ingests only the files that account can access. To ingest content that isn't tied to one person's account, use an OAuth service account."
+    },
+    {
+      "family": "choosing-partner-token-replacement",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "Six months after a workspace admin connected a cloud-based ingestion partner through Partner Connect, the partner's loads start failing because the personal access token Partner Connect created for the partner's service principal has expired. A data engineer without admin rights is asked to fix it. What must happen?",
+      "options": [
+        {
+          "text": "A workspace admin creates a replacement token for the service principal for the partner",
+          "correct": true,
+          "why": "An expired token must be replaced with a new token for the partner's service principal, and only workspace admins can generate replacement tokens for service principals; the new value is then shared with the partner."
+        },
+        {
+          "text": "The data engineer creates a personal token of their own and gives it to the partner",
+          "average": true,
+          "why": "A personal token gets loads running, but the partner would then act with the engineer's identity, and Databricks recommends service principal tokens for automated tools."
+        },
+        {
+          "text": "The partner generates a new Databricks token from its own console",
+          "why": "Databricks tokens are created in Databricks; the partner can only use the token value it is given."
+        },
+        {
+          "text": "Nothing; Partner Connect renews the token on the next load",
+          "why": "An expired token stays invalid; a replacement token has to be created for the service principal."
+        }
+      ],
+      "in_practice": "Tracking service principal token expiry on the platform team's calendar turns a surprise outage into routine rotation, and keeps partner writes attributed to one auditable identity.",
+      "source": "https://docs.databricks.com/aws/en/partner-connect/",
+      "evidence": "If for any reason the token expires or the token's value is no longer shared with the partner, you must create a replacement token for the service principal ... Only Databricks workspace administrators can generate replacement tokens for Databricks service principals."
+    },
+    {
+      "family": "choosing-kafka-structured-streaming-control",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team ingests clickstream events from Apache Kafka. Each micro-batch must be split and written to three tables with custom logic, and after an outage the team must set the starting offsets itself. Databricks recommends starting with the most managed layer, and Lakeflow Connect offers a managed Kafka connector (Beta). Which approach fits?",
+      "options": [
+        {
+          "text": "Read Kafka directly with Structured Streaming",
+          "correct": true,
+          "why": "Databricks points to reading Kafka directly with Structured Streaming when you need finer control than the managed connector offers, such as custom offset handling or per-batch transformations."
+        },
+        {
+          "text": "The managed Kafka connector, as the most managed layer",
+          "average": true,
+          "why": "Starting with the most managed layer is the default, but the guidance is to drop a layer when requirements aren't met, and custom offsets and per-batch logic call for Structured Streaming."
+        },
+        {
+          "text": "Auto Loader subscribed to the Kafka topic",
+          "why": "Auto Loader discovers files in cloud object storage; it doesn't consume Kafka topics."
+        },
+        {
+          "text": "A query-based connector with the offset as its cursor",
+          "why": "Query-based connectors poll database tables with a cursor column; a Kafka topic isn't a database table."
+        }
+      ],
+      "in_practice": "Owning the stream code costs maintenance, but it lets the team replay from chosen offsets after an incident and fan one topic out to three tables in a single pass instead of running three readers.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/streaming-overview",
+      "evidence": "You can also read from Apache Kafka directly with Structured Streaming when you need finer control over how the stream is read and processed than the managed Kafka connector offers, such as custom offset handling or per-batch transformations."
+    },
+    {
+      "family": "choosing-api-high-volume-stream-reader",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team pulls events from an internal REST API that adds millions of records a day and pages through them with an offset cursor. Ingestion runs in a Lakeflow pipeline, no managed or community connector covers the API, Beta features aren't allowed, and after a failure the next update must resume from the last offset instead of re-reading history. Which pattern fits?",
+      "options": [
+        {
+          "text": "A streaming table that reads a Python data source with an offset-tracking stream reader",
+          "correct": true,
+          "why": "For high-volume or streaming APIs, Databricks suggests a custom source built on the Python Data Source API; its stream reader checkpoints progress, so a restart resumes from the last offset."
+        },
+        {
+          "text": "A materialized view that loops over every API page on each update",
+          "average": true,
+          "why": "The materialized view pattern suits small, bounded payloads; it re-reads the full API response on every update, which doesn't scale to millions of records a day."
+        },
+        {
+          "text": "A foreign catalog over the API through Lakehouse Federation",
+          "why": "Lakehouse Federation connects to external databases and catalogs, not to REST APIs."
+        },
+        {
+          "text": "A query-based connector that uses the offset as its cursor column",
+          "why": "Query-based connectors query database tables through a connection; they can't page through an HTTP API."
+        }
+      ],
+      "in_practice": "Checkpointed offsets keep daily cost proportional to new data: after a two-hour API outage, the pipeline fetches only the backlog instead of re-pulling months of events.",
+      "source": "https://docs.databricks.com/aws/en/ldp/api-ingestion",
+      "evidence": "You need to poll a high-volume or streaming API incrementally, with checkpointed progress so a restart doesn't re-read everything. ... This gives you proper streaming semantics, including checkpointed progress and incremental reads, so a restart resumes from the last offset instead of pulling the whole API again."
+    },
+    {
+      "family": "choosing-query-based-foreign-catalog-ingestion",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team must land 40 tables from Amazon Redshift into Unity Catalog streaming tables every hour. A Lakehouse Federation foreign catalog over Redshift already exists, every table has a reliable updated_at column, and the platform team rules out an always-on ingestion gateway. Which approach meets these requirements?",
+      "options": [
+        {
+          "text": "A query-based connector that uses foreign catalog ingestion over the existing catalog",
+          "correct": true,
+          "why": "Query-based connectors can read through a foreign catalog backed by any Lakehouse Federation source, Redshift included, with updated_at as the cursor and no gateway or staging volume."
+        },
+        {
+          "text": "A query-based connector that uses foreign connection ingestion with a Redshift connection",
+          "average": true,
+          "why": "Foreign connection ingestion is the more familiar setup, but it supports only Oracle, Teradata, SQL Server, MySQL, MariaDB and PostgreSQL, so Redshift has to go through foreign catalog ingestion."
+        },
+        {
+          "text": "A CDC database connector with an ingestion gateway and staging volume",
+          "why": "CDC database connectors depend on an ingestion gateway, which the platform team has ruled out."
+        },
+        {
+          "text": "Hourly dashboards that query the foreign catalog directly",
+          "why": "Querying the foreign catalog leaves the data in Redshift, while the requirement is to land streaming tables in Unity Catalog."
+        }
+      ],
+      "in_practice": "Reusing the foreign catalog means no second set of credentials to manage, and hourly cursor-based pulls of changed rows keep both Redshift load and serverless cost in line with what actually changed.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/query-based-overview",
+      "evidence": "Foreign catalog ingestion Uses a foreign catalog backed by a Lakehouse Federation data source. ... Foreign connection ingestion sources: Oracle, Teradata, SQL Server, MySQL, MariaDB, PostgreSQL. Foreign catalog ingestion sources: All Lakehouse Federation data sources are supported using foreign catalog ingestion."
+    },
+    {
+      "family": "choosing-cdc-over-query-based-source-load",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team ingests 300 high-churn tables from a production MySQL database that already has binary logging enabled. The DBA's top requirement is keeping query load on the source low, and changes must reach Unity Catalog within minutes. A teammate proposes a query-based connector because it needs no ingestion gateway. What should the team choose?",
+      "options": [
+        {
+          "text": "A CDC database connector that captures changes from the binlog",
+          "correct": true,
+          "why": "CDC connectors read changes from the binlog through a continuously running gateway, which loads the source less than querying its tables and keeps latency low."
+        },
+        {
+          "text": "A query-based connector, since skipping the gateway lowers source load",
+          "average": true,
+          "why": "No gateway means less Databricks infrastructure, not less database load: query-based connectors run queries directly on the source tables, which can load the database more than reading the binlog."
+        },
+        {
+          "text": "Lakehouse Federation queries issued directly by downstream reports",
+          "why": "Federated reports push their queries to MySQL on every run, which adds load and lands nothing in Unity Catalog."
+        },
+        {
+          "text": "Nightly COPY INTO loads of CSV exports from MySQL",
+          "why": "Nightly exports miss the within-minutes requirement and add export work on the database side."
+        }
+      ],
+      "in_practice": "On 300 busy tables, frequent cursor queries can compete with production traffic; paying for an always-on gateway can cost less than scaling up the primary database to absorb ingestion queries.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/query-based-overview",
+      "evidence": "The trade-off is that query performance can be slower and queries run directly on source tables, which can place more load on the source database compared to CDC connectors that query the binlog."
+    },
+    {
+      "family": "choosing-zerobus-direct-write-no-bus",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A company's fleet of IoT gateways must write telemetry records straight into a Unity Catalog Delta table within seconds. The data engineering team doesn't want to run a message bus such as Kafka or land the records as files first. Which ingestion option fits?",
+      "options": [
+        {
+          "text": "Zerobus Ingest, which the gateways push records to directly",
+          "correct": true,
+          "why": "Zerobus Ingest is a push-based streaming API that writes records straight into Unity Catalog Delta tables with no message bus to run, and Databricks calls it the most direct path when the lakehouse is the destination."
+        },
+        {
+          "text": "A Kafka cluster read by the Lakeflow Connect Kafka connector",
+          "average": true,
+          "why": "Managed streaming connectors fit when Kafka already serves other consumers; standing up Kafka only to feed the lakehouse adds the broker layer the team wants to avoid."
+        },
+        {
+          "text": "Auto Loader over files that the gateways write to Amazon S3",
+          "why": "Auto Loader is the choice for data already landed as files in cloud storage; here it would force the gateways to write files first, which the team ruled out."
+        },
+        {
+          "text": "A COPY INTO statement scheduled every minute on a SQL warehouse",
+          "why": "COPY INTO loads files from a storage location in batches, so it still needs the gateways to land files and adds scheduling delay on top."
+        }
+      ],
+      "in_practice": "Dropping the broker removes a cluster to size, patch and pay for; capacity scales serverlessly as more gateways connect, and usage is billed against the Jobs Serverless SKU.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/zerobus-overview",
+      "evidence": "Zerobus Ingest is a push-based streaming API that writes data straight into Unity Catalog Delta tables at high scale, with no message bus to run. It removes the middle layer that many teams place between their producers and the lakehouse. ... When your destination is the lakehouse, Zerobus Ingest is the most direct path."
+    },
+    {
+      "family": "choosing-kafka-batch-bounded-backfill",
+      "objective": "ingestion.choosing",
+      "guide": "2.6",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "After an outage, a data engineer must reload the events that an Apache Kafka topic holds between two known offsets into a Unity Catalog bronze table. It is a one-time backfill, and the team's continuous Kafka ingestion is already running separately. Which approach fits this load?",
+      "options": [
+        {
+          "text": "A batch spark.read from Kafka that sets startingOffsets and endingOffsets",
+          "correct": true,
+          "why": "Databricks recommends Kafka batch mode, spark.read, for one-time loads and backfills; it requires both startingOffsets and endingOffsets, so the job reads exactly that range and then finishes."
+        },
+        {
+          "text": "A spark.readStream query from Kafka that sets startingOffsets",
+          "average": true,
+          "why": "Streaming mode suits continuous or low-latency ingestion; a stream started at an offset keeps reading past the end of the gap, so it doesn't express a bounded one-time load."
+        },
+        {
+          "text": "A second pipeline built on the managed Kafka connector (Beta)",
+          "why": "The managed Kafka connector runs a pipeline that continuously reads topics into streaming tables, which fits ongoing ingestion rather than a bounded one-time reload."
+        },
+        {
+          "text": "A COPY INTO statement that names the Kafka topic as its source",
+          "why": "COPY INTO loads files from a storage location such as S3 or a volume; it can't read records from a Kafka topic."
+        }
+      ],
+      "in_practice": "A bounded batch read finishes and releases its compute once the gap is filled, and because it keeps no streaming checkpoint, it can't disturb the offsets of the production stream running beside it.",
+      "source": "https://docs.databricks.com/aws/en/connect/streaming/kafka/faq",
+      "evidence": "Streaming mode (spark.readStream): Use when you need continuous data processing or low-latency ingestion. Batch mode (spark.read): Use for one-time data loads, backfills, or debugging. Requires both startingOffsets and endingOffsets."
+    },
+    {
+      "family": "jdbc-rest-connection-driver-volume-read",
+      "objective": "ingestion.jdbc-rest",
+      "guide": "2.5",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team created the JDBC Unity Catalog connection erp_jdbc and stored its driver JAR in the volume ops.drivers.jdbc_jars. A Lakeflow Job's notebook on serverless compute reads ERP tables with .option('databricks.connection', 'erp_jdbc') and runs as the service principal etl_sp, which has USE CONNECTION on erp_jdbc, USE CATALOG on ops and USE SCHEMA on ops.drivers. Which additional privilege does etl_sp need?",
+      "options": [
+        {
+          "text": "READ VOLUME on ops.drivers.jdbc_jars, where the driver JAR is stored",
+          "correct": true,
+          "why": "A JDBC connection installs its driver from a Unity Catalog volume, so the requirements include volume access for whoever queries the connection, and Databricks grants READ VOLUME on the JAR volume for this."
+        },
+        {
+          "text": "No other privilege, since USE CONNECTION covers the driver JAR",
+          "average": true,
+          "why": "USE CONNECTION lets a principal query through the connection, but the driver is loaded from a volume, and querying principals need read access to that volume as well."
+        },
+        {
+          "text": "CREATE CONNECTION on the metastore attached to the workspace",
+          "why": "CREATE CONNECTION is needed to create a connection, which the platform team already did; it isn't what a principal needs to read through an existing one."
+        },
+        {
+          "text": "MANAGE on erp_jdbc, so the job can load the connection's driver",
+          "why": "MANAGE lets a principal administer the connection, such as granting access to it; reading through a JDBC connection relies on USE CONNECTION plus read access to the driver's volume."
+        }
+      ],
+      "in_practice": "Granting READ VOLUME on the driver volume to a group of connection users, rather than to each principal in turn, saves a failed first run every time a new job or service principal starts using the connection.",
+      "source": "https://docs.databricks.com/aws/en/connect/jdbc-connection",
+      "evidence": "Volume access by the user querying the connection. ... The JDBC connection reads and installs the JDBC driver JAR from a Unity Catalog volume. ... Grant read access on the volume to the users who query the connection: GRANT READ VOLUME ON VOLUME my_catalog.my_schema.my_volume_JARs TO `account users`"
+    }
+  ]
+}

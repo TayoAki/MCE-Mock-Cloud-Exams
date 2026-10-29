@@ -1,0 +1,913 @@
+{
+  "items": [
+    {
+      "family": "orchestration-sql-task-named-parameter",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer adds a SQL task that runs a saved query on a serverless SQL warehouse. The task's Parameters list the key-value pair region = emea. Which WHERE clause in the query reads this value at run time?",
+      "options": [
+        {
+          "text": "WHERE region = :region",
+          "correct": true,
+          "why": "SQL tasks pass their parameters to the query as named parameters, so the query references the key with a colon prefix and receives emea when the task runs."
+        },
+        {
+          "text": "WHERE region = '${region}'",
+          "average": true,
+          "why": "The ${key} form is how pipeline Configuration values are substituted into SQL; a SQL task binds its parameters through named parameter markers instead."
+        },
+        {
+          "text": "WHERE region = {{region}}",
+          "why": "Double curly braces mark dynamic value references in task configuration fields; they aren't resolved inside the query text itself."
+        },
+        {
+          "text": "WHERE region = getArgument('region')",
+          "why": "getArgument is a legacy notebook widget function, not how a saved query on a SQL warehouse receives task parameters."
+        }
+      ],
+      "in_practice": "One parameterized query can serve every region: separate SQL tasks or a For each loop pass emea, amer and apac, instead of the team maintaining three near-identical saved queries.",
+      "source": "https://docs.databricks.com/aws/en/jobs/parameter-use",
+      "evidence": "SQL: You can use dynamic value references in your task configuration. Use named parameters to retrieve parameter values. ... to retrieve a task parameter called year_param, you can get its value by using :year_param in your query"
+    },
+    {
+      "family": "orchestration-run-now-uses-run-as-identity",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "Priya creates a job in Lakeflow Jobs and leaves its Run as setting unchanged. Later, Omar, who has CAN MANAGE RUN on the job, clicks Run now. Whose permissions do the job's tasks use to read and write data?",
+      "options": [
+        {
+          "text": "Priya's, because runs use the Run as identity, which defaults to the creator",
+          "correct": true,
+          "why": "The job creator is set as Run as by default, and runs started with Run now use the Run as user's permissions, not those of the person who clicked."
+        },
+        {
+          "text": "Omar's, because a manual run uses the identity of whoever starts it",
+          "average": true,
+          "why": "It feels natural that a manual run acts as the person who starts it, but Run now runs assume the permissions of the Run as user, not the user who issued Run now."
+        },
+        {
+          "text": "The Jobs service's application service principal, which starts every run",
+          "why": "The Jobs service principal is recorded as the identity that runs the job, but data access is evaluated against the Run as identity."
+        },
+        {
+          "text": "A workspace admin's, because admins hold CAN MANAGE on every job",
+          "why": "Admins get CAN MANAGE on jobs by default, which lets them manage the job, but it doesn't make runs use an admin's data permissions."
+        }
+      ],
+      "in_practice": "Because Run now doesn't switch identities, an operator with CAN MANAGE RUN can rerun a job without holding its data grants, which is also why production jobs usually run as a service principal.",
+      "source": "https://docs.databricks.com/aws/en/jobs/privileges",
+      "evidence": "The creator of the job is set for Run as. ... Jobs triggered through Run Now assume the permissions of the Run as user (the owner, by default) and not the user who issued Run Now."
+    },
+    {
+      "family": "orchestration-can-manage-run-for-operators",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "An on-call rotation must be able to trigger, cancel and restart runs of a production job, but must not edit its tasks, schedule or permissions. Which job permission should the on-call group receive?",
+      "options": [
+        {
+          "text": "CAN MANAGE RUN",
+          "correct": true,
+          "why": "CAN MANAGE RUN lets users trigger and cancel job runs, and Databricks names it as the permission for users who trigger, stop or restart runs, without the right to change the job definition."
+        },
+        {
+          "text": "CAN MANAGE",
+          "average": true,
+          "why": "CAN MANAGE would allow running, but it also allows editing the job definition, tasks and permissions and pausing the schedule, which goes beyond what the rotation should have."
+        },
+        {
+          "text": "CAN VIEW",
+          "why": "CAN VIEW only shows run results, details, history and status; it doesn't let the group start or cancel runs."
+        },
+        {
+          "text": "IS OWNER",
+          "why": "IS OWNER belongs to exactly one user or service principal, can't be assigned to a group, and carries full management rights."
+        }
+      ],
+      "in_practice": "Least-privilege job permissions keep a 2 a.m. rerun to one click for on-call staff, while changes to production code still go through the few people trusted to edit the job.",
+      "source": "https://docs.databricks.com/aws/en/jobs/privileges",
+      "evidence": "Users that view the job configuration or monitor runs need the Can View permission. Users that trigger, stop, or restart job runs need the Can Manage Run permission. Only grant Can Manage or Is Owner privileges to users trusted to modify production code."
+    },
+    {
+      "family": "orchestration-job-tags-filter-and-cost",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A FinOps team wants to filter the Jobs list by cost center and to see each job's classic job cluster usage under that cost center in its existing cluster monitoring. Which job setting covers both needs?",
+      "options": [
+        {
+          "text": "A cost_center tag added in the Job details pane",
+          "correct": true,
+          "why": "Job tags let users filter the Jobs list, and they also propagate to the job clusters created when the job runs, so existing cluster monitoring sees the same tag."
+        },
+        {
+          "text": "Custom tags on each task's job cluster configuration",
+          "average": true,
+          "why": "Cluster custom tags reach cluster usage, but they aren't job tags, so they don't let anyone filter the Jobs list by cost center."
+        },
+        {
+          "text": "A cost_center job parameter pushed down to all tasks",
+          "why": "Job parameters pass values to task code at run time; they don't label the job in the Jobs list or reach cluster usage records."
+        },
+        {
+          "text": "A cost-center prefix added to every job's name",
+          "why": "A naming convention helps a text search, but it doesn't carry over to the job clusters that each run creates."
+        }
+      ],
+      "in_practice": "One tag serves two audiences: an owner filters 300 jobs down to their department's 20, and the same key shows up on the cluster usage that finance already reports on.",
+      "source": "https://docs.databricks.com/aws/en/jobs/configure-job",
+      "evidence": "You can use tags to filter jobs in the Jobs list. For example, you can use a department tag to filter all jobs that belong to a specific department. ... Tags also propagate to job clusters created when a job is run, allowing you to use tags with your existing cluster monitoring."
+    },
+    {
+      "family": "orchestration-git-commit-sha-in-run",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A job's notebook tasks use a Git provider source set to the main branch. An auditor asks which exact commit ran in last night's run. Where can the data engineer find it?",
+      "options": [
+        {
+          "text": "In the task run details pane, whose Git details show the commit SHA",
+          "correct": true,
+          "why": "For tasks that run code from a remote Git repository, the task run details pane includes Git details, including the commit SHA associated with that run."
+        },
+        {
+          "text": "In the job's Git settings, which show the configured Git reference",
+          "average": true,
+          "why": "The Git settings show the reference you configured, here the main branch, which has moved since last night; they don't record which commit a past run used."
+        },
+        {
+          "text": "In the commit history of a Git folder in the workspace",
+          "why": "A Git folder is a separate workspace clone that someone syncs by hand; its history doesn't show what a Git-sourced job run checked out."
+        },
+        {
+          "text": "In the revision history of the notebook in the workspace",
+          "why": "Git-sourced tasks check out code from the remote repository at run time, so a workspace notebook's revisions aren't a record of the code a run used."
+        }
+      ],
+      "in_practice": "Recording the commit per run turns 'what code produced this table?' into a lookup: an engineer can diff the commit behind a bad run against the last good one in minutes.",
+      "source": "https://docs.databricks.com/aws/en/jobs/git",
+      "evidence": "When you view the run history of a task that runs code stored in a remote Git repository, the Task run details pane includes Git details, including the commit SHA associated with the run."
+    },
+    {
+      "family": "orchestration-dashboard-task-default-warehouse",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer adds a Dashboard task to a job and leaves the task's optional SQL warehouse field empty. Which compute does the task use to refresh the dashboard?",
+      "options": [
+        {
+          "text": "The dashboard's default SQL warehouse",
+          "correct": true,
+          "why": "The warehouse field is optional; if it isn't set, the dashboard task refreshes the dashboard on the dashboard's default warehouse."
+        },
+        {
+          "text": "Serverless compute for jobs, the job default",
+          "average": true,
+          "why": "Serverless compute for jobs is the default for task types that support it, but dashboard tasks need a serverless or pro SQL warehouse and fall back to the dashboard's default."
+        },
+        {
+          "text": "The job's shared classic job cluster",
+          "why": "Dashboard tasks run on a serverless or pro SQL warehouse, not on a job cluster shared with notebook tasks."
+        },
+        {
+          "text": "None, so the task fails until one is set",
+          "why": "Because the field is optional, an empty value falls back to the dashboard's default warehouse instead of failing the task."
+        }
+      ],
+      "in_practice": "Leaving the field empty keeps refreshes on the warehouse the dashboard author sized for it; setting it lets a team move a heavy 6 a.m. refresh off the warehouse analysts are querying.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/dashboard",
+      "evidence": "(Optional) Select the SQL warehouse used to refresh the dashboard. If not specified, the task uses the dashboard's default warehouse. You must use a serverless or pro SQL warehouse for dashboard tasks."
+    },
+    {
+      "family": "orchestration-swap-compute-all-tasks",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's job has 12 notebook tasks that all run on one classic job cluster. The team wants to move every task that uses that cluster to serverless compute for jobs in a single change. What should the engineer use?",
+      "options": [
+        {
+          "text": "Swap under Compute in the Job details pane",
+          "correct": true,
+          "why": "The Compute section of the Job details pane lists the job's compute, and its Swap button changes the compute for all tasks associated with that compute resource at once."
+        },
+        {
+          "text": "Each task's Compute setting, edited one at a time",
+          "average": true,
+          "why": "Editing tasks one by one reaches the same end state, but it takes 12 edits and risks missing one; Swap changes every task tied to that compute in one action."
+        },
+        {
+          "text": "Run now with different settings, choosing serverless",
+          "why": "Run now with different settings changes the tasks, parameters and Performance optimized setting for one run; it doesn't move tasks to other compute."
+        },
+        {
+          "text": "Clone job, then select serverless for the clone",
+          "why": "Cloning creates an identical copy of the job, including its compute, with a new job ID; it adds a job without changing any task's compute."
+        }
+      ],
+      "in_practice": "Moving a whole job to serverless in one swap makes it easy to compare a week of cost and runtime against the old cluster, and to swap back if a task hits a serverless limitation.",
+      "source": "https://docs.databricks.com/aws/en/jobs/compute",
+      "evidence": "The Compute section in the Job details pane lists all compute configured for tasks in the current job. ... Use the Swap button to change the compute for all tasks associated with a compute resource."
+    },
+    {
+      "family": "orchestration-resolved-parameters-run-page",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants to check which date {{job.start_time.iso_date}} resolved to in a notebook task during last night's run. Where can the engineer see the resolved value?",
+      "options": [
+        {
+          "text": "Under Parameters on that run's details page",
+          "correct": true,
+          "why": "After a task completes, its resolved parameter values appear under Parameters on the run details page, showing the actual date the reference produced."
+        },
+        {
+          "text": "In the Job parameters dialog of Job details",
+          "average": true,
+          "why": "The Job parameters dialog shows configured keys and default values, including the unresolved reference, not the value a past run used."
+        },
+        {
+          "text": "In the job's YAML code version view",
+          "why": "The YAML view shows the job definition, so it contains the {{job.start_time.iso_date}} reference itself rather than what it resolved to."
+        },
+        {
+          "text": "In the notebook's widget bar in the workspace",
+          "why": "Opening the notebook in the workspace shows its own widgets, not the parameter values passed to a specific job run."
+        }
+      ],
+      "in_practice": "Checking resolved values on the run page quickly shows whether a 'wrong day' bug comes from the parameter or from the code, before anyone reruns a 2-hour job.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "After a task completes, you can see resolved parameter values under Parameters on the run details page."
+    },
+    {
+      "family": "orchestration-git-source-task-types",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "multiple",
+      "stem": "A data engineering team adds a Git provider source to a job so that tasks check out code from the team's remote repository at run time. Which two task types can use that Git source? (Choose two.)",
+      "options": [
+        {
+          "text": "Notebook task",
+          "correct": true,
+          "why": "Notebooks are one of the task types that support remote Git repositories, referenced by a path relative to the repository root."
+        },
+        {
+          "text": "SQL task of type File",
+          "correct": true,
+          "why": "SQL files are a supported Git source, so a SQL task of type File can run a .sql file from the remote repository on a SQL warehouse."
+        },
+        {
+          "text": "SQL task of type Query",
+          "average": true,
+          "why": "A Query task runs a saved query object from the workspace; saved queries aren't among the asset types that jobs check out from a remote repository."
+        },
+        {
+          "text": "Dashboard task",
+          "why": "A Dashboard task refreshes a published dashboard chosen from the workspace; dashboards aren't checked out from the job's Git source."
+        },
+        {
+          "text": "Pipeline task",
+          "why": "A pipeline task points at an existing pipeline, whose source code and compute are managed in the pipeline definition rather than by the job's Git source."
+        }
+      ],
+      "in_practice": "Keeping notebooks and .sql files in one repository lets a single release change ingestion code and gold-table SQL together, and every task in a run uses the same commit.",
+      "source": "https://docs.databricks.com/aws/en/jobs/git",
+      "evidence": "The following task types support remote Git repositories: Notebooks, Python scripts, SQL files, data build tool (dbt) projects. All tasks in a job must reference the same commit in the remote repository."
+    },
+    {
+      "family": "orchestration-run-job-nesting-guidance",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform team links several jobs together with Run Job tasks. Which arrangement stays within what Databricks supports for Run Job tasks?",
+      "options": [
+        {
+          "text": "Job A runs job B, and job B runs job C",
+          "correct": true,
+          "why": "Two levels of Run Job tasks with no job triggering an earlier one is supported; Databricks rules out only circular dependencies and nesting more than three Run Job tasks."
+        },
+        {
+          "text": "Five jobs in a chain, each one running the next",
+          "average": true,
+          "why": "Chaining feels unlimited, but a five-job chain nests four Run Job tasks, more than the three Databricks supports, and such jobs might be blocked from deploying later."
+        },
+        {
+          "text": "Job A runs job B, and job B runs job A to retry",
+          "why": "Job B triggering job A again makes the Run Job tasks indirectly trigger each other, which is a circular dependency Databricks doesn't support."
+        },
+        {
+          "text": "Job A runs itself to pick up the next batch",
+          "why": "A job that triggers itself is the most direct form of circular dependency, which Databricks doesn't support for Run Job tasks."
+        }
+      ],
+      "in_practice": "Shallow, acyclic chains keep run lineage readable: an on-call engineer can trace a failure from parent to child in two clicks instead of unwinding jobs that keep restarting each other.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/run-job",
+      "evidence": "Databricks does not support jobs with circular dependencies or that nest more than three Run Job tasks. Databricks might block deploying jobs with this pattern in a future release. Circular dependencies are Run Job tasks that directly or indirectly trigger each other."
+    },
+    {
+      "family": "orchestration-dvr-in-query-text",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's SQL task runs a saved query that ends with INSERT INTO ops.load_audit SELECT '{{job.run_id}}', current_timestamp(). After each run, the audit row holds the text {{job.run_id}} instead of the run's ID. What should the engineer change?",
+      "options": [
+        {
+          "text": "Add a task parameter run_id = {{job.run_id}} and use :run_id in the query",
+          "correct": true,
+          "why": "Dynamic value references resolve only in task configuration fields such as parameters, so the task maps {{job.run_id}} to a parameter and the query reads it with named parameter syntax."
+        },
+        {
+          "text": "Write ${job.run_id} in the query, the substitution syntax for SQL tasks",
+          "average": true,
+          "why": "${...} is pipeline Configuration substitution syntax, not a way for a query to reach job metadata; the run ID still has to arrive through a task parameter."
+        },
+        {
+          "text": "Remove the quotes so the job evaluates the reference as an expression",
+          "why": "Without quotes the text is invalid SQL, and the job still doesn't substitute references written inside the query asset itself."
+        },
+        {
+          "text": "Escape the reference with backticks so the job resolves it in the query",
+          "why": "Backticks escape special characters in a key inside a reference; they don't make the job resolve references embedded in a query's own text."
+        }
+      ],
+      "in_practice": "Passing run metadata as parameters keeps saved queries reusable: one audit query can serve 40 jobs, each mapping its own {{job.run_id}} at the task level.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "You cannot directly reference dynamic value references from assets configured using tasks like notebooks, queries, or JARs. Dynamic value references must be defined using parameters or fields that pass context into tasks."
+    },
+    {
+      "family": "orchestration-dvr-backtick-special-key",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's job has a job parameter whose key is run-date, a name that external schedulers already pass when they trigger the job. A shared notebook in the job reads a widget named snapshot_date, so the engineer adds a task parameter snapshot_date whose value comes from the job parameter. Which value should the engineer enter?",
+      "options": [
+        {
+          "text": "{{job.parameters.`run-date`}}",
+          "correct": true,
+          "why": "Identifiers inside a reference support only alphanumeric and underscore characters, so a key that contains a hyphen is escaped by surrounding it with backticks."
+        },
+        {
+          "text": "{{job.parameters.run-date}}",
+          "average": true,
+          "why": "Job parameter keys may contain hyphens, but identifiers inside a reference don't; the hyphenated key has to be wrapped in backticks."
+        },
+        {
+          "text": "{{job.parameters.run_date}}",
+          "why": "run_date names a parameter that doesn't exist, and a non-existent reference is treated as a literal string rather than the run-date value."
+        },
+        {
+          "text": "{{job.parameters['run-date']}}",
+          "why": "References don't support bracket indexing, because their contents aren't evaluated as expressions; special-character keys are escaped with backticks."
+        }
+      ],
+      "in_practice": "Escaping keeps an established parameter name working for every external caller, instead of renaming run-date and updating each scheduler that triggers the job.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "User-provided value identifiers support alphanumeric and underscore characters. Escape keys that contain special characters by surrounding the identifier with backticks."
+    },
+    {
+      "family": "orchestration-large-job-cli-api-2-2",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team generates a job with about 240 tasks, one per source table, and creates it from CI with an older version of the Databricks CLI. The call fails with Resources with more than 100 tasks can only be handled by API 2.2 and above. The team wants to keep a single job. What should the team do?",
+      "options": [
+        {
+          "text": "Upgrade the Databricks CLI to a version that uses API 2.2",
+          "correct": true,
+          "why": "A job can hold up to 1,000 tasks, but resources with more than 100 tasks need API 2.2 or above, so the fix is a newer CLI, at least version 0.244.0, or a newer SDK."
+        },
+        {
+          "text": "Split the tasks into three jobs of at most 100 tasks each",
+          "average": true,
+          "why": "Splitting avoids the error but breaks the single-job requirement, and it works around a limit that doesn't apply: jobs can hold up to 1,000 tasks."
+        },
+        {
+          "text": "Ask Databricks support to raise the workspace's task limit",
+          "why": "No limit increase is needed; the job limit is 1,000 tasks, and the error is about the API version the client uses."
+        },
+        {
+          "text": "Create the job in the UI, since every API client hits the limit",
+          "why": "The 100-task error comes from clients on older API versions, not from every client; an upgraded CLI keeps creating the job from CI."
+        }
+      ],
+      "in_practice": "Pinning a current CLI version in CI avoids surprises: a generator that grows from 90 to 240 tables keeps deploying one job instead of failing at task 101.",
+      "source": "https://docs.databricks.com/aws/en/jobs/large-jobs",
+      "evidence": "You can create jobs that contain up to 1000 tasks. ... If you receive an error like Resources with more than 100 tasks can only be handled by API 2.2 and above. Your resource has 200 tasks then you must update your Databricks SDK or Databricks CLI. ... Your Databricks CLI must be at least version 0.244.0."
+    },
+    {
+      "family": "orchestration-shared-job-cluster-one-run",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team has two classic-compute jobs: ingest_raw at 02:00 and build_silver, which must start right after it. Each job spends about 6 minutes starting its own job cluster, and the team wants build_silver to reuse the cluster that ingest_raw started. What should the team do?",
+      "options": [
+        {
+          "text": "Move build_silver's tasks into ingest_raw so they share one job cluster",
+          "correct": true,
+          "why": "Job compute configured in a job is available to all of that job's tasks, so putting both stages in one job lets the silver tasks run on the cluster that is already up."
+        },
+        {
+          "text": "Point build_silver at the shared job cluster defined in ingest_raw",
+          "average": true,
+          "why": "A shared job cluster is scoped to a single job run and can't be used by other jobs, so a second job can't attach to it."
+        },
+        {
+          "text": "Start build_silver from ingest_raw with a Run Job task to pass it on",
+          "why": "A Run Job task starts a run of another job, and a shared job cluster can't be used by other jobs or runs, so the cluster isn't handed over."
+        },
+        {
+          "text": "Keep ingest_raw's job cluster running after its last task finishes",
+          "why": "A job cluster terminates after the final task configured to use it runs; it isn't a long-lived cluster that other jobs can attach to."
+        }
+      ],
+      "in_practice": "Merging the stages removes one ~6-minute cluster start per night and puts the dependency in a single DAG, so build_silver can't start before ingest_raw finishes.",
+      "source": "https://docs.databricks.com/aws/en/jobs/compute",
+      "evidence": "Any job compute configured as part of a job is available for all other tasks in the job. ... Terminate: After the final task configured to use the compute resource runs. ... A shared job cluster is scoped to a single job run and cannot be used by other jobs or runs of the same job."
+    },
+    {
+      "family": "orchestration-run-as-privileges-checked-mid-run",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly job runs as the service principal etl_sp and takes about three hours, with five tasks in sequence. Half an hour into last night's run, the governance team revoked etl_sp's SELECT on a lookup table that only the fourth task reads. The first three tasks succeeded, and the fourth failed with a permission error. Why didn't the run fail when it started?",
+      "options": [
+        {
+          "text": "Run as privileges are evaluated during the run, as each task starts or runs",
+          "correct": true,
+          "why": "Run as privileges are evaluated during a job run, and not all of them are verified at the beginning, so a grant removed mid-run surfaces when a later task needs it."
+        },
+        {
+          "text": "Privileges were verified at the start, so the fourth task failed for another reason",
+          "average": true,
+          "why": "Databricks doesn't verify every Run as privilege when a run begins, so a grant removed after the start can still fail a later task, as this permission error shows."
+        },
+        {
+          "text": "Each task rechecks the job's permission list, which the revocation also changed",
+          "why": "The job's permission list controls who can view, run or manage the job and is checked when a user acts on it; reading a table is a Run as privilege."
+        },
+        {
+          "text": "Only the fourth task runs as etl_sp; the others use the job owner's identity",
+          "why": "The tasks share the job's Run as identity, etl_sp; nothing in this job switches identity between the third and fourth tasks."
+        }
+      ],
+      "in_practice": "Make grant changes for production identities between runs, or pause the job first; revoking access an hour into a three-hour run leaves partly written outputs that need a repair run.",
+      "source": "https://docs.databricks.com/aws/en/jobs/privileges",
+      "evidence": "Run as privileges are evaluated during a job run. So each task might check privileges when the task starts or during the run. Not all Run as privileges are verified at the beginning of a job run. If you change Run as user's privileges while a job is running, especially if you remove privileges, the job might fail before it completes."
+    },
+    {
+      "family": "orchestration-param-default-not-security",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer reviews a payroll job that runs as a service principal and has a job parameter output_catalog with the default payroll_prod. Support analysts hold CAN MANAGE RUN so they can rerun failed nights, and a security reviewer worries that an analyst could start a run that writes payroll data to a catalog the analyst can read. Which statement is accurate?",
+      "options": [
+        {
+          "text": "CAN MANAGE RUN users can override job parameters, so limit who holds it",
+          "correct": true,
+          "why": "Any user with CAN MANAGE RUN or higher can override job parameter values with Run now with different parameters; a default isn't a security control, so the safeguard is the job's permissions."
+        },
+        {
+          "text": "Only CAN MANAGE users can override defaults, so the risk doesn't exist",
+          "average": true,
+          "why": "Overriding job parameters for a manual run is open to CAN MANAGE RUN and above, not only to CAN MANAGE holders, so the analysts can change the value."
+        },
+        {
+          "text": "Overrides apply only to scheduled runs, so manual reruns use defaults",
+          "why": "Run now with different parameters is exactly a manual run with overridden values; nothing limits overrides to scheduled runs."
+        },
+        {
+          "text": "Overrides are ignored whenever a job runs as a service principal",
+          "why": "The run still uses the service principal's identity together with the overridden value, which is what makes the concern real."
+        }
+      ],
+      "in_practice": "Treat parameters as untrusted input when a job runs as a powerful principal: one overridden catalog name could copy 2 million payroll rows somewhere the operator can query.",
+      "source": "https://docs.databricks.com/aws/en/jobs/parameters",
+      "evidence": "Any user with CAN MANAGE RUN permission or higher on a job can override job parameter values for a manual run using Run now with different parameters. A default parameter value is not a security control. To prevent changes, restrict the job's permissions."
+    },
+    {
+      "family": "orchestration-dashboard-task-attach-pages",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's Dashboard task refreshes a four-page sales dashboard after the nightly load and emails a PDF to regional managers. The managers report that the PDF shows only the Summary page, but they also need the Regions and Products pages. What should the engineer configure in the task?",
+      "options": [
+        {
+          "text": "Select the three pages under Include pages in Attachments",
+          "correct": true,
+          "why": "Include pages chooses which pages go into the PDF attachment, in the selected order; when no pages are selected, only the first page is included."
+        },
+        {
+          "text": "Select widgets from those pages under Include data",
+          "average": true,
+          "why": "Include data attaches the underlying data of selected widgets as CSV, TSV or Excel files; it doesn't add those pages to the PDF."
+        },
+        {
+          "text": "Add a Dashboard filter for each page the managers need",
+          "why": "Dashboard filters pre-apply values to filter widgets when the dashboard refreshes; they don't control which pages are attached."
+        },
+        {
+          "text": "Add one Dashboard task per page with the same subscribers",
+          "why": "Each task still attaches only the first page unless pages are selected, so extra tasks would just send more copies of Summary."
+        }
+      ],
+      "in_practice": "Selecting pages in the task keeps one refresh and one email per night, so a dozen managers get the three pages they act on without logging in to find them.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/dashboard",
+      "evidence": "Include pages: Select which dashboard pages to include in the PDF attachment. Pages are attached in the selected order. If you don't select any pages, only the first page is included."
+    },
+    {
+      "family": "orchestration-serverless-notebook-libraries",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's notebook task runs on serverless compute and now needs the openpyxl package from PyPI to write Excel reports. The engineer looks for a Dependent libraries setting on the task to add it. How should the engineer install the package?",
+      "options": [
+        {
+          "text": "In the notebook's Environment pane, or with %pip install in the notebook",
+          "correct": true,
+          "why": "For serverless compute, libraries are installed inside the notebook, through the Environment pane or %pip install; Dependent libraries is for other compute configurations."
+        },
+        {
+          "text": "Under Dependent libraries in the notebook task's configuration",
+          "average": true,
+          "why": "Dependent libraries applies to non-serverless compute; for a serverless notebook task the package belongs in the notebook's environment."
+        },
+        {
+          "text": "As a compute-scoped library on the job's cluster",
+          "why": "Serverless compute has no cluster for the team to manage, so there is no cluster to attach a compute-scoped library to."
+        },
+        {
+          "text": "With an init script that runs before each task starts",
+          "why": "Init scripts configure classic clusters at startup; serverless compute for jobs is managed by Databricks and gets packages from the notebook's environment."
+        }
+      ],
+      "in_practice": "Declaring the package in the notebook's environment keeps it with the code, so the notebook behaves the same in development and in the scheduled job without a second library list to maintain.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/notebook",
+      "evidence": "If you use Serverless compute, install libraries directly inside notebook, using the Environment pane or using %pip install. ... For all other compute configurations, click Add under Dependent libraries."
+    },
+    {
+      "family": "orchestration-git-tag-pinned-release",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team's production job runs notebook tasks from a remote Git repository whose main branch receives commits every day. Compliance requires the job to run exactly the approved release, tagged v2.3.0, until a change ticket approves the next one. How should the team configure the job's Git source?",
+      "options": [
+        {
+          "text": "Set the Git reference to the tag v2.3.0",
+          "correct": true,
+          "why": "A job's Git reference is a branch, a tag or a commit; a tag names one fixed version, so every run checks out the approved release until someone changes the reference."
+        },
+        {
+          "text": "Set the Git reference to the main branch",
+          "average": true,
+          "why": "A branch reference picks up the branch's latest commit when each run starts, so daily merges to main would reach production without the change ticket."
+        },
+        {
+          "text": "Use a Git folder checked out at v2.3.0",
+          "why": "A Git folder must be synced by hand, and Databricks recommends workspace paths in Git folders only for development, not for production jobs."
+        },
+        {
+          "text": "Set both the main branch and the v2.3.0 tag",
+          "why": "The Git settings take only one of branch, tag or commit, so a branch and a tag can't be combined in one reference."
+        }
+      ],
+      "in_practice": "Pinning to a release tag turns a production change into a one-field edit tied to a ticket, and rollback is just as simple: point the job back at the previous tag.",
+      "source": "https://docs.databricks.com/aws/en/jobs/git",
+      "evidence": "You must specify only one of the following: branch: The name of the branch, for example, main. tag: The tag's name, for example, release-1.0.0. commit: The hash of a specific commit, for example, e0056d01."
+    },
+    {
+      "family": "orchestration-pipeline-job-param-pushdown",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's job has a job parameter region, which operators sometimes override for a single run. A pipeline task in the job runs a Lakeflow Spark Declarative Pipelines pipeline whose SQL filters on :region, and the pipeline settings declare no parameters. What else must the engineer configure so the SQL receives each run's region?",
+      "options": [
+        {
+          "text": "Nothing, since job parameters are pushed down to pipeline tasks",
+          "correct": true,
+          "why": "Lakeflow Jobs pushes all job parameters to pipeline tasks automatically, and the pipeline's SQL reads any pushed-down value with named parameter syntax."
+        },
+        {
+          "text": "A region default in the Parameters section of pipeline settings",
+          "average": true,
+          "why": "Declaring the parameter in pipeline settings is optional and only sets a default for runs without an override; the pushed-down value arrives without it."
+        },
+        {
+          "text": "A region entry in the pipeline's Configuration, read with ${region}",
+          "why": "Configuration holds static values read with ${key} or spark.conf.get; job parameters reach the pipeline SQL as named parameters instead."
+        },
+        {
+          "text": "A task value named region set by an upstream notebook task",
+          "why": "A task value would need extra code and a reference in the task's parameters; the job parameter already reaches the pipeline on its own."
+        }
+      ],
+      "in_practice": "Relying on pushdown keeps one source of truth: an operator overrides region once for a rerun, and the notebook, SQL and pipeline tasks in that run all see the same value.",
+      "source": "https://docs.databricks.com/aws/en/ldp/parameters",
+      "evidence": "Lakeflow Jobs also pushes all job parameters down to pipeline tasks automatically, the same way it pushes them down to notebook and SQL tasks. The pipeline source code can reference any pushed-down value with named parameter syntax. Declaring a parameter in pipeline settings is optional and only sets a default for runs without an override."
+    },
+    {
+      "family": "orchestration-sql-query-run-as-owner",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 3,
+      "type": "multiple",
+      "stem": "A job runs as the service principal prod_sp. One of its SQL tasks runs the saved query daily_rollup, which an analyst owns and has shared with the Run as owner setting. Audit logs show the query running as the analyst, and the platform team wants that task to use prod_sp like the rest of the job. Which two changes achieve this? (Choose two.)",
+      "options": [
+        {
+          "text": "Change the query's sharing setting to Run as viewer",
+          "correct": true,
+          "why": "With Run as viewer, runs of the scheduled SQL task use the identity set in the job's Run as field, which is prod_sp."
+        },
+        {
+          "text": "Move the SQL into a .sql file run by the File task type",
+          "correct": true,
+          "why": "The File type is the only SQL task type that fully respects the job's Run as user, so running the same SQL from a file uses prod_sp."
+        },
+        {
+          "text": "Make prod_sp the owner of the job",
+          "average": true,
+          "why": "Job ownership doesn't change how a Run as owner query executes; such a query always runs with the identity of the query's owner."
+        },
+        {
+          "text": "Grant prod_sp CAN RUN on the daily_rollup query",
+          "why": "Permissions on the query let prod_sp run it, but a Run as owner query still executes with its owner's identity."
+        },
+        {
+          "text": "Point the task at a SQL warehouse that prod_sp owns",
+          "why": "The warehouse supplies compute; who owns it doesn't change which identity the query runs as."
+        }
+      ],
+      "in_practice": "Routing every task through one service principal keeps grants auditable; otherwise a nightly job breaks the day the analyst who owns one query changes teams.",
+      "source": "https://docs.databricks.com/aws/en/jobs/privileges",
+      "evidence": "The file task is the only SQL task type to respect the Run as user fully. SQL queries and alerts respect configured sharing settings. Run as owner: Runs of the scheduled SQL task always use the identity of the owner of the configured SQL asset. Run as viewer: Runs of the scheduled SQL task always use the identity set in the job Run as field."
+    },
+    {
+      "family": "orchestration-alert-task-succeeds-on-trigger",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's job runs load_orders, then a SQL alert task (Public Preview) named check_dupes whose alert triggers when duplicate order IDs exist, then publish, which depends on check_dupes with Run if set to All succeeded. Last night the alert triggered and emailed its subscribers, yet publish still ran. What explains this?",
+      "options": [
+        {
+          "text": "The alert task reports Succeeded whether or not the condition triggers",
+          "correct": true,
+          "why": "A SQL alert task reports Succeeded when the alert is evaluated without error, triggered or not, and Failed only for errors such as query or warehouse problems, so All succeeded was met."
+        },
+        {
+          "text": "The alert's own schedule evaluated it, so the job ignored the outcome",
+          "average": true,
+          "why": "The task evaluates the alert itself, independently of any schedule on the alert, and that evaluation sent the email; the cause is how the task reports its status."
+        },
+        {
+          "text": "A triggered alert fails the task only when it has retries configured",
+          "why": "Retries rerun failed tasks; they don't turn a successful evaluation of a triggered alert into a failure."
+        },
+        {
+          "text": "Run if conditions check notebook tasks and skip SQL alert tasks",
+          "why": "Run if evaluates the status of every upstream task, including SQL alert tasks; the alert task's status was simply Succeeded."
+        }
+      ],
+      "in_practice": "To stop publishing on a triggered alert, branch on {{tasks.check_dupes.output.alert_state}} with an If/else task, so a bad night halts before dashboards refresh with duplicate orders.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/alert",
+      "evidence": "Succeeded: The alert was evaluated successfully, regardless of whether the alert condition was triggered or not. Failed: An error occurred during alert evaluation, such as a SQL warehouse connectivity issue or a query error."
+    },
+    {
+      "family": "orchestration-dvr-missing-brace-literal",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer edits a notebook task parameter so that run_date is {{job.start_time.iso_date}, missing one closing brace. The job saves without any warning, but the next run fails in the cell that casts run_date to a DATE. What explains the failure?",
+      "options": [
+        {
+          "text": "The malformed reference was passed on unchanged as a literal string",
+          "correct": true,
+          "why": "Syntax errors such as missing braces are silently ignored and treated as literal strings, so the notebook received the text itself, which can't be cast to a date."
+        },
+        {
+          "text": "job.start_time is in UTC, so the value rolled into the next day",
+          "average": true,
+          "why": "Start times are in UTC, which can shift the calendar day, but a shifted day is still a valid date and wouldn't break the cast."
+        },
+        {
+          "text": "Notebook task parameters can't hold references, only job parameters",
+          "why": "Dynamic value references work in notebook task parameters; Databricks shows them in notebook base parameters in its own examples."
+        },
+        {
+          "text": "The reference resolved to epoch milliseconds, not an ISO date",
+          "why": "iso_date returns the date in ISO format, and epoch milliseconds come from timestamp_ms; a malformed reference isn't resolved at all."
+        }
+      ],
+      "in_practice": "Because malformed references fail silently when the job is saved, checking a run's resolved parameters after each config change catches the typo after one run instead of a night of failed loads.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "Syntax errors, including non-existent dynamic reference values and missing braces, are silently ignored and treated as literal strings."
+    },
+    {
+      "family": "orchestration-widget-default-masks-typo",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's notebook begins with dbutils.widgets.text('region', 'us') so it can be tested interactively, then reads dbutils.widgets.get('region'). The job has no job parameters, and its notebook task was given the parameter regoin = eu by mistake. For a week the job processed US data with no errors. What explains this?",
+      "options": [
+        {
+          "text": "No parameter named region arrived, so the widget's default us filled in",
+          "correct": true,
+          "why": "Parameters are matched by key, and nothing named region was passed, so the widget fell back to its default; a default helps testing but masks misconfigured parameters."
+        },
+        {
+          "text": "Defining the widget in code resets it to us, overriding task parameters",
+          "average": true,
+          "why": "A widget default applies only when no value arrives; a task parameter whose key matches the widget would have been returned by dbutils.widgets.get."
+        },
+        {
+          "text": "Notebook tasks receive values only through job parameters",
+          "why": "Notebook task parameters are key-value pairs read with dbutils.widgets; they don't need a job-level parameter to reach the notebook."
+        },
+        {
+          "text": "Unrecognized parameter keys make the task run in test mode",
+          "why": "There is no test mode; the stray key regoin was simply never read, and the widget used its default."
+        }
+      ],
+      "in_practice": "Failing loudly beats a wrong default: dropping the default from production code, or checking the value against an allowed list, turns a week of mislabeled US data into one failed run.",
+      "source": "https://docs.databricks.com/aws/en/jobs/parameter-use",
+      "evidence": "The above code produces an error when run in a standalone notebook and not as part of a job because parameters are not sent into a standalone notebook. ... While this is helpful for testing outside a job, it also masks misconfigured task or job parameters."
+    },
+    {
+      "family": "orchestration-notebook-output-size-limit",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's nightly notebook task used to succeed. After a teammate added a cell that prints a debug line for each of about 200,000 input records, runs are canceled and marked failed, even though the writes before that cell complete. Which change fixes the job?",
+      "options": [
+        {
+          "text": "Stop printing per-record lines, since notebook output has size limits",
+          "correct": true,
+          "why": "Notebook tasks limit total cell output to 30 MB and each cell's output to 8 MB; exceeding either cancels the run and marks it failed, so the fix is to stop sending bulk output to cells."
+        },
+        {
+          "text": "Use a larger driver node so it can hold all of the printed output",
+          "average": true,
+          "why": "The limits are on notebook cell output size, not on driver memory, so a bigger driver still produces output over the limit."
+        },
+        {
+          "text": "Raise the task's timeout so the extra cell has time to finish",
+          "why": "A timeout would mark the run Timed Out, and more time doesn't shrink the output that exceeded the limit."
+        },
+        {
+          "text": "Add retries so a second attempt can complete the extra cell",
+          "why": "A retry reruns the same cells and produces the same oversized output, so it fails the same way."
+        }
+      ],
+      "in_practice": "Writing diagnostics to a Delta table or a volume instead of cell output keeps them queryable for weeks, while the job's output stays well under the per-cell and total limits.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/notebook",
+      "evidence": "Total notebook cell output (the combined output of all notebook cells) is subject to a 30MB size limit. Additionally, individual cell output is subject to an 8MB size limit. If total cell output exceeds 30MB in size, or if the output of an individual cell is larger than 8MB, the run is canceled and marked as failed."
+    },
+    {
+      "family": "orchestration-pipeline-date-range-full-refresh",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's job passes start_date and end_date to a pipeline task each night. The pipeline defines a materialized view with WHERE order_date >= :start_date AND order_date < :end_date. The team expected incremental refreshes, but every update recomputes the view in full, and the task's full refresh option is off. What should the engineer change?",
+      "options": [
+        {
+          "text": "Filter only on the lower bound, order_date >= :start_date",
+          "correct": true,
+          "why": "Filtering both sides of a date range invalidates incremental processing on materialized views and triggers a full refresh on each update; a lower-bound-only filter can refresh incrementally."
+        },
+        {
+          "text": "Stop overriding pipeline parameters from the pipeline task",
+          "average": true,
+          "why": "The parameters aren't the cause; a two-sided date range in the view's definition forces a full refresh however its values arrive."
+        },
+        {
+          "text": "Move both dates into the pipeline's Configuration field",
+          "why": "Substituting the dates with ${key} still leaves a filter on both sides of the range, so the view keeps fully refreshing."
+        },
+        {
+          "text": "Pass both dates as job parameters, not task parameters",
+          "why": "Job parameters are pushed down to the pipeline the same way; the shape of the predicate, not where the values come from, decides incremental processing."
+        }
+      ],
+      "in_practice": "On a view over about three years of orders, moving from a full recompute to incremental refresh can cut a 40-minute nightly update to a few minutes, with matching savings in compute.",
+      "source": "https://docs.databricks.com/aws/en/ldp/parameters",
+      "evidence": "Date filters can trigger full refreshes: A common parameterization use case is to filter data by date. Take care with predicates: filtering on both sides of a date range invalidates incremental processing on materialized views and triggers a full refresh on each update."
+    },
+    {
+      "family": "orchestration-execution-context-limit",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team's job fans out to about 180 notebook tasks, one per source table, that run in parallel on a single shared classic job cluster. Runs now fail with the error Too many execution contexts are open right now. (Limit set to 150). What should the team do?",
+      "options": [
+        {
+          "text": "Split the tasks across several job clusters",
+          "correct": true,
+          "why": "The error means the job is running too many tasks on a single compute cluster, and the documented fix is to split the tasks across multiple clusters."
+        },
+        {
+          "text": "Raise the job cluster's maximum worker count",
+          "average": true,
+          "why": "More workers add executor capacity, but they don't reduce how many tasks run on that one cluster, which is what the limit is about."
+        },
+        {
+          "text": "Raise the job's maximum concurrent runs",
+          "why": "Maximum concurrent runs controls how many runs of the job can be active at once; the problem is the number of tasks inside one run on one cluster."
+        },
+        {
+          "text": "Enable queueing so extra tasks wait their turn",
+          "why": "Queueing holds whole job runs when concurrency limits are reached; it doesn't spread the tasks within a run across clusters."
+        }
+      ],
+      "in_practice": "Grouping 180 tasks onto, say, four job clusters of about 45 tasks each stays under the limit and also contains the impact when one cluster has a problem.",
+      "source": "https://docs.databricks.com/aws/en/jobs/large-jobs",
+      "evidence": "If you receive an error like Too many execution contexts are open right now. (Limit set to 150), then your job is trying to run too many tasks on a single compute cluster. You must split the tasks across multiple clusters."
+    },
+    {
+      "family": "orchestration-dvr-no-date-arithmetic",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly job starts shortly after midnight UTC, and its notebook task must process the previous UTC day, received as a task parameter named process_date. A teammate proposes setting process_date to {{date_sub(job.start_time.iso_date, 1)}} so the notebook needs no date logic. Which approach meets the requirement?",
+      "options": [
+        {
+          "text": "Pass {{job.start_time.iso_date}} and subtract one day in the notebook's code",
+          "correct": true,
+          "why": "A dynamic value reference is replaced by a string literal, and the contents of the braces aren't evaluated as expressions. Passing the run's start date and subtracting the day in code, for example with date_sub, is the way to derive the previous day."
+        },
+        {
+          "text": "Use {{date_sub(job.start_time.iso_date, 1)}} as the teammate proposes",
+          "average": true,
+          "why": "Wrapping the reference in a SQL function looks natural, but the contents of {{ }} aren't evaluated as expressions, and operations or functions can't run inside the braces."
+        },
+        {
+          "text": "Set process_date to {{job.start_time.iso_date}} - 1",
+          "why": "Only the reference itself is replaced; the text around it is kept as is, so the parameter becomes a string such as 2026-10-27 - 1 rather than the previous day's date."
+        },
+        {
+          "text": "Use {{backfill.iso_date}}, which holds the previous day on scheduled runs",
+          "why": "Backfill references are available only when you create a backfill, and backfill.iso_date is the start of the backfill's time range, so a scheduled run has no previous-day value to read from it."
+        }
+      ],
+      "in_practice": "Passing the raw run date and deriving windows in code keeps the date logic in one testable place, and an operator can rerun a missed night by overriding a single date parameter instead of editing references.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "When a job or task runs, a string literal replaces the dynamic value reference. ... Contents of the double curly braces are not evaluated as expressions. You cannot run operations or functions in double-curly braces."
+    },
+    {
+      "family": "orchestration-git-source-one-repo-per-job",
+      "objective": "jobs.orchestration",
+      "guide": "4.2",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer configures several tasks in one job to read their code through the Git provider source. How many remote Git repositories can the tasks in that job use?",
+      "options": [
+        {
+          "text": "One repository, shared by every task in the job",
+          "correct": true,
+          "why": "Only one remote Git repository can be used for all tasks in a job. Each Git-sourced task then points at its own file with a path relative to that repository."
+        },
+        {
+          "text": "One repository for each task, set in that task's Source",
+          "average": true,
+          "why": "Each task does pick Git provider as its source and enters its own relative path, but the repository behind those paths is shared: a job can use only one remote repository for all its tasks."
+        },
+        {
+          "text": "One repository for each task type, such as notebooks and SQL files",
+          "why": "Notebook tasks and SQL File tasks read from the same repository when they use the Git provider source; the limit is one repository for the whole job, not one per task type."
+        },
+        {
+          "text": "Any number, as long as one Git credential can read them all",
+          "why": "Access isn't the constraint: even with a credential that reads several repositories, the tasks of one job can use only one remote Git repository."
+        }
+      ],
+      "in_practice": "When a job needs code from two repositories, teams usually package the shared code as a library or split the work into two jobs linked by a Run Job task, so each job keeps a single versioned source.",
+      "source": "https://docs.databricks.com/aws/en/jobs/tasks/notebook",
+      "evidence": "The options displayed by the UI depend on whether or not you have already configured a Git provider elsewhere. Only one remote Git repository can be used for all tasks in a job."
+    }
+  ]
+}

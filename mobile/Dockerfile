@@ -1,0 +1,12 @@
+# The learner app's web build, served by Caddy, which also proxies /v1 to the API.
+FROM node:22-bookworm-slim AS build
+WORKDIR /app
+ENV CI=1 EXPO_NO_TELEMETRY=1
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npx expo export --platform web
+
+FROM caddy:2-alpine
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/dist /srv

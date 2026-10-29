@@ -1,0 +1,41 @@
+@import 'tailwindcss';
+
+/* CertPath design tokens (docs/plan/design/design_tokens.json). */
+@theme {
+  --color-bg: #f7f6fb;
+  --color-surface: #ffffff;
+  --color-ink: #24243a;
+  --color-muted: #6f7085;
+  --color-primary: #6750ee;
+  --color-primary-dark: #4d37ce;
+  --color-primary-tint: #eeeafe;
+  --color-mint: #ddf6eb;
+  --color-success: #137b60;
+  --color-coral: #e15d64;
+  --color-coral-tint: #fff0ef;
+  --color-coral-ink: #b3373e;
+  --color-streak: #f5a623;
+  --color-streak-tint: #fff4df;
+  --color-border: #e9e7f3;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}

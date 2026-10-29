@@ -1,0 +1,105 @@
+{
+  "expo": {
+    "name": "CertPath",
+    "slug": "certpath",
+    "version": "0.3.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "certpath",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F7F6FB",
+    "ios": {
+      "bundleIdentifier": "dev.certpath.app",
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {}
+    },
+    "android": {
+      "package": "dev.certpath.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#6750EE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F7F6FB",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 96
+        }
+      ],
+      "expo-secure-store",
+      "expo-localization",
+      [
+        "expo-notifications",
+        {
+          "color": "#6750EE"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "CertPath uses the microphone only while you speak an answer, to turn it into text.",
+          "recordAudioAndroid": true,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "expo-asset",
+      [
+        "expo-widgets",
+        {
+          "groupIdentifier": "group.dev.certpath.app",
+          "bundleIdentifier": "dev.certpath.app.widgets",
+          "widgets": [
+            {
+              "name": "StreakWidget",
+              "displayName": "CertPath streak",
+              "description": "Your study streak, and whether today still needs a lesson.",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "accessoryCircular",
+                  "accessoryRectangular",
+                  "accessoryInline"
+                ],
+                "initialLayout": "./src/widgets/StreakWidget.tsx"
+              }
+            }
+          ]
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "CertPath uses the microphone only while you speak an answer, to turn it into text.",
+          "speechRecognitionPermission": "CertPath uses your device's speech recognition to turn a spoken answer into text so it can be checked. CertPath doesn't keep the audio."
+        }
+      ]
+    ],
+    "experiments": {
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "949ac733-a079-44ce-8090-3e019fc63fe5"
+      }
+    },
+    "owner": "tayom"
+  }
+}

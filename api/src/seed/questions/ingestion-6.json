@@ -1,0 +1,877 @@
+{
+  "items": [
+    {
+      "family": "auto-loader-available-now-mid-run-arrivals",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs an Auto Loader job in Lakeflow Jobs every hour with `.trigger(availableNow=True)` to land vendor files in a Unity Catalog table. A run starts at 09:00 and takes 20 minutes, and several new files land in the source folder at 09:10. When are those files ingested?",
+      "options": [
+        {
+          "text": "In the next scheduled run, because a run takes only files that arrived before it started",
+          "correct": true,
+          "why": "The AvailableNow trigger processes all files that arrived before the query start time. Files that land after the run starts are ignored until the next trigger, so the 10:00 run picks them up."
+        },
+        {
+          "text": "In the 09:00 run, because AvailableNow keeps discovering files until the folder is drained",
+          "average": true,
+          "why": "AvailableNow is often read as 'drain the folder', but its scope is fixed when the query starts: only files that arrived before the start time are processed in that run."
+        },
+        {
+          "text": "Never, because files that land during a run are marked as processed in the checkpoint",
+          "why": "Files that arrive mid-run aren't recorded as processed; they are simply left for the next trigger to discover and ingest."
+        },
+        {
+          "text": "Right away, in an extra micro-batch that the run appends before it stops",
+          "why": "The run doesn't add micro-batches for late arrivals; rate limits split only the files that were available at the start into micro-batches."
+        }
+      ],
+      "in_practice": "Because each run has a fixed scope, an hourly AvailableNow job finishes predictably instead of chasing a busy folder, and a file's worst-case latency is about one schedule interval plus the run time.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/production",
+      "evidence": "The AvailableNow trigger instructs Auto Loader to process all files that arrived before the query start time. New files that arrive after the stream starts are ignored until the next trigger."
+    },
+    {
+      "family": "auto-loader-cloud-files-state-audit",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer must show an auditor, using SQL, which source files an Auto Loader stream has already discovered. The stream writes to a Unity Catalog table and keeps its checkpoint at /Volumes/ops/raw/chk/orders. Which query returns this file-level information?",
+      "options": [
+        {
+          "text": "SELECT * FROM cloud_files_state('/Volumes/ops/raw/chk/orders')",
+          "correct": true,
+          "why": "The cloud_files_state table-valued function takes an Auto Loader checkpoint location and returns metadata about each file that the stream has discovered."
+        },
+        {
+          "text": "DESCRIBE HISTORY ops.raw.orders",
+          "average": true,
+          "why": "Table history is the familiar audit tool, but it lists commits and operations on the target table, not the individual source files that Auto Loader discovered and tracks in its checkpoint."
+        },
+        {
+          "text": "SELECT * FROM read_files('/Volumes/ops/raw/chk/orders')",
+          "why": "read_files reads data files at a path; pointing it at a checkpoint doesn't return Auto Loader's record of discovered files."
+        },
+        {
+          "text": "LIST '/Volumes/ops/raw/landing/orders'",
+          "why": "LIST shows the files that currently sit in a directory, whether or not the stream has discovered or processed them."
+        }
+      ],
+      "in_practice": "Joining cloud_files_state with a captured _metadata.file_path column lets an auditor trace any row back to its source file and see that file's whole ingestion lifecycle, without anyone reading raw checkpoint files.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/production",
+      "evidence": "Using the cloud_files_state function, you can find metadata about files that have been discovered by an Auto Loader stream. Query cloud_files_state, providing the checkpoint location associated with an Auto Loader stream."
+    },
+    {
+      "family": "auto-loader-empty-source-needs-schema",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer deploys a new Auto Loader stream into a Unity Catalog table before a partner has delivered its first file, so the source folder is still empty. What does Auto Loader require in this situation?",
+      "options": [
+        {
+          "text": "A provided schema, because there is no data to infer one from",
+          "correct": true,
+          "why": "Schema inference samples files in the source directory; when the directory is empty there is nothing to sample, so Auto Loader requires you to provide a schema."
+        },
+        {
+          "text": "Nothing, because it waits and infers the schema from the first file",
+          "average": true,
+          "why": "Waiting for the first file is a natural assumption, but with an empty source directory Auto Loader needs a schema up front since it can't perform inference."
+        },
+        {
+          "text": "The cloudFiles.inferColumnTypes option set to true",
+          "why": "inferColumnTypes changes how column types are inferred from sampled files; with no files present there is still nothing to sample."
+        },
+        {
+          "text": "A schema location placed inside the empty source folder",
+          "why": "A schema location stores a schema once one exists; it doesn't supply one, and placing stream metadata among the input files is poor practice."
+        }
+      ],
+      "in_practice": "Supplying the agreed contract schema lets the job go live on the planned date instead of failing on its first run and paging the on-call engineer until the partner finally delivers.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/faq",
+      "evidence": "How does Auto Loader behave when the source folder is empty? If the source directory is empty, Auto Loader requires you to provide a schema as there is no data to perform inference."
+    },
+    {
+      "family": "auto-loader-rescued-data-source-path",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer finds non-NULL values in the `_rescued_data` column of a bronze table loaded by Auto Loader and must tell the vendor which delivered files caused them. What does the rescued data column hold that helps with this?",
+      "options": [
+        {
+          "text": "A JSON blob of the rescued fields plus the source file path of the record",
+          "correct": true,
+          "why": "The rescued data column stores a JSON blob with the columns that didn't match the schema and the path of the source file each record came from."
+        },
+        {
+          "text": "Only the raw text of the field that failed to parse, with no file details",
+          "average": true,
+          "why": "Many assume the column keeps just the failed value, but Auto Loader also records the source file path of the record alongside the rescued columns."
+        },
+        {
+          "text": "A pointer to a quarantine file written under badRecordsPath",
+          "why": "badRecordsPath is a separate option for incomplete or malformed records; rescued values are kept inline in the column, not written elsewhere."
+        },
+        {
+          "text": "The checkpoint offset of the micro-batch that read the record",
+          "why": "Rescued data doesn't carry checkpoint offsets; the file path is the provenance detail Auto Loader stores with the rescued fields."
+        }
+      ],
+      "in_practice": "Grouping rescued rows by the file path in the blob shows the drift per delivery, so the team can send the vendor the exact files that broke the contract instead of a day's worth of uploads.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/schema",
+      "evidence": "The rescued data column contains a JSON blob with the rescued columns and the source file path of the record."
+    },
+    {
+      "family": "auto-loader-schema-hints-keep-evolution",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer ingests partner JSON into a Unity Catalog table with Auto Loader. Finance requires order_id to land as BIGINT and amount as DECIMAL(18,2), but the partner adds optional fields every few months, and those must be picked up without code changes. Which configuration meets both needs?",
+      "options": [
+        {
+          "text": "Set cloudFiles.schemaHints for the two columns and keep schema inference on",
+          "correct": true,
+          "why": "Schema hints enforce the types you know while the rest is inferred, and addNewColumns evolution still works when the known schema is given as hints rather than as a provided schema."
+        },
+        {
+          "text": "Pass the full schema with .schema() and set schemaEvolutionMode to addNewColumns",
+          "average": true,
+          "why": "A full schema feels most controlled, but addNewColumns isn't allowed when the stream's schema is provided; it works only when the schema is given as schema hints."
+        },
+        {
+          "text": "Pass the full schema with .schema() and keep the default evolution mode",
+          "why": "With a provided schema the default mode is none, so new partner fields would be ignored instead of added."
+        },
+        {
+          "text": "Set cloudFiles.inferColumnTypes to true and drop the schema location",
+          "why": "Inferred types may not match BIGINT and DECIMAL(18,2), and without cloudFiles.schemaLocation there is nowhere to track inference and evolution."
+        }
+      ],
+      "in_practice": "Hints pin the few columns finance reconciles on while the rest of the feed evolves by itself, so a new partner field appears after one automatic restart rather than after a code change and redeploy.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/schema",
+      "evidence": "addNewColumns mode is the default when a schema is not provided, but none is the default when you provide a schema. addNewColumns is not allowed when the schema of the stream is provided, but does work if you provide your schema as a schema hint."
+    },
+    {
+      "family": "auto-loader-uc-checkpoint-outside-table-dir",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer streams Auto Loader output into a Unity Catalog external table registered at s3://sales-ext/tables/orders. To keep everything together, the engineer plans to set checkpointLocation and cloudFiles.schemaLocation to s3://sales-ext/tables/orders/_checkpoint. Where should these locations go instead?",
+      "options": [
+        {
+          "text": "A separate path in a Unity Catalog external location, outside the table directory",
+          "correct": true,
+          "why": "Unity Catalog doesn't allow checkpoint or schema inference and evolution files to be nested under the table directory, and Databricks recommends keeping them in storage locations managed by Unity Catalog."
+        },
+        {
+          "text": "The planned path is fine once the engineer holds WRITE FILES on it",
+          "average": true,
+          "why": "Grants aren't the problem: Unity Catalog doesn't allow checkpoint or schema evolution files under the table directory, whatever privileges the engineer holds."
+        },
+        {
+          "text": "The cluster driver's local disk, so no cloud storage is involved",
+          "why": "Local disk doesn't survive cluster restarts and isn't governed; checkpoint and schema information belong in Unity Catalog-managed storage."
+        },
+        {
+          "text": "A subfolder of the source path that Auto Loader reads from",
+          "why": "Keeping stream state among the input files mixes metadata with the data being scanned; it belongs in its own governed path on the output side."
+        }
+      ],
+      "in_practice": "Keeping stream state in its own governed path lets the team manage table data and ingestion progress separately, for example resetting a checkpoint without touching any of the table's files.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/unity-catalog",
+      "evidence": "Databricks recommends always storing checkpoint and schema evolution information in storage locations managed by Unity Catalog. Unity Catalog does not allow you to nest checkpoint or schema inference and evolution files under the table directory."
+    },
+    {
+      "family": "auto-loader-corrupt-record-column",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's Auto Loader stream lands JSON into a bronze Unity Catalog table. Some files contain truncated lines that can't be parsed at all, and the team wants every such row captured for triage without any being missed. Which configuration does Databricks recommend?",
+      "options": [
+        {
+          "text": "Set columnNameOfCorruptRecord to _corrupt_record and add that column as a schema hint",
+          "correct": true,
+          "why": "The _corrupt_record column captures rows that can't be parsed at all, and Databricks recommends columnNameOfCorruptRecord over badRecordsPath to avoid race conditions that can miss corrupted records."
+        },
+        {
+          "text": "Rely on the _rescued_data column that Auto Loader adds automatically",
+          "average": true,
+          "why": "_rescued_data is the familiar safety net, but it captures fields that don't match the current schema; rows that can't be parsed at all are what a corrupt record column captures."
+        },
+        {
+          "text": "Set badRecordsPath to a volume folder for the unparsable rows",
+          "why": "badRecordsPath writes bad records to a separate location, and Databricks recommends columnNameOfCorruptRecord instead to avoid race conditions that can miss records."
+        },
+        {
+          "text": "Set the JSON parser mode to DROPMALFORMED",
+          "why": "DROPMALFORMED discards malformed records, which is the opposite of keeping them for triage."
+        }
+      ],
+      "in_practice": "With unparsable rows kept in the table, an expectation such as _corrupt_record IS NULL can flag them and a quarantine sink can route them, so a truncated upload never silently disappears.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/best-practices",
+      "evidence": "_corrupt_record captures rows that cannot be parsed at all. Enable it using columnNameOfCorruptRecord. Databricks recommends columnNameOfCorruptRecord over badRecordsPath to avoid potential race conditions that can miss corrupted records."
+    },
+    {
+      "family": "auto-loader-classic-notification-queue-limit",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team plans to run 120 Auto Loader streams in classic file notification mode against different folders of one S3 bucket, but learns that classic mode allows only 100 concurrent notification pipelines per bucket. The bucket is covered by a Unity Catalog external location. Which change does Databricks recommend?",
+      "options": [
+        {
+          "text": "Enable file events on the external location and set cloudFiles.useManagedFileEvents",
+          "correct": true,
+          "why": "File events use a single notification queue for all streams that read from an external location, so streams no longer need a queue each and the per-bucket notification limits are easier to avoid."
+        },
+        {
+          "text": "Raise cloudFiles.fetchParallelism so each queue can serve more streams",
+          "average": true,
+          "why": "fetchParallelism only sets how many threads fetch messages from one stream's queue; it doesn't let streams share queues, and file events make it unnecessary."
+        },
+        {
+          "text": "Switch every stream to directory listing with a processingTime trigger",
+          "why": "That avoids queues but brings back full listings; with continuous triggers, directory listing keeps listing the whole directory and drives up LIST costs."
+        },
+        {
+          "text": "Spread the streams across two workspaces that read the same bucket",
+          "why": "The limit applies to notification pipelines on the bucket, not per workspace, so moving streams to another workspace doesn't create more room."
+        }
+      ],
+      "in_practice": "One queue per external location also turns onboarding into a one-time permission grant, so adding the 121st stream is a code change rather than a cloud infrastructure ticket.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/file-notification-mode",
+      "evidence": "(Recommended) File events: You use a single file notification queue for all streams that process files from a given external location. Because you no longer need to create a queue for each Auto Loader stream, it's easier to avoid hitting the cloud provider notification limits"
+    },
+    {
+      "family": "auto-loader-file-events-full-listing-cases",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 2,
+      "type": "multiple",
+      "stem": "A data engineer runs Auto Loader with cloudFiles.useManagedFileEvents set to true against a Unity Catalog external location, scheduled daily with Trigger.AvailableNow. Which two situations make Auto Loader perform a full directory listing of the load path? (Choose two.)",
+      "options": [
+        {
+          "text": "The stream's first run, even with includeExistingFiles set to false",
+          "correct": true,
+          "why": "A new stream always lists the load path to establish a valid read position in the file events cache and store it in the checkpoint, whatever includeExistingFiles is set to."
+        },
+        {
+          "text": "The first run after an admin turns file events off and on again",
+          "correct": true,
+          "why": "Turning file events off and on again for the external location invalidates the stream's stored read position, so Auto Loader lists the directory to resynchronize."
+        },
+        {
+          "text": "Every run, because AvailableNow always lists the full directory",
+          "average": true,
+          "why": "AvailableNow defines which files a run takes; with file events, later runs read new files from the cache at the stored read position instead of listing."
+        },
+        {
+          "text": "Any run in which Auto Loader evolves the schema with addNewColumns",
+          "why": "Schema evolution updates the stored schema; it has no effect on how files are discovered."
+        },
+        {
+          "text": "Any run that reaches the cloudFiles.maxFilesPerTrigger limit",
+          "why": "Rate limits split the work into micro-batches; they don't reset the read position in the file events cache."
+        }
+      ],
+      "in_practice": "Expecting the first full listing, for example by starting the stream in a quiet window, avoids a surprise long discovery on a bucket with millions of objects; after that, daily runs stay incremental.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/file-events-explained",
+      "evidence": "Auto Loader performs a full directory listing when: Starting a new stream. You make updates to the external location that invalidate Auto Loader's read position. Examples include when you turn file events off and on again. Auto Loader always performs a full listing on the first run, even when includeExistingFiles is set to false."
+    },
+    {
+      "family": "auto-loader-target-table-merge-schema",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's Python Auto Loader stream uses addNewColumns mode to land JSON into a Unity Catalog Delta table, run as a Lakeflow Jobs task with retries. A vendor adds a column, and the stream stops with UnknownFieldException as expected. The schema location now includes the new column, yet every retry fails with a schema mismatch from the Delta write. What should the engineer change?",
+      "options": [
+        {
+          "text": "Enable schema evolution on the write, for example with .option('mergeSchema', 'true')",
+          "correct": true,
+          "why": "Auto Loader's schema and the target Delta table's schema are persisted separately. When Auto Loader evolves its schema, the Delta table must evolve too, or the query fails."
+        },
+        {
+          "text": "Delete the schema location so Auto Loader infers the schema again",
+          "average": true,
+          "why": "Re-inferring doesn't help, because Auto Loader's schema already has the column. The second persisted schema, the target table's, is the one that must evolve."
+        },
+        {
+          "text": "Switch cloudFiles.schemaEvolutionMode to rescue",
+          "why": "rescue stops evolving the schema and sends new columns to _rescued_data, so the vendor's column would never become a real table column."
+        },
+        {
+          "text": "Raise the task's retry count until the stream catches up",
+          "why": "Retries repeat the same write against a table schema that lacks the column; nothing changes until the target table's schema evolves."
+        }
+      ],
+      "in_practice": "Pairing addNewColumns with schema evolution on the write makes a vendor addition a one-restart event that job retries absorb, instead of an outage that waits for someone to alter the table.",
+      "source": "https://docs.databricks.com/aws/en/data-engineering/schema-evolution",
+      "evidence": "When using Auto Loader to ingest data into a Delta table, there are two persisted schemas: one is managed by Auto Loader in its schema location and the other is the schema of the target Delta table. When Auto Loader evolves its schema, based on incoming data, the Delta table must also evolve its schema, or the query fails."
+    },
+    {
+      "family": "auto-loader-overwritten-file-not-reingested",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer ingests a supplier's price list into a Unity Catalog table with Auto Loader on default settings. Each night the supplier overwrites the same object, s3://supplier/prices/current.csv, with new prices. Since the first night, the table has never reflected a price change, and the stream reports no errors. What explains this?",
+      "options": [
+        {
+          "text": "Auto Loader ingests each file path once and doesn't reprocess overwrites by default",
+          "correct": true,
+          "why": "Auto Loader normally ingests each file only once based on its path. Only with cloudFiles.allowOverwrites set to true does it also use the last-modified timestamp to re-ingest an updated file."
+        },
+        {
+          "text": "Directory listing mode sees only new file names, not changed contents",
+          "average": true,
+          "why": "Detection mode isn't the cause: with allowOverwrites at its default of false, Auto Loader ingests each file path once whichever mode discovers it."
+        },
+        {
+          "text": "The schema location still holds the first file's schema, so rows are rescued",
+          "why": "Rescued data would still produce new rows; here the overwritten file isn't being read again at all."
+        },
+        {
+          "text": "The file expired from the checkpoint after cloudFiles.maxFileAge elapsed",
+          "why": "maxFileAge has no default, and expiring a tracked file would make Auto Loader likelier to reprocess it, not skip it."
+        }
+      ],
+      "in_practice": "Asking the supplier for a new, dated file each night keeps ingestion exactly-once; turning on allowOverwrites instead reprocesses the whole file on every overwrite and leaves deduplication to the team.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/faq",
+      "evidence": "Auto Loader normally ingests each file only once based on its file path. However, if you set the allowOverwrites option to true, Auto Loader also uses the file's last-modified timestamp to determine whether a file is new or has been updated and needs to be re-ingested."
+    },
+    {
+      "family": "auto-loader-daily-folder-same-checkpoint",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer runs a daily Auto Loader job that loads each day's folder, such as s3://exports/20261027/ and then s3://exports/20261028/, into one Unity Catalog table, passing that day's path to load() and reusing a single checkpoint so files from earlier folders stay tracked. On Databricks Runtime 11.3 LTS and above, which file detection setup supports this?",
+      "options": [
+        {
+          "text": "Directory listing mode, which allows a new input path on the same checkpoint",
+          "correct": true,
+          "why": "In Databricks Runtime 11.3 LTS and above, Auto Loader in directory listing mode can change its input path without a new checkpoint, keeping state for files from all previously used directories."
+        },
+        {
+          "text": "Classic file notification mode, which subscribes each new folder it is given",
+          "average": true,
+          "why": "Changing the source path isn't supported in file notification mode; files already in the new folder when the path changes might never be ingested."
+        },
+        {
+          "text": "Either mode, provided includeExistingFiles is set to true each day",
+          "why": "includeExistingFiles is evaluated only when a stream first starts, so setting it every day has no effect on later path changes."
+        },
+        {
+          "text": "Neither mode, since every new input path needs a new checkpoint",
+          "why": "Path changes usually call for a new checkpoint, but directory listing mode on Runtime 11.3 LTS and above is the documented exception."
+        }
+      ],
+      "in_practice": "One checkpoint across daily folders keeps a single exactly-once record for the table, so rerunning last Tuesday's folder skips files that already loaded instead of duplicating a day of orders.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/directory-listing-mode",
+      "evidence": "In Databricks Runtime 11.3 LTS and above, you can change the directory input path for Auto Loader configured with directory listing mode without having to choose a new checkpoint directory. This functionality is not supported for file notification mode."
+    },
+    {
+      "family": "lakeflow-connect-cdf-enabled-targets",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants a downstream pipeline to consume row-level changes from a Unity Catalog destination written by a Lakeflow Connect Salesforce pipeline. Which configuration is needed on that destination before its change data feed can be read?",
+      "options": [
+        {
+          "text": "Nothing, because the change data feed is enabled on all target tables",
+          "correct": true,
+          "why": "Managed ingestion enables the Delta Lake change data feed for all of its target tables, so downstream readers can consume row-level changes right away."
+        },
+        {
+          "text": "Set the delta.enableChangeDataFeed property on the destination table",
+          "average": true,
+          "why": "Setting the property by hand is the usual step for ordinary Delta tables, but Lakeflow Connect already enables the change data feed on every target table."
+        },
+        {
+          "text": "Turn on SCD type 2 history tracking for the table",
+          "why": "History tracking decides whether earlier row versions are kept as rows in the table; it isn't what turns on the change data feed."
+        },
+        {
+          "text": "Enable the feed in the Unity Catalog connection's options",
+          "why": "A connection stores authentication details for the source; table features such as the change data feed aren't configured there."
+        }
+      ],
+      "in_practice": "Because every target already emits a change feed, silver flows can process only the changed Salesforce rows from day one instead of rescanning a multi-million-row object on each run.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/faq",
+      "evidence": "Can I enable the Delta Lake change data feed on a target table? This is enabled for all target tables."
+    },
+    {
+      "family": "lakeflow-connect-overlapping-update-skipped",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer schedules a Lakeflow Connect ingestion pipeline every 15 minutes. One update runs for 25 minutes because of a backlog of source changes. What happens to the next scheduled update, which comes due while that long update is still running?",
+      "options": [
+        {
+          "text": "It is skipped, and ingestion resumes with the update scheduled after it",
+          "correct": true,
+          "why": "When update N is still running at the time update N+1 is due, Databricks skips update N+1 and picks up with update N+2, assuming update N has completed by then."
+        },
+        {
+          "text": "It starts in parallel and ingests the same source changes a second time",
+          "average": true,
+          "why": "Overlapping runs would duplicate work; instead the overlapping update is skipped and the following scheduled update carries on."
+        },
+        {
+          "text": "It is queued and starts as soon as the running update finishes",
+          "why": "The overdue update isn't queued for later; it is skipped, and ingestion continues with the next scheduled update."
+        },
+        {
+          "text": "It cancels the running update and restarts from the last cursor",
+          "why": "A schedule tick doesn't interrupt a running update; the running update finishes and the overlapping one is skipped."
+        }
+      ],
+      "in_practice": "Skipped ticks mean an undersized schedule shows up as lost freshness rather than duplicate rows, so alert when run duration approaches the interval before a whole cycle of latency is lost.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/faq",
+      "evidence": "What happens if a pipeline is still running (update N) when the next update is scheduled to run (update N+1)? Databricks skips update N+1 and picks up on update N+2, assuming that update N has completed in time."
+    },
+    {
+      "family": "lakeflow-connect-source-lineage-privilege",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A governance team wants Unity Catalog lineage to show the SQL Server source tables upstream of the destination tables that a Lakeflow Connect pipeline writes. The pipeline runs as a service principal. What does the service principal need for this source lineage to be recorded?",
+      "options": [
+        {
+          "text": "The CREATE EXTERNAL METADATA privilege on the metastore",
+          "correct": true,
+          "why": "Lakeflow Connect records source lineage automatically as external metadata objects, so the identity that runs the pipeline must hold CREATE EXTERNAL METADATA on the metastore."
+        },
+        {
+          "text": "A lineage setting turned on in the pipeline configuration",
+          "average": true,
+          "why": "There is no setting to enable on the pipeline; after an update completes it populates source lineage automatically, provided its identity can create external metadata."
+        },
+        {
+          "text": "The MANAGE privilege on each destination table",
+          "why": "Privileges on the destination tables aren't what source lineage needs; the identity must be able to create external metadata objects in the metastore."
+        },
+        {
+          "text": "The USE CONNECTION privilege on the SQL Server connection",
+          "why": "USE CONNECTION lets an identity build pipelines on a connection, but writing the upstream lineage objects requires CREATE EXTERNAL METADATA."
+        }
+      ],
+      "in_practice": "With end-to-end lineage, the team can see every dashboard affected before a DBA drops a source column; lineage writes are best-effort, so a missing grant only logs a failure and the next update fills the gap.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/source-lineage",
+      "evidence": "The identity that runs the pipeline must have the CREATE EXTERNAL METADATA privilege on the metastore. If the pipeline is configured to run as a service principal, grant the privilege to the service principal. There is no setting to enable on the pipeline."
+    },
+    {
+      "family": "lakeflow-connect-destination-liquid-clustering",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants liquid clustering on customer_id for a Unity Catalog destination table that a Lakeflow Connect SQL Server pipeline writes. How should clustering be configured for this table?",
+      "options": [
+        {
+          "text": "Set clustering_columns in the table's table_configuration in the pipeline definition",
+          "correct": true,
+          "why": "Destination tables are streaming tables managed by the pipeline, so clustering is configured in the ingestion_definition through table_configuration, with clustering_columns for an individual table."
+        },
+        {
+          "text": "Run ALTER TABLE ... CLUSTER BY (customer_id) on the destination table",
+          "average": true,
+          "why": "That is how clustering is set on an ordinary Delta table, but you can't run ALTER TABLE ... CLUSTER BY directly on a destination table that a managed ingestion pipeline manages."
+        },
+        {
+          "text": "Add a clustered index on customer_id to the source table in SQL Server",
+          "why": "A source index changes how SQL Server stores the table; it does not set the layout of the Delta destination table, which is configured in the pipeline."
+        },
+        {
+          "text": "Run OPTIMIZE ... ZORDER BY (customer_id) after each pipeline update",
+          "why": "Z-ordering is a different layout technique and not how liquid clustering is enabled; for managed ingestion, clustering is set through table_configuration."
+        }
+      ],
+      "in_practice": "Clustering a large orders table on the column analysts filter by lets queries skip most files; when query patterns are unclear, enable_auto_clustering lets Databricks choose and maintain the keys instead.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/clustering",
+      "evidence": "Because destination tables are streaming tables managed by the pipeline, you can't run ALTER TABLE ... CLUSTER BY on them directly. Instead, configure clustering in the pipeline's ingestion_definition using the table_configuration field."
+    },
+    {
+      "family": "lakeflow-connect-sql-server-pipeline-scheduling",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants SQL Server changes to reach Unity Catalog as quickly as possible and plans to run the Lakeflow Connect ingestion pipeline in continuous mode. What does Databricks support and recommend for this ingestion pipeline?",
+      "options": [
+        {
+          "text": "Scheduled runs at least 5 minutes apart, since continuous mode isn't supported",
+          "correct": true,
+          "why": "Databricks doesn't support running the ingestion pipeline in continuous mode, and it recommends at least 5 minutes between scheduled runs because serverless compute takes time to start."
+        },
+        {
+          "text": "Continuous mode, so the pipeline applies changes with no schedule at all",
+          "average": true,
+          "why": "Continuous running is what the gateway does, but Databricks doesn't support running the ingestion pipeline itself in continuous mode."
+        },
+        {
+          "text": "Runs every 30 seconds, since serverless compute has no startup time",
+          "why": "There is no hard limit on frequency, but serverless compute takes time to start, which is why at least 5 minutes between runs is recommended."
+        },
+        {
+          "text": "One run per day, since the gateway stages only one snapshot daily",
+          "why": "The gateway captures changes continuously into staging, so the pipeline can run on whatever schedule the team needs."
+        }
+      ],
+      "in_practice": "A 5-to-15-minute schedule gives near-real-time freshness for most reporting while the always-on gateway keeps capturing changes, so nothing is lost between runs.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/sql-server-faq",
+      "evidence": "There is no limit on how often the ingestion pipeline can be scheduled to run. However, Databricks recommends at least 5 minutes between intervals because it takes some time for the serverless compute to startup. Databricks doesn't support running the ingestion pipeline in continuous mode."
+    },
+    {
+      "family": "lakeflow-connect-database-create-volume",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "An admin creates a Unity Catalog connection to a production SQL Server and grants a data engineer USE CONNECTION on it, USE CATALOG on erp, and USE SCHEMA and CREATE TABLE on erp.raw. The engineer's deployment of a gateway and ingestion pipeline into erp.raw is rejected for missing privileges. Which privilege on erp.raw is still missing?",
+      "options": [
+        {
+          "text": "CREATE VOLUME",
+          "correct": true,
+          "why": "For database sources, a non-admin needs USE SCHEMA, CREATE TABLE and CREATE VOLUME on the existing schema, because database connectors also create staging storage, which is a Unity Catalog volume."
+        },
+        {
+          "text": "CREATE CONNECTION",
+          "average": true,
+          "why": "CREATE CONNECTION, on the metastore, is what the admin needed to create the connection; the engineer only needs USE CONNECTION plus schema privileges."
+        },
+        {
+          "text": "CREATE MATERIALIZED VIEW",
+          "why": "Destination tables are streaming tables, covered by CREATE TABLE; the extra need for a database source is a volume for staging."
+        },
+        {
+          "text": "MODIFY",
+          "why": "MODIFY governs changing data in existing tables; the missing grant is the one that lets the pipeline create its staging volume."
+        }
+      ],
+      "in_practice": "SaaS pipelines don't need this grant, so teams that copy a Salesforce privilege template for a database source often hit this failure; adding CREATE VOLUME up front keeps a release from stalling mid-deploy.",
+      "source": "https://docs.databricks.com/aws/en/connect/managed-ingestion",
+      "evidence": "Non-admin: USE CONNECTION on an existing connection, USE CATALOG on the target catalog, (SaaS apps) USE SCHEMA and CREATE TABLE on an existing schema or CREATE SCHEMA on the target catalog, (Databases) USE SCHEMA, CREATE TABLE, and CREATE VOLUME on an existing schema"
+    },
+    {
+      "family": "lakeflow-connect-include-columns-future",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer configures a Lakeflow Connect Salesforce pipeline with include_columns listing the 12 Opportunity fields that finance approved. Months later, a Salesforce admin adds the field Discount_Reason__c, which finance also approves. What must the engineer do for the pipeline to ingest it?",
+      "options": [
+        {
+          "text": "Add the field to include_columns, since an include list skips new columns",
+          "correct": true,
+          "why": "When columns are included explicitly, the pipeline automatically excludes columns added to the source later; to ingest a future column, you must add it to the list."
+        },
+        {
+          "text": "Nothing, because managed connectors ingest new source columns automatically",
+          "average": true,
+          "why": "Automatic pickup of new columns is the default, but an explicit include_columns list makes the pipeline exclude columns that are added to the source later."
+        },
+        {
+          "text": "Run only a full refresh, which re-reads the object with every field",
+          "why": "A full refresh reprocesses the configured columns; it doesn't override the include list, so the new field stays out until it's added."
+        },
+        {
+          "text": "Replace the list with an empty exclude_columns list",
+          "why": "An exclude list ingests every column not listed, so an empty one would pull all Opportunity fields, not just the 13 that finance approved."
+        }
+      ],
+      "in_practice": "An include list works as a data contract: new Salesforce fields, which may hold sensitive data, stay out of the lakehouse until someone approves them, at the cost of a small configuration change each time.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/column-selection",
+      "evidence": "If you use this option to explicitly include columns, the pipeline automatically excludes columns that are added to the source in the future. To ingest the future columns, you must add them to the list."
+    },
+    {
+      "family": "lakeflow-connect-alter-streaming-table-mask",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's Lakeflow Connect Workday pipeline writes employee records into the Unity Catalog streaming table hr.raw.workers. Compliance requires the national_id column to be masked for everyone outside HR, without changing or rebuilding the ingestion pipeline. Which approach meets this requirement?",
+      "options": [
+        {
+          "text": "ALTER STREAMING TABLE with ALTER COLUMN national_id SET MASK and a masking function",
+          "correct": true,
+          "why": "Streaming tables created by managed ingestion pipelines accept ALTER STREAMING TABLE statements, including ALTER COLUMN ... SET MASK, so the mask applies without touching the pipeline."
+        },
+        {
+          "text": "Exclude national_id from ingestion with exclude_columns in the pipeline",
+          "average": true,
+          "why": "Excluding the column changes the pipeline and removes the data for HR as well; a column mask keeps it for authorized readers only."
+        },
+        {
+          "text": "Configure the mask in the options of the Workday connection",
+          "why": "A connection holds source authentication details; data masking is defined on the destination table's columns."
+        },
+        {
+          "text": "Copy the table into a managed table and mask the copy instead",
+          "why": "A copy duplicates sensitive data and leaves the original unmasked, while the ingested streaming table can take a column mask directly."
+        }
+      ],
+      "in_practice": "Masking the ingested table in place keeps one governed copy of HR data, so the access policy follows the table through every downstream query instead of depending on readers using the right copy.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/faq",
+      "evidence": "you can modify streaming tables and materialized views created by managed ingestion pipelines using the following ALTER SQL statements: ALTER MATERIALIZED VIEW view_name | ALTER STREAMING TABLE table_name { ALTER COLUMN column_clause | SET ROW FILTER clause ... column_identifier COMMENT clause | SET MASK clause | DROP MASK"
+    },
+    {
+      "family": "lakeflow-connect-gateway-new-table-discovery",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's Lakeflow Connect pipeline ingests an entire SQL Server schema. The DBA creates a new table, dbo.returns, at 09:00, and the business wants it in Unity Catalog before a noon review, but at 10:30 it still hasn't appeared. Which action speeds up discovery of the new table?",
+      "options": [
+        {
+          "text": "Restart the ingestion gateway",
+          "correct": true,
+          "why": "To limit load on the source database, the gateway checks for new tables only periodically and can take up to six hours to find them; restarting the gateway speeds this up."
+        },
+        {
+          "text": "Trigger a full refresh of the ingestion pipeline",
+          "average": true,
+          "why": "A full refresh reprocesses the tables the pipeline already knows about; the new table first has to be discovered by the gateway's periodic check."
+        },
+        {
+          "text": "Run an extra update of the ingestion pipeline",
+          "why": "The pipeline applies only what the gateway has extracted, so extra updates have nothing to apply until the gateway discovers the table."
+        },
+        {
+          "text": "Give the gateway larger classic compute",
+          "why": "Discovery waits on a periodic check that protects the source database, not on gateway capacity, so more compute doesn't make it look sooner."
+        }
+      ],
+      "in_practice": "The periodic check keeps catalog queries off a busy production database; a gateway restart is the documented way to bring in a new table sooner instead of waiting up to six hours.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/pipeline-maintenance",
+      "evidence": "To decrease the load on the source database, the ingestion gateway only checks for new tables periodically. It might take up to six hours to discover new tables. To speed up this process, restart the gateway."
+    },
+    {
+      "family": "lakeflow-connect-full-refresh-window",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A DBA allows heavy snapshot reads on a production SQL Server only on Saturday and Sunday nights after 22:00 Eastern time. A data engineer's Lakeflow Connect pipeline occasionally needs full refreshes, requested by the team or triggered by the auto full refresh policy. How can the engineer keep those snapshots inside the allowed time?",
+      "options": [
+        {
+          "text": "Add a full_refresh_window with start_hour, days_of_week and time_zone_id",
+          "correct": true,
+          "why": "A full refresh window schedules snapshot operations: whether a full refresh is requested or triggered automatically, its snapshot starts at the next available time in the configured window."
+        },
+        {
+          "text": "Schedule the ingestion pipeline to run only on weekend nights",
+          "average": true,
+          "why": "The pipeline schedule controls when staged data is applied, not when the gateway takes snapshots, and it would also stall ordinary change ingestion all week."
+        },
+        {
+          "text": "Set the auto full refresh policy's min_interval_hours to 168",
+          "why": "min_interval_hours only sets the minimum wait between automatic full refreshes; it doesn't decide what time of day or week a snapshot starts."
+        },
+        {
+          "text": "Stop the ingestion gateway on weekdays and start it on weekends",
+          "why": "The gateway must run continuously so changes aren't lost to log retention; stopping it can force a full refresh of every affected table."
+        }
+      ],
+      "in_practice": "Deferring snapshots to an agreed window keeps multi-hour table scans away from business-hours OLTP load, which is often the condition a DBA sets before approving CDC ingestion at all.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/full-refresh",
+      "evidence": "A full refresh window lets you schedule when snapshot operations for full refresh occur. When you request a full refresh or when the system automatically triggers a full refresh, the snapshot starts during the next available time in the configured window."
+    },
+    {
+      "family": "lakeflow-connect-change-tracking-ag-failover",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer ingests 80 tables from a SQL Server Availability Group with a Lakeflow Connect database connector, connecting through the AG listener. The DBA enabled change tracking on every table because all have primary keys. After an unplanned failover to another replica, what recovery does the pipeline need?",
+      "options": [
+        {
+          "text": "A full refresh of all tables, because change tracking data isn't replicated",
+          "correct": true,
+          "why": "Change tracking data is not replicated to secondary nodes, so any change of source node, including an AG failover, requires a full refresh of all tables in the pipeline."
+        },
+        {
+          "text": "None, because the listener address lets the pipeline resume on its own",
+          "average": true,
+          "why": "Resuming through the listener applies to Microsoft CDC, whose LSN checkpoints are portable across replicas; change tracking state doesn't follow the failover."
+        },
+        {
+          "text": "A full refresh of only the tables changed during the failover",
+          "why": "The documented requirement after a source node change with change tracking is a full refresh of all tables in the pipeline, not a chosen subset."
+        },
+        {
+          "text": "A restart of the gateway so it rebuilds change tracking state",
+          "why": "A restart can't recover change tracking data that was never replicated to the new primary; the tables have to be fully refreshed."
+        }
+      ],
+      "in_practice": "For large databases in an Availability Group, choosing CDC and the listener address can turn a failover from a re-snapshot of every table into a routine resume, at the cost of more load on the source than change tracking.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/sql-server-limits",
+      "evidence": "If you connect using the AG listener address, the pipeline can resume after an unplanned AG failover without data loss. To use Microsoft change tracking, you must have SQL Server 2012 or above. Change tracking data is not replicated to secondary nodes. Any source node change, including an AG failover, requires a full refresh of all tables in the pipeline."
+    },
+    {
+      "family": "lakeflow-connect-no-primary-key-duplicates",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer ingests a SQL Server audit table that has no primary key with a Lakeflow Connect database connector. A reconciliation shows that the destination holds fewer rows than the source, and every missing row is an exact duplicate of a row that did arrive. What explains the difference?",
+      "options": [
+        {
+          "text": "Without a key, all non-LOB columns act as one key, so duplicates land as one row",
+          "correct": true,
+          "why": "For a table without a primary key, the connector treats all columns except large objects as a bundled primary key, so duplicate source rows are ingested as a single destination row."
+        },
+        {
+          "text": "The gateway's initial snapshot is still running, so later runs add the rows",
+          "average": true,
+          "why": "A partial first load can happen, but it wouldn't single out exact duplicates; identical rows collapse because of the bundled key the connector uses."
+        },
+        {
+          "text": "Change tracking dropped the rows because it can't follow keyless tables",
+          "why": "Change tracking can't be enabled on a table without a primary key at all, so CDC tracks this table; the duplicates collapse because of the bundled key."
+        },
+        {
+          "text": "A row filter on the pipeline removed repeated values during ingestion",
+          "why": "API-based row filtering isn't supported for the SQL Server connector, and filters wouldn't target duplicates anyway."
+        }
+      ],
+      "in_practice": "When repeated rows carry meaning, as identical audit events often do, give the source table a key such as an identity column before ingesting, or counts will never reconcile.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/sql-server-faq",
+      "evidence": "How does the connector handle a table without a primary key? The connector treats all columns except large objects as a bundled primary key. If there are duplicate rows in the source table, these rows are ingested as a single row in the destination table."
+    },
+    {
+      "family": "lakeflow-connect-initial-run-partial-rows",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer creates a SQL Server gateway and ingestion pipeline for a 900-million-row orders table and schedules the pipeline every 10 minutes. After the first two pipeline runs succeed, the destination holds only about 300 million rows, and no errors appear anywhere. What is the most likely explanation?",
+      "options": [
+        {
+          "text": "The gateway is still extracting the table, and later runs will apply the rest",
+          "correct": true,
+          "why": "The gateway extracts historical and CDC data as soon as it starts, and the pipeline may run before extraction finishes, so it can take a few runs to apply all the data."
+        },
+        {
+          "text": "The pipeline hit a per-table row limit, so the table needs a full refresh",
+          "average": true,
+          "why": "There is no row limit to hit; the pipeline applies what the gateway has extracted so far, and the remaining rows arrive over the next runs."
+        },
+        {
+          "text": "Change tracking captures only new rows, so older rows will never load",
+          "why": "The first load includes all the selected historical data; the gateway extracts history as well as changes from the moment it starts."
+        },
+        {
+          "text": "The staging volume purged older files, so those rows were lost",
+          "why": "Staging data is purged only after 30 days; two runs into a new pipeline, the gap is data not yet extracted and applied."
+        }
+      ],
+      "in_practice": "Watching snapshot progress in the gateway's event log before announcing go-live keeps stakeholders from pulling numbers out of a table that is still two-thirds empty.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/sql-server-faq",
+      "evidence": "The ingestion gateway extracts historical and CDC data as soon as it starts running. The ingestion pipeline might run before all of this data has been extracted, resulting in a partial application of data into target tables. It can take a few runs of the ingestion pipeline to have all of the data extracted and applied to target tables."
+    },
+    {
+      "family": "lakeflow-connect-servicenow-restored-records",
+      "objective": "ingestion.lakeflow-connect",
+      "guide": "2.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A ServiceNow admin accidentally deletes 40 incident records and restores them an hour later. A data engineer's Lakeflow Connect pipeline ingests the incident table into Unity Catalog every 30 minutes and ran in between. The next day, the 40 incidents are still missing from the destination, and the run logs show no errors. What explains this?",
+      "options": [
+        {
+          "text": "The connector doesn't reingest records that are deleted and later restored",
+          "correct": true,
+          "why": "The ServiceNow connector has a documented limitation: if a record is deleted in the source and later restored, the connector does not reingest the restored record."
+        },
+        {
+          "text": "The pipeline needs one more scheduled run to pick up the restored rows",
+          "average": true,
+          "why": "Waiting doesn't help: a record deleted in ServiceNow and later restored isn't reingested, however many runs follow."
+        },
+        {
+          "text": "Restored rows are applied only when history tracking is SCD type 2",
+          "why": "The history tracking mode doesn't change this; the limitation is that restored records aren't reingested at all."
+        },
+        {
+          "text": "Deleted rows are marked inactive, which blocks reinserts of the same sys_id",
+          "why": "Inactive marking applies to deleted columns and tables, not to individual records; the gap exists because restored records aren't reingested."
+        }
+      ],
+      "in_practice": "Teams that know this gap add a runbook step: after a bulk restore in ServiceNow, fully refresh the affected table so the lakehouse matches the source before the next SLA report.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/servicenow-limits",
+      "evidence": "Restored records: If you delete a record in the source and later restore it, the connector does not reingest the restored record."
+    },
+    {
+      "family": "auto-loader-clean-source-move-archive",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer runs Auto Loader on Databricks Runtime 16.4 LTS and wants files in the landing folder moved to an archive path some time after they are ingested, to cut storage costs and shorten future directory listings. Which option does this?",
+      "options": [
+        {
+          "text": "cloudFiles.cleanSource = 'MOVE' with cloudFiles.cleanSource.moveDestination",
+          "correct": true,
+          "why": "With cleanSource set to MOVE, Auto Loader moves processed files to the moveDestination path once the retention duration, 30 days by default, has elapsed; DELETE removes them instead."
+        },
+        {
+          "text": "cloudFiles.maxFileAge = '30 days' to age processed files out of the folder",
+          "average": true,
+          "why": "maxFileAge sets how long a file event is tracked for deduplication in the stream's state; it never moves or deletes source files, and tuning it too aggressively can cause duplicate ingestion."
+        },
+        {
+          "text": "cloudFiles.includeExistingFiles = 'false' so ingested files are skipped",
+          "why": "includeExistingFiles decides whether files already in the path when the stream first starts are ingested; it doesn't touch files after they are processed."
+        },
+        {
+          "text": "cloudFiles.allowOverwrites = 'true' so files can be replaced after loading",
+          "why": "allowOverwrites lets Auto Loader reprocess a file that is appended to or overwritten; it changes what gets ingested, not where processed files are kept."
+        }
+      ],
+      "in_practice": "Archiving keeps a busy landing folder small, so listings stay fast as volume grows; avoid it when several streams read the same folder, because the fastest stream cleans up files before the slower ones ingest them.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/clean-source",
+      "evidence": "Use cloudFiles.cleanSource to move or delete files from the source directory after they are processed. Removing processed files reduces storage costs and shortens the duration of future listing operations. MOVE: The files in the source directory are moved to the path specified by cloudFiles.cleanSource.moveDestination after the retention duration (default 30 days)"
+    },
+    {
+      "family": "auto-loader-inference-samples-recent-files",
+      "objective": "ingestion.auto-loader",
+      "guide": "2.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer starts a new Auto Loader stream with schema inference on a folder that holds three years of JSON files. Which files does Auto Loader sample to infer the initial schema?",
+      "options": [
+        {
+          "text": "The most recent 50 GB or 1,000 files, by file modification time",
+          "correct": true,
+          "why": "When the DataFrame is first defined, Auto Loader lists the source directory and infers the schema from the most recent 50 GB of data or 1,000 files, chosen by file modification time."
+        },
+        {
+          "text": "Every file in the folder, read once in full before the first batch",
+          "average": true,
+          "why": "Reading three years of files before the first batch would make startup slow and costly, so Auto Loader infers from a bounded sample of recent files instead."
+        },
+        {
+          "text": "The oldest 1,000 files, so the schema matches the first deliveries",
+          "why": "Auto Loader picks its sample by most recent modification time, not by age, so the newest files are the ones that shape the inferred schema."
+        },
+        {
+          "text": "Only the first file it lists, then it adds columns as batches arrive",
+          "why": "Inference uses a sample of up to 50 GB or 1,000 files rather than a single file; schema evolution handles new columns after that initial inference."
+        }
+      ],
+      "in_practice": "A field that appears only in older files can be missed by inference, so for long histories pin the important columns with schema hints instead of trusting the sample to see every shape of the data.",
+      "source": "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/faq",
+      "evidence": "When the DataFrame is first defined, Auto Loader lists your source directory and chooses the most recent (by file modification time) 50 GB of data or 1000 files, and uses those to infer your data schema."
+    }
+  ]
+}

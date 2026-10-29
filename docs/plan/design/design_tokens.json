@@ -1,0 +1,25 @@
+{
+  "background": "#F7F6FB",
+  "surface": "#FFFFFF",
+  "ink": "#24243A",
+  "muted": "#6F7085",
+  "primary": "#6750EE",
+  "primaryDark": "#4D37CE",
+  "primaryTint": "#EEEAFE",
+  "mint": "#DDF6EB",
+  "success": "#137B60",
+  "coral": "#E15D64",
+  "coralTint": "#FFF0EF",
+  "streak": "#F5A623",
+  "border": "#E9E7F3",
+  "radius": 20,
+  "spacing": [
+    4,
+    8,
+    12,
+    16,
+    24,
+    32
+  ],
+  "font": "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+}

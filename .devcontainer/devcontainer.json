@@ -1,0 +1,16 @@
+{
+  "name": "CertPath",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "postCreateCommand": "npm ci && npm run setup",
+  "postAttachCommand": "echo 'Run: npm run dev   (API :4000, learner app :8081, backoffice :5173)'",
+  "forwardPorts": [8081, 5173, 4000],
+  "portsAttributes": {
+    "8081": { "label": "Learner app (Expo web)", "onAutoForward": "openBrowser" },
+    "5173": { "label": "Admin backoffice", "onAutoForward": "notify" },
+    "4000": { "label": "API", "onAutoForward": "silent" }
+  },
+  "customizations": {
+    "codespaces": { "openFiles": ["README.md"] },
+    "vscode": { "extensions": ["dbaeumer.vscode-eslint", "bradlc.vscode-tailwindcss", "expo.vscode-expo-tools"] }
+  }
+}

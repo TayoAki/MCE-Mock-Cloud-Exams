@@ -1,0 +1,464 @@
+{
+  "items": [
+    {
+      "family": "bundles-default-sql-template",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A team of SQL analysts wants to start a new bundle project whose starter files already define a Lakeflow Job that runs SQL queries on a SQL warehouse. The team writes plain SQL files and has no dbt project. Which default template should the team pass to `databricks bundle init`?",
+      "options": [
+        { "text": "`default-sql`", "correct": true, "why": "The default-sql template contains a configuration file that defines a job running SQL queries on a SQL warehouse, which is exactly the starter project the analysts need." },
+        { "text": "`dbt-sql`", "average": true, "why": "The dbt-sql template sounds right for SQL users, but it is built around dbt-core: it defines a job with a dbt task plus dbt profiles, which a team without a dbt project doesn't need." },
+        { "text": "`default-python`", "why": "The default-python template creates a job and an ETL pipeline in Python and requires uv, which doesn't fit a team that writes plain SQL." },
+        { "text": "`default-minimal`", "why": "The default-minimal template creates an empty bundle with only the required files and no sample code, so the analysts would have to write the SQL job definition themselves." }
+      ],
+      "in_practice": "Starting from the SQL template gives analysts a working job and warehouse setting on day one, so their first pull request changes queries instead of debugging hand-written YAML.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/templates",
+      "evidence": "default-sql: A template for using SQL with Databricks. This template contains a configuration file that defines a job that runs SQL queries on a SQL warehouse."
+    },
+    {
+      "family": "bundles-workspace-requires-git-folder",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer wants to create, edit and deploy a bundle entirely in the Databricks workspace UI, without installing the Databricks CLI locally. Where must the engineer create the bundle?",
+      "options": [
+        { "text": "Inside a Git folder in the workspace", "correct": true, "why": "Bundles in the workspace require a Git folder: the engineer creates the bundle with Create > Bundle inside one, and changes to its files sync with the folder's remote repository." },
+        { "text": "In the engineer's home folder under /Workspace/Users", "average": true, "why": "A home folder feels like the natural place to start, but a workspace bundle must be created in a Git folder; a plain workspace folder doesn't qualify." },
+        { "text": "In the shared /Workspace/Shared folder", "why": "The Shared folder is a plain workspace folder that every user can write to; it isn't a Git folder, so it doesn't meet the requirement for workspace bundles." },
+        { "text": "In a Unity Catalog volume", "why": "Volumes hold data and files such as libraries; workspace bundles are authored as workspace files inside a Git folder, not in a volume." }
+      ],
+      "in_practice": "Requiring a Git folder means every bundle edited in the browser is still version-controlled, so a UI change goes through the same pull request review as one made in an IDE.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/workspace",
+      "evidence": "You do not have to install anything locally to use bundles in the workspace. Workspace files must be enabled. You must have a Git folder in which to create the bundle."
+    },
+    {
+      "family": "bundles-terraform-for-workspaces",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A company's platform team must provision three Databricks workspaces (dev, test and prod) and their supporting infrastructure. The data engineering team then deploys its Lakeflow Jobs and pipelines into each workspace. Which split of tools follows Databricks guidance?",
+      "options": [
+        { "text": "Terraform provider for the workspaces; bundles for the jobs and pipelines", "correct": true, "why": "Databricks positions its Terraform provider for provisioning and managing workspaces and infrastructure, and Declarative Automation Bundles for defining, deploying and running jobs and pipelines with CI/CD." },
+        { "text": "Bundles for the workspaces and the jobs, with one target per workspace", "average": true, "why": "Targets let one bundle deploy into several workspaces, but bundles deploy resources into workspaces that already exist; provisioning the workspaces is the Terraform provider's job." },
+        { "text": "Git folders for the workspaces; Terraform for the jobs and pipelines", "why": "Git folders mirror a repository inside an existing workspace and don't create workspaces, and bundles, not Terraform, are the recommended way to deliver jobs and pipelines." },
+        { "text": "Account console setup by hand; Git folders for the jobs and pipelines", "why": "Manual setup isn't repeatable, and a Git folder only source-controls code files, so the job and pipeline configurations would stay outside source control." }
+      ],
+      "in_practice": "Splitting the layers lets the platform team change networking or workspace settings without touching pipeline code, while data engineers ship daily releases through bundles without infrastructure permissions.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/ci-cd/",
+      "evidence": "Declarative Automation Bundles: Programmatically define, deploy, and run Databricks resources, including Lakeflow Jobs, Lakeflow pipelines, and MLOps Stacks using CI/CD best practices. Databricks Terraform provider: Provision and manage Databricks workspaces and infrastructure using Terraform."
+    },
+    {
+      "family": "bundles-artifact-path-uc-volume",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineering team's governance policy says every library a bundle deploys, such as Python wheels and JARs, must be stored in the Unity Catalog volume `/Volumes/platform/releases/libs` rather than in workspace files. Which bundle setting makes `bundle deploy` upload the bundle's artifacts there?",
+      "options": [
+        { "text": "`artifact_path` set to the volume path", "correct": true, "why": "When artifact_path points to a Unity Catalog volume path, the bundle automatically uploads every artifact it references to that volume during deployment." },
+        { "text": "`root_path` set to the volume path", "average": true, "why": "The root_path setting sets the bundle's deployment folder and identity in the workspace; it must be a workspace path, because /Volumes is supported only for artifacts." },
+        { "text": "`file_path` set to the volume path", "why": "The file_path setting controls where the bundle's source files go in the workspace for deployments and job runs; it isn't where built artifacts are uploaded." },
+        { "text": "A `sync` include rule for the volume path", "why": "The sync mapping chooses which local files are synchronized to the workspace; it doesn't change where artifacts are uploaded." }
+      ],
+      "in_practice": "Keeping release libraries in a volume puts them under Unity Catalog permissions, so the security team can see exactly which wheel version each prod job loads and who can replace it.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/artifact-private",
+      "evidence": "Declarative Automation Bundles automatically uploads all artifacts referenced in the bundle to Unity Catalog if you set artifact_path in your bundle configuration to a Unity Catalog volumes path."
+    },
+    {
+      "family": "bundles-versioned-artifacts-commit-hash",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineering team's CI uploads its compiled JAR to a Unity Catalog volume as `etl.jar` on every merge, overwriting the previous file. After a bad release, nobody can tell which build prod ran, and rolling back means guessing. Which practice does Databricks recommend for uploaded artifacts?",
+      "options": [
+        { "text": "Version each upload by Git commit hash, such as `etl-<sha>.jar`", "correct": true, "why": "Databricks recommends versioned artifacts, such as names tied to Git commit hashes, so every deployed file traces to a commit and an earlier build can be redeployed to roll back." },
+        { "text": "Restore the previous JAR from the volume's Delta history", "average": true, "why": "Time travel is a feature of Delta tables; a JAR in a volume is a plain file, so overwriting it leaves no table history to restore from." },
+        { "text": "Commit the built JAR to the main branch next to the code", "why": "Databricks recommends storing compiled files in a Unity Catalog volume or an artifact repository, not checking build outputs into the source branch." },
+        { "text": "Rebuild the JAR from main whenever a rollback is needed", "why": "Rebuilding from main produces the current code, not the release that was running, and it still leaves no record of which build prod used." }
+      ],
+      "in_practice": "With commit-named artifacts, a rollback is a redeploy that points at the previous file, often minutes of work instead of an evening spent reconstructing which code was live.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/ci-cd/flows",
+      "evidence": "always use versioned artifacts, such as Git commit hashes, when uploading to Databricks or external storage to ensure traceability and rollback capabilities."
+    },
+    {
+      "family": "bundles-schema-grants-on-resource",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team's bundle creates the Unity Catalog schema `sales_gold` in every target through `resources.schemas.sales_gold`. In each environment, the `analysts` group must get SELECT on that schema as part of the same deployment, without a separate GRANT step. Where should the team define this?",
+      "options": [
+        { "text": "A `grants` list on the schema resource, granting SELECT to `analysts`", "correct": true, "why": "Schema grants are defined inside the schema's own definition in the schemas mapping, as a principal with its privileges, so each deployment applies them along with the schema." },
+        { "text": "A top-level `grants` mapping in `databricks.yml`", "average": true, "why": "One top-level grants block sounds tidy, but bundles don't support a top-level grants mapping; grants for a schema must go within the schemas mapping." },
+        { "text": "A top-level `permissions` mapping giving `analysts` CAN_VIEW", "why": "The top-level permissions mapping sets access levels such as CAN_VIEW, CAN_RUN and CAN_MANAGE on bundle resources; it doesn't grant Unity Catalog privileges like SELECT." },
+        { "text": "A `run_as` setting that names the `analysts` group", "why": "The run_as setting picks the identity the bundle's workflows run as; it doesn't grant privileges to other principals, and schema operations ignore it." }
+      ],
+      "in_practice": "Keeping grants beside the schema means a new environment comes up with its access already correct, instead of a ticket to the platform team after every first deployment.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/resources",
+      "evidence": "A top-level grants mapping is not supported by Declarative Automation Bundles, so if you want to set grants for a schema, define the grants for the schema within the schemas mapping."
+    },
+    {
+      "family": "bundles-app-run-after-deploy",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team's bundle includes a Databricks app (resource key `ops_portal`) alongside its jobs. CI runs `databricks bundle deploy -t prod` after each merge and the deploy succeeds, yet users keep seeing the previous version of the app, while the jobs pick up new code on their next run. What should the CI pipeline add?",
+      "options": [
+        { "text": "`databricks bundle run ops_portal -t prod` after the deploy", "correct": true, "why": "An app is a continuously running process that keeps serving the previously deployed code until it restarts; bundle run starts or restarts it with the most recently deployed source." },
+        { "text": "`databricks bundle deploy -t prod --force` instead of a plain deploy", "average": true, "why": "The new code was already deployed; the --force option only overrides validations that block a deployment, so the running app still serves the old code." },
+        { "text": "`databricks bundle sync -t prod` after the deploy", "why": "The bundle sync command copies local file changes to the workspace, which the deploy already did; it doesn't restart the running app." },
+        { "text": "`databricks bundle validate -t prod` before the deploy", "why": "The bundle validate command checks the configuration files; it doesn't change what a running app serves." }
+      ],
+      "in_practice": "Adding the run step makes app releases behave like job releases: the merge that ships the code is the one users see, instead of a stale UI that keeps support guessing for hours.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "For Databricks Apps, databricks bundle run starts or restarts the app with the most recently deployed source code. Unlike a job or a pipeline, which picks up new code the next time it runs, an app is a continuously running process that keeps serving the previously deployed code until it is restarted."
+    },
+    {
+      "family": "bundles-prebuilt-wheel-skip-artifacts",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team's CI pipeline builds and unit-tests a Python wheel in an earlier stage, producing `dist/sales_lib-2.3.0-py3-none-any.whl`. The deploy stage must ship exactly that tested file and must not rebuild it. The bundle's job task already lists the wheel under `libraries`. How should the bundle configuration handle the build?",
+      "options": [
+        { "text": "Omit the `artifacts` mapping and keep the `whl` entry under `libraries`", "correct": true, "why": "Without an artifacts mapping, the Databricks CLI assumes the wheel is already built and deploys the files named in the libraries whl entries, so the tested file is what ships." },
+        { "text": "Keep an `artifacts` mapping with `type: whl` for the package", "average": true, "why": "An artifacts mapping tells each deployment to build the wheel, so the deploy stage would ship a fresh build rather than the file CI tested." },
+        { "text": "Pass the wheel's path as a job parameter for the task to install", "why": "Job parameters pass values to tasks at run time; they don't upload or install libraries for the task." },
+        { "text": "Upload the wheel in the workspace UI before each deploy", "why": "A manual upload breaks the automated pipeline and isn't tied to the deployment, so a job could run a different file than the one that was tested." }
+      ],
+      "in_practice": "Build once, deploy many: the same wheel moves from test to prod byte for byte, so a prod incident can't come from a rebuild that quietly pulled a newer dependency.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/python-wheel",
+      "evidence": "If you have already built a Python wheel file and just want to deploy it, then modify the following bundle configuration file by omitting the artifacts mapping. The Databricks CLI will then assume that the Python wheel file is already built and will automatically deploy the files that are specified in the libraries array's whl entries."
+    },
+    {
+      "family": "bundles-ui-deploy-no-cross-workspace",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer develops a bundle in a Git folder in the team's dev workspace and deploys it to the `dev` target from the bundle's Deployments pane. The `prod` target in `databricks.yml` points to a separate production workspace. How should the engineer promote the tested bundle to production?",
+      "options": [
+        { "text": "Deploy the `prod` target from CI with the Databricks CLI, signed in to the production workspace", "correct": true, "why": "The workspace UI can't deploy a bundle to a different workspace; the production workspace is defined in databricks.yml for automated deployments, such as CLI runs in CI." },
+        { "text": "Pick the `prod` target in the dev workspace's Deployments pane and click Deploy", "average": true, "why": "The Deployments pane lists every target, but deploying bundles across different workspaces isn't supported when you deploy from the UI." },
+        { "text": "Share the bundle folder with production users so they run it from the dev workspace", "why": "Sharing changes who can edit or deploy the bundle in the dev workspace; it doesn't create anything in the production workspace." },
+        { "text": "Export the bundle folder and import it into the production workspace's Shared folder", "why": "Importing files doesn't deploy the bundle's jobs and pipelines, and the Shared folder is writable by every workspace user." }
+      ],
+      "in_practice": "Routing prod deploys through CI also means a service principal, not an engineer's account, owns production releases, and every prod change maps to a reviewed commit.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/workspace-deploy",
+      "evidence": "If a user does not have access to a production workspace they cannot deploy to that workspace. In addition, deploying bundles across different workspaces is not supported when you use the UI to deploy bundles. Define a different production workspace for your automated deployments in the databricks.yml configuration file."
+    },
+    {
+      "family": "bundles-dashboard-ui-edits-generate",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team's bundle deploys an AI/BI dashboard, `sales_overview`, from `src/sales_overview.lvdash.json` to the `test` target. An analyst then improves the deployed dashboard's layout in the workspace UI. The next CI run of `databricks bundle deploy -t test` fails with an error about that dashboard. The team wants to keep the analyst's changes and track them in Git. What should the team do?",
+      "options": [
+        { "text": "Pull the UI version into the local file with `bundle generate dashboard --resource sales_overview`, commit, then deploy", "correct": true, "why": "UI edits never flow back to the local JSON on their own; generating the file for the existing dashboard resource brings the analyst's version into the repository, so the next deploy carries those changes." },
+        { "text": "Rerun the deploy with `--force` so the dashboard check no longer blocks the release", "average": true, "why": "The --force option makes the deployment overwrite the remote dashboard with the local JSON, which discards exactly the edits the team wants to keep." },
+        { "text": "Unbind `sales_overview` with `bundle deployment unbind`, then deploy the bundle again", "why": "Unbinding removes the link to the deployed dashboard, so the next deploy creates a separate copy from the old local file and the analyst's version stays outside Git." },
+        { "text": "Delete the dashboard in the workspace so the next deploy recreates it from the bundle", "why": "Deleting the deployed dashboard throws away the analyst's work, and the redeploy recreates it from the outdated local file." }
+      ],
+      "in_practice": "Pulling UI edits back into Git lets analysts keep polishing dashboards in the browser without a forced release overwriting their work the following morning.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "For dashboards, --force also overwrites a dashboard that was modified in the workspace after the last deployment. Without --force, the deployment fails in this case so that the remote changes aren't lost. To update the .lvdash.json file after you have already deployed a dashboard, use the --resource option when you run bundle generate dashboard"
+    },
+    {
+      "family": "bundles-schema-owner-deploying-identity",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A platform team's CI pipeline deploys a bundle to `prod` authenticated as the service principal `sp-deployer`. The `prod` target sets `run_as` to the service principal `sp-etl`, so the bundle's jobs and pipelines run as `sp-etl`. The bundle also defines a Unity Catalog schema. An auditor asks which identity owns that schema after deployment. What is the answer?",
+      "options": [
+        { "text": "`sp-deployer`, because a bundle schema is always owned by the deploying identity", "correct": true, "why": "A schema resource's owner is always the deployment user and can't be changed, and run_as is ignored by operations on the schema." },
+        { "text": "`sp-etl`, because `run_as` applies to every resource the target deploys", "average": true, "why": "The run_as setting sets the identity for the bundle's jobs and pipelines, but schema operations ignore it, so it doesn't decide who owns the schema." },
+        { "text": "The workspace admins group, because automation-created schemas go to admins", "why": "Nothing assigns bundle-created schemas to admins; the owner is the identity that ran the deployment." },
+        { "text": "The catalog's owner, because a new schema inherits its catalog's owner", "why": "A schema doesn't inherit its catalog's owner; the bundle creates it as the deploying identity, which becomes its owner." }
+      ],
+      "in_practice": "Knowing the deployer owns the schema tells the team to guard that service principal's credentials closely and to give analysts access through the schema's grants instead of ownership changes.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/resources",
+      "evidence": "The owner of a schema resource is always the deployment user, and cannot be changed. If run_as is specified in the bundle, it will be ignored by operations on the schema."
+    },
+    {
+      "family": "bundles-select-dev-only",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team's bundle defines an ingestion job, a pipeline that reads the job's output, and a reporting job that runs after the pipeline. To shorten releases, a lead proposes that CI run `databricks bundle deploy -t prod --select ingest_job` whenever a pull request changes only the ingestion job. What is the risk, and what should the team do?",
+      "options": [
+        { "text": "Downstream resources aren't updated, risking dependency errors; deploy the full bundle to prod and keep `--select` for dev", "correct": true, "why": "Databricks recommends --select only for development workspaces: it deploys the named resources and their upstream dependencies, so downstream resources can fall out of step and cause errors." },
+        { "text": "None; `--select` also redeploys everything downstream of the job, so prod stays consistent", "average": true, "why": "The --select option deploys only the named resources and their required upstream dependencies; downstream resources and dependencies aren't updated." },
+        { "text": "It bypasses the deployment lock, so concurrent deploys can collide; add `--force-lock`", "why": "The --select option doesn't change locking; --force-lock disables the protection against concurrent deployments and is meant only for a stale lock left by a crash." },
+        { "text": "It deploys to the default target instead of `prod`; mark `prod` as the default target", "why": "The --select option only limits which resources are deployed; the -t flag still picks the prod target." }
+      ],
+      "in_practice": "A full prod deploy of a mid-sized bundle usually takes a minute or two; saving that time isn't worth a reporting job running against a pipeline definition from last week.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "Databricks recommends only using this option for deploying resources to development workspaces. It is not intended for use in production. Only the specified resource(s) and required upstream dependencies are deployed; downstream resources and dependencies are not updated. This can cause dependency errors and unexpected behavior."
+    },
+    {
+      "family": "cli-validate-warns-unknown-property",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer misspells a job setting as `max_concurent_runs` in a bundle's YAML. Which Databricks CLI command reports the unknown property without deploying anything?",
+      "options": [
+        { "text": "`databricks bundle validate`", "correct": true, "why": "The bundle validate command checks the configuration files and outputs warnings for resource properties that aren't in the corresponding object's schema, such as a misspelled key." },
+        { "text": "`databricks bundle schema`", "average": true, "why": "The name suggests a schema check, but bundle schema only displays the JSON Schema for bundle configuration; it doesn't inspect the project's files." },
+        { "text": "`databricks bundle summary`", "why": "The bundle summary command outputs the bundle's identity and resources with deep links; it isn't a configuration check." },
+        { "text": "`databricks bundle open`", "why": "The bundle open command navigates to a resource in the workspace; it doesn't inspect configuration properties." }
+      ],
+      "in_practice": "Running validate as the first CI step catches typos like this in seconds; otherwise the intended concurrency limit would never reach the deployed job, and duplicate runs could collide in prod.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "The bundle validate command outputs warnings if resource properties are defined in the bundle configuration files that are not found in the corresponding object's schema."
+    },
+    {
+      "family": "cli-output-json-for-scripts",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A release script must read the job IDs returned by `databricks jobs list` and pass them to `jq`. Which flag makes the Databricks CLI print the command's results as JSON?",
+      "options": [
+        { "text": "`-o json`", "correct": true, "why": "The global -o (--output) flag sets the command output type to text or json; json gives the script machine-readable results to pass to jq." },
+        { "text": "`--log-format json`", "average": true, "why": "The --log-format flag sets the format of the CLI's log messages, not of the command's results, so the job list would still print as text." },
+        { "text": "`--progress-format json`", "why": "The --progress-format flag controls how progress logs are displayed; it doesn't change the format of the results." },
+        { "text": "`--log-file jobs.json`", "why": "The --log-file flag only chooses where log messages are written; the results still print as text on standard output." }
+      ],
+      "in_practice": "Parsing JSON instead of scraping a text table keeps release scripts stable when a new CLI version adds or reorders columns.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/commands",
+      "evidence": "-o, --output type The command output type, text or json. The default value is text."
+    },
+    {
+      "family": "cli-legacy-version-lacks-bundles",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's CI runner image ships the legacy Databricks CLI, version 0.17. The step `databricks bundle deploy -t test` fails because the CLI doesn't recognize the `bundle` command. What should the engineer do?",
+      "options": [
+        { "text": "Install the current Databricks CLI, version 0.218.0 or above", "correct": true, "why": "Bundles are a feature of the current Databricks CLI and need version 0.218.0 or above; the legacy CLI has no bundle command." },
+        { "text": "Enable workspace files in the test workspace", "average": true, "why": "Workspace files are also required for bundles, but this failure happens on the runner before any workspace call: the installed CLI has no bundle command." },
+        { "text": "Run `databricks configure` to refresh the runner's profile", "why": "Configuring authentication doesn't add commands; the legacy CLI would still lack bundle support." },
+        { "text": "Replace the step with `databricks workspace import-dir`", "why": "Importing a directory only uploads files; the bundle's jobs and pipelines wouldn't be deployed." }
+      ],
+      "in_practice": "Pinning a current CLI version in the runner image, for example through the setup-cli action, removes a class of red builds that have nothing to do with the code under review.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/",
+      "evidence": "Declarative Automation Bundles are a feature of the Databricks CLI. You build bundles locally, then use the Databricks CLI to deploy your bundles. You must install the Databricks CLI, version v0.218.0 or above."
+    },
+    {
+      "family": "cli-log-file-needs-log-level",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A release engineer wants each CI run of `databricks bundle deploy` to write detailed debug logs to `deploy.log`, which the CI system keeps as a build artifact. Which flags should the deploy step add?",
+      "options": [
+        { "text": "`--log-file deploy.log --log-level debug`", "correct": true, "why": "The --log-file flag sets where log messages go and --log-level debug turns on detailed logging; both are needed to capture debug logs in the file." },
+        { "text": "`--log-file deploy.log`", "average": true, "why": "Pointing logs at a file isn't enough on its own: the default log level is disabled, so nothing would be written to deploy.log." },
+        { "text": "`-o json > deploy.log`", "why": "The -o json flag changes the command's output format, and redirecting it saves results, not debug log messages." },
+        { "text": "`--progress-format append`", "why": "The --progress-format flag changes how progress messages are displayed; it doesn't enable debug logging or write a log file." }
+      ],
+      "in_practice": "Debug logs show the API calls behind a failed deploy, which turns a flaky-build mystery into a specific error, such as a permission denied on one resource.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/troubleshooting",
+      "evidence": "--log-file: A string representing the file to write output logs to. --log-level: Valid log levels are error, warn, info, debug, trace, and disabled. The default level is disabled, which means nothing is logged. --debug is equivalent to --log-level debug."
+    },
+    {
+      "family": "cli-jobs-update-partial-settings",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer must raise `max_concurrent_runs` on an existing job that was built in the Jobs UI and isn't managed by a bundle, leaving all of its other settings untouched. Which Databricks CLI command fits?",
+      "options": [
+        { "text": "`databricks jobs update`, sending only the changed setting", "correct": true, "why": "The jobs update command adds, updates or removes specific settings of an existing job, so every setting not in the request stays as it is." },
+        { "text": "`databricks jobs reset`, sending only the changed setting", "average": true, "why": "The jobs reset command overwrites all of the job's settings with the request, so the settings left out of the body would be lost." },
+        { "text": "`databricks jobs create`, with the new setting", "why": "The jobs create command makes a new job; the existing job would keep its old limit and a duplicate job would appear." },
+        { "text": "`databricks jobs repair-run`, with the new setting", "why": "The jobs repair-run command reruns tasks of an existing run; it doesn't change the job's settings." }
+      ],
+      "in_practice": "A partial update is safe to script across dozens of jobs; a reset with an incomplete body can wipe schedules or notifications on every job it touches.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/reference/jobs-commands",
+      "evidence": "databricks jobs reset: Overwrite all settings for the given job. Use the databricks jobs update command to update job settings partially. databricks jobs update: Add, update, or remove specific settings of an existing job."
+    },
+    {
+      "family": "cli-bundle-init-config-file",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A platform team's automation creates new data engineering projects from the company's custom bundle template. It runs with no one at a terminal, so `databricks bundle init` can't stop to prompt for the project name and catalog. How should the automation supply those values?",
+      "options": [
+        { "text": "Pass a JSON file of input values with `--config-file`", "correct": true, "why": "The bundle init command accepts --config-file, a JSON file of key-value pairs for the template's input parameters, so initialization doesn't need to prompt." },
+        { "text": "Add `--auto-approve` to skip the prompts", "average": true, "why": "The --auto-approve option skips approval prompts on commands such as deploy and destroy; bundle init doesn't take it, and the template still needs its input values." },
+        { "text": "Point `--template-dir` at the input values", "why": "The --template-dir option names the directory inside a Git repository that holds the template; it doesn't supply input values." },
+        { "text": "Set the values with `--output-dir`", "why": "The --output-dir option only chooses where the initialized project is written." }
+      ],
+      "in_practice": "Non-interactive init lets a self-service portal spin up a compliant project in seconds, with the template's defaults and naming rules applied the same way every time.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "--config-file string JSON file containing key value pairs of input parameters required for template initialization."
+    },
+    {
+      "family": "cli-pipeline-full-refresh-one-table",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer deploys a logic fix to the `test` target and finds that the streaming table `orders_silver` in the bundle's pipeline (resource key `orders_pipeline`) still holds bad rows written before the fix. Only that table must be reset and recomputed; the pipeline's other tables are large and correct. Which command should the engineer run?",
+      "options": [
+        { "text": "`databricks bundle run -t test orders_pipeline --full-refresh orders_silver`", "correct": true, "why": "The --full-refresh flag takes a list of tables to reset and recompute, so only orders_silver is rebuilt while the other tables are left alone." },
+        { "text": "`databricks bundle run -t test orders_pipeline --full-refresh-all`", "average": true, "why": "The --full-refresh-all flag resets and recomputes the whole graph, reprocessing the large tables that were already correct." },
+        { "text": "`databricks bundle run -t test orders_pipeline --refresh orders_silver`", "why": "The --refresh flag updates the listed tables without resetting them, so the rows written before the fix stay." },
+        { "text": "`databricks bundle run -t test orders_pipeline --validate-only`", "why": "The --validate-only flag runs an update that checks graph correctness; it doesn't reset or recompute any table." }
+      ],
+      "in_practice": "Resetting one table instead of the whole graph can turn a multi-hour, multi-terabyte recompute into a short rebuild of the one table that was wrong.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "--full-refresh strings List of tables to reset and recompute. --full-refresh-all Perform a full graph reset and recompute. --refresh strings List of tables to update."
+    },
+    {
+      "family": "cli-export-dir-test-results",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team's Jenkins pipeline deploys a bundle and runs a test job that writes JUnit XML reports into the bundle's folder in the workspace. A later stage must copy those reports from the workspace to the Jenkins build directory so Jenkins can publish them. Which CLI command should that stage use?",
+      "options": [
+        { "text": "`databricks workspace export-dir` from the reports folder to a local directory", "correct": true, "why": "The workspace export-dir command copies a workspace folder down to the local file system, which brings the reports from the workspace to the Jenkins machine." },
+        { "text": "`databricks bundle sync` pointed at the bundle's workspace folder", "average": true, "why": "The bundle sync command is one-way, from a local directory to the workspace; it can't bring files written in the workspace back to the build machine." },
+        { "text": "`databricks bundle summary` with `-o json` for the report paths", "why": "The bundle summary command describes the bundle's identity and resources; it doesn't download any files." },
+        { "text": "`databricks repos update` on the folder that holds the reports", "why": "The repos update command moves a Git folder to a branch or tag; the reports aren't in Git and wouldn't reach Jenkins." }
+      ],
+      "in_practice": "Publishing results in the CI tool lets reviewers see a failing test on the pull request itself, without opening the workspace or digging through job run output.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/ci-cd/jenkins",
+      "evidence": "The seventh stage in this Jenkins Pipeline, titled Import Test Results, uses the Databricks CLI to send the test results from your workspace over to your local development machine. databricks workspace export-dir"
+    },
+    {
+      "family": "cli-airgapped-docker-image",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "The data platform team at a bank runs CI on build agents in a network with no internet access. Bundle commands fail there because the bundle tooling can't reach the external dependencies it needs. How should the team run `databricks bundle` commands on these agents?",
+      "options": [
+        { "text": "Pull the Databricks CLI Docker image in advance and run bundle commands in the container", "correct": true, "why": "Bundles depend on external libraries and tools whose URLs must be reachable; for air-gapped networks, Databricks provides a CLI Docker image so bundles are managed through Docker." },
+        { "text": "Install the newest Databricks CLI binary on each build agent", "average": true, "why": "A newer CLI binary still needs to reach the same external dependencies, so bundle commands would keep failing without internet access." },
+        { "text": "Add `--force` to the deploy to skip the dependency download", "why": "The --force option overrides validations that block a deployment, such as the Git branch check; it doesn't remove the need for bundle dependencies." },
+        { "text": "Deploy from the workspace bundle editor instead of from CI", "why": "Deploying from the UI gives up automation and can't target a different workspace, so it can't replace CI deployments to prod." }
+      ],
+      "in_practice": "Mirroring one pinned CLI image into the bank's internal registry gives every agent identical tooling, and upgrades become a reviewed image change rather than ad hoc installs.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/airgapped-environment",
+      "evidence": "The locations (URLs) of these dependencies need to be accessible or bundle initialization fails. Because of this, before using Declarative Automation Bundles in an air-gapped network environment that doesn't have access to the internet, you must download the Docker container image provided by the Databricks CLI and manage your Declarative Automation Bundles through Docker."
+    },
+    {
+      "family": "cli-deploy-fail-on-active-runs",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A release engineer's CI pipeline deploys a bundle to `prod` at 10:00. The bundle's nightly Lakeflow Job sometimes overruns past 10:00, and the team doesn't want a deployment to change the job while a run is in progress; it would rather the deploy stop and be retried later. Which option should the deploy step use?",
+      "options": [
+        { "text": "`--fail-on-active-runs`", "correct": true, "why": "With --fail-on-active-runs, bundle deploy fails if any job or pipeline in the deployment is running, so the step stops and can be retried after the run ends." },
+        { "text": "No option; the deployment lock already blocks deploys while jobs run", "average": true, "why": "The deployment lock keeps concurrent deployments from interfering with each other; it doesn't check whether the bundle's jobs are running." },
+        { "text": "`--auto-approve`", "why": "The --auto-approve option skips interactive approvals during deployment; it doesn't look at active runs." },
+        { "text": "`--select nightly_job`", "why": "The --select option limits which resources are deployed; the running job would still be updated." }
+      ],
+      "in_practice": "Failing fast keeps releases predictable: the team retries after the nightly run finishes instead of investigating whether a mid-run deploy affected that night's output.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "--fail-on-active-runs Fail if there are running jobs or pipelines in the deployment."
+    },
+    {
+      "family": "cli-auth-describe-credential-source",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team's CI job runs `databricks bundle deploy -t prod`, and the deployed jobs show an unexpected owner. The release engineer suspects the runner picks up credentials from a leftover environment variable instead of the intended profile. Which command shows the identity the CLI authenticates as and where each setting came from?",
+      "options": [
+        { "text": "`databricks auth describe`", "correct": true, "why": "The auth describe command shows the configuration the CLI uses to authenticate, including the credentials and the source of each setting, such as an environment variable or the config file." },
+        { "text": "`databricks current-user me`", "average": true, "why": "The current-user me command returns the authenticated user or service principal, but not which variable, file or flag supplied the credentials." },
+        { "text": "`databricks auth profiles`", "why": "The auth profiles command lists the profiles in .databrickscfg and whether each is valid; it doesn't show which credentials the current command resolves to." },
+        { "text": "`databricks auth token`", "why": "The auth token command returns a cached OAuth token for U2M logins only; it doesn't explain where the CI credentials came from." }
+      ],
+      "in_practice": "One describe call in the CI log turns a vague 'wrong owner' report into a precise fix, such as removing a stale DATABRICKS_TOKEN from the runner image.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/reference/auth-commands",
+      "evidence": "Describes the configuration that the Databricks CLI is using to authenticate, including the credentials and the source of those credentials."
+    },
+    {
+      "family": "cli-wif-subject-exact-match",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A platform team sets up workload identity federation so GitHub Actions can deploy a bundle as a service principal. The repository was created in 2023, and the federation policy's subject is `repo:acme/sales-etl:environment:Prod`. The deploy job sets `DATABRICKS_AUTH_TYPE: github-oidc`, `DATABRICKS_HOST`, `DATABRICKS_CLIENT_ID` and `permissions: id-token: write`, and it runs in the GitHub environment `production`. Authentication fails. What is the most likely cause?",
+      "options": [
+        { "text": "The token's subject names environment `production`, which doesn't exactly match the policy", "correct": true, "why": "Databricks matches the federation policy's subject against the token's subject exactly, so a token for the production environment doesn't match a policy written for Prod." },
+        { "text": "The job must also set `DATABRICKS_CLIENT_SECRET` for the service principal", "average": true, "why": "Workload identity federation removes the need for a Databricks secret; the CLI exchanges the GitHub token for a Databricks OAuth token instead." },
+        { "text": "The job must store a service principal access token in a GitHub secret", "why": "A stored token is the approach federation replaces; the failure comes from the policy match, not from a missing secret." },
+        { "text": "The `id-token: write` permission conflicts with federation and must be removed", "why": "The id-token: write permission is required, because the workflow needs it to request the GitHub token used for federation." }
+      ],
+      "in_practice": "Binding the policy to a GitHub environment such as Prod, protected by required reviewers, means only approved deploy jobs can obtain production credentials.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/ci-cd/github",
+      "evidence": "The federation policy subject (the identity of the federated token) must exactly match the expected token subject. For this example, the entity type and name is Environment and Prod. The constructed subject should be in the form repo:my-github-org-or-user/my-repo:environment:Prod."
+    },
+    {
+      "family": "cli-bundle-folder-auth-context",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 3,
+      "type": "multiple",
+      "stem": "A data engineer's terminal is in a bundle folder whose `databricks.yml` sets the dev workspace as the host of its default target. From there, the engineer runs `databricks secrets list-scopes` to check the analytics workspace, which has its own `analytics` profile in `.databrickscfg`, but the command returns the dev workspace's scopes. Which two changes make the command use the `analytics` profile? (Choose two.)",
+      "options": [
+        { "text": "Add `-p analytics` and leave out any `--target`", "correct": true, "why": "Inside a bundle folder the CLI uses the bundle's settings for authentication; giving a profile with --profile and no --target makes it use that profile instead." },
+        { "text": "Run it with `-p analytics` from a directory outside the bundle folder", "correct": true, "why": "Outside the bundle folder there are no bundle settings to pick up, so the command authenticates with the profile it is given." },
+        { "text": "Run `databricks auth switch --profile analytics`, then rerun in the same folder", "average": true, "why": "The auth switch command changes the default profile in .databrickscfg, but inside the bundle folder the bundle's settings are checked before configuration profiles." },
+        { "text": "Add `-p analytics -t dev` to the command", "why": "Naming a target ties the command to that bundle target's settings; the documented way to use another profile is to give --profile without --target." },
+        { "text": "Add `--debug` to the command", "why": "The --debug flag only turns on debug logging; it doesn't change which credentials the command uses." }
+      ],
+      "in_practice": "Engineers who hop between workspaces often keep a separate shell outside project folders for admin commands, which avoids running them against a bundle's dev workspace by accident.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/bundle-commands",
+      "evidence": "Bundle commands use the settings in databricks.yml for authentication when run from inside the bundle folder. To use different authentication from inside the bundle folder, specify a configuration profile using the --profile flag and do not specify a --target. Alternatively, run commands that do not need the same authentication as the bundle from outside the bundle folder."
+    },
+    {
+      "family": "cli-run-now-idempotency-token",
+      "objective": "cicd.cli",
+      "guide": "5.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineering team's orchestration script calls `databricks jobs run-now 5521 --no-wait` to start a costly backfill and retries the call automatically when the request times out. Last week a timeout happened after Databricks had already accepted the request, and the retry started a second, duplicate backfill run. How should the script call the command so a retry can't start a duplicate run?",
+      "options": [
+        { "text": "Pass the same `--idempotency-token` value on the first call and on each retry", "correct": true, "why": "The idempotency token guarantees the idempotency of run requests, so a retry that carries the same token doesn't trigger a second run." },
+        { "text": "Remove `--no-wait` so the CLI waits for the run to finish", "average": true, "why": "Waiting changes how long the call blocks, not whether a retried request starts another run; a request that times out can still be retried into a duplicate." },
+        { "text": "Add `--timeout 60m` so the request has longer to complete", "why": "The --timeout option sets the maximum time to wait for the run to reach TERMINATED or SKIPPED; it doesn't stop a retried request from starting a new run." },
+        { "text": "Switch the backfill to `databricks jobs submit` one-time runs", "why": "A submitted run isn't saved as a job and doesn't retry on failure, and without an idempotency token a retried submit can still start a duplicate." }
+      ],
+      "in_practice": "On a backfill that burns hundreds of DBUs, an idempotency token is a one-line change that makes automatic retries safe instead of a source of double spend and duplicate writes.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/cli/reference/jobs-commands",
+      "evidence": "databricks jobs run-now: Run a job and return the run_id of the triggered run. --idempotency-token string An optional token to guarantee the idempotency of job run requests."
+    },
+    {
+      "family": "bundles-pydabs-python-resources",
+      "objective": "cicd.bundles",
+      "guide": "5.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineering team is starting a new bundle project. It wants its Lakeflow Jobs defined in Python code rather than YAML, so that job definitions can be built from metadata, such as a list of source tables, when the bundle deploys. Which Databricks-provided template should the team pass to `databricks bundle init`?",
+      "options": [
+        { "text": "`pydabs`", "correct": true, "why": "The pydabs template sets up Python support for bundles: resources are defined in Python code, can coexist with YAML resources, and can be created dynamically from metadata during bundle deployment." },
+        { "text": "`default-python`", "average": true, "why": "The default-python template uses Python for the project's code, but its bundle configuration is YAML; pydabs is the modified version of it that uses Python for configuration instead." },
+        { "text": "`default-minimal`", "why": "The default-minimal template creates an empty bundle with only the required files and no sample code, so it doesn't set up resources defined in Python." },
+        { "text": "`mlops-stacks`", "why": "The mlops-stacks template is an advanced full-stack template for starting MLOps Stacks projects, not the starting point for defining bundle resources in Python." }
+      ],
+      "in_practice": "Generating resources from metadata lets a team define, say, 40 near-identical ingestion jobs from one table list at deploy time, instead of copying 40 YAML blocks whose small differences are easy to miss in review.",
+      "source": "https://docs.databricks.com/aws/en/dev-tools/bundles/python",
+      "evidence": "Python support for Declarative Automation Bundles lets you define resources in Python code and dynamically create resources during bundle deployment using metadata. To create a new Python support for Declarative Automation Bundles project, initialize a bundle using the pydabs template: databricks bundle init pydabs"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+erDiagram
+    user_profiles ||--o{ daily_study_days : earns
+    user_profiles ||--o| streak_state : caches
+    practice_sessions ||--o| daily_study_days : qualifies
+    user_profiles ||--o{ reward_ledger : earns
+    user_profiles ||--o{ streak_freeze_ledger : optional
+    user_profiles ||--o{ entitlements : receives
+    user_profiles ||--o{ store_events : purchases
+    user_profiles ||--o| notification_preferences : configures
+    user_profiles ||--o{ notification_jobs : queues
+    user_profiles ||--o{ circle_members : joins
+    study_circles ||--o{ circle_members : contains
+    study_circles ||--o{ circle_invites : invites
+    study_circles ||--o{ circle_weeks : snapshots
+    user_profiles ||--o{ analytics_events : emits
+    user_profiles ||--o{ content_audit : reviews
+

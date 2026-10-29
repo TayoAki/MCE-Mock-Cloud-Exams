@@ -1,0 +1,311 @@
+{
+  "items": [
+    {
+      "family": "filters-masks-python-mask-sql-wrapper",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer has written email-masking logic as a Python UDF, `crm.util.email_mask_py`, registered in Unity Catalog, and wants it to mask the `email` column of `crm.core.contacts`. What should the engineer apply with SET MASK?",
+      "options": [
+        { "text": "A SQL UDF that calls email_mask_py, applied as the mask in its place", "correct": true, "why": "Row filters and column masks are applied as SQL UDFs. To use Python or Scala logic, you create a SQL UDF that calls the Python UDF and apply that SQL wrapper as the column mask." },
+        { "text": "The email_mask_py function itself, since it is a Unity Catalog UDF", "average": true, "why": "Applying the Python UDF directly is the natural guess, but it fails with a [ROUTINE_NOT_FOUND] error; the Python function has to be wrapped in a SQL UDF, and the wrapper is what you set as the mask." },
+        { "text": "The email_mask_py function, after redefining it as DETERMINISTIC", "why": "Marking a Python UDF DETERMINISTIC improves performance and lets query filters run before the mask, but it doesn't make the Python UDF usable as a mask; it still needs a SQL wrapper." },
+        { "text": "A nightly job that rewrites the email column with email_mask_py", "why": "Rewriting the column in a job destroys the original values for everyone, including people allowed to see them, and it isn't a query-time mask at all." }
+      ],
+      "in_practice": "A thin SQL wrapper lets a team keep an existing Python regex routine for masking; marking that Python UDF DETERMINISTIC also lets query filters run before the mask instead of masking every scanned row first.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "evidence": "You must apply the SQL wrapper function (email_mask_sql) as the column mask, not the Python UDF directly. If you try to use the Python UDF (email_mask_python) directly as a column mask, you will receive a [ROUTINE_NOT_FOUND] error."
+    },
+    {
+      "family": "filters-masks-zero-column-filter-on",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer writes a row filter UDF, `ops.acl.allowed_user()`, that takes no parameters and returns TRUE only when SESSION_USER() appears in an allow-list table. Which statement attaches it as the row filter of `ops.core.incidents`?",
+      "options": [
+        { "text": "ALTER TABLE ops.core.incidents SET ROW FILTER ops.acl.allowed_user ON ()", "correct": true, "why": "A row filter can take zero input columns. The ON clause is still written, with an empty list, and the UDF must accept zero parameters and return a BOOLEAN that doesn't depend on the row's values." },
+        { "text": "ALTER TABLE ops.core.incidents SET ROW FILTER ops.acl.allowed_user ON (*)", "average": true, "why": "Passing every column with ON (*) looks right for a filter on whole rows, but the ON list binds columns to the function's parameters one for one, and this function declares none, so the list must be empty." },
+        { "text": "ALTER TABLE ops.core.incidents SET ROW FILTER ops.acl.allowed_user USING COLUMNS ()", "why": "USING COLUMNS belongs to the column MASK clause, where it supplies extra arguments to a masking function; a row filter binds its arguments with ON (…)." },
+        { "text": "ALTER TABLE ops.core.incidents ALTER COLUMN id SET MASK ops.acl.allowed_user", "why": "A column mask changes the values shown in one column and never removes rows; a masking function must also take the masked column as its first parameter." }
+      ],
+      "in_practice": "A zero-argument allow-list filter suits a table that only a short on-call roster may read; changing who sees it means editing rows in the allow-list table, with no ALTER TABLE or redeploy.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "evidence": "The example below applies the row filter during table creation. You can also add the filter later using an ALTER TABLE statement. When applying the filter to unspecified columns, use the ON () syntax. For a specific column, use ON (column);."
+    },
+    {
+      "family": "filters-masks-information-schema-audit",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A security reviewer asks a data engineer for a list of every table in the `finance` catalog that has a row filter or column mask set directly with ALTER TABLE. Where should the engineer look?",
+      "options": [
+        { "text": "The INFORMATION_SCHEMA.ROW_FILTERS and COLUMN_MASKS views of the catalog", "correct": true, "why": "Table-level row filters and column masks are audited through INFORMATION_SCHEMA.ROW_FILTERS and INFORMATION_SCHEMA.COLUMN_MASKS, so a query against the catalog's information schema lists every protected table and column." },
+        { "text": "The output of SHOW EFFECTIVE POLICIES run against the finance catalog", "average": true, "why": "SHOW EFFECTIVE POLICIES is the tool for ABAC policies created with CREATE POLICY, including ones inherited from parent scopes; filters and masks set directly with ALTER TABLE are inspected through the information schema instead." },
+        { "text": "The INFORMATION_SCHEMA.TABLE_PRIVILEGES view of the catalog", "why": "TABLE_PRIVILEGES shows grants such as SELECT and MODIFY; a row filter or column mask isn't a privilege, so it doesn't appear there." },
+        { "text": "The INFORMATION_SCHEMA.TABLE_TAGS view of the catalog", "why": "Tags classify data and drive ABAC policies, but a table-level filter or mask can sit on an untagged table, so tags say nothing reliable about where they are set." }
+      ],
+      "in_practice": "A scheduled query over these two views gives compliance a current inventory of protected tables and columns, so a quarterly access review takes minutes instead of opening each table definition by hand.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/abac-vs-rls-cm",
+      "evidence": "Auditability: ABAC policies use DESCRIBE POLICY and SHOW POLICIES to inspect policy definitions. Table-level row filters and column masks: INFORMATION_SCHEMA.ROW_FILTERS and INFORMATION_SCHEMA.COLUMN_MASKS."
+    },
+    {
+      "family": "filters-masks-row-filter-object-types",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "multiple",
+      "stem": "A data engineer wants to attach a row filter with the ROW FILTER clause, either when an object is created or later with an ALTER statement. Besides regular Unity Catalog tables, which two object types accept this clause? (Choose two.)",
+      "options": [
+        { "text": "Materialized views", "correct": true, "why": "The ROW FILTER clause can be added with CREATE MATERIALIZED VIEW and ALTER MATERIALIZED VIEW, so a materialized view can carry its own row filter." },
+        { "text": "Streaming tables", "correct": true, "why": "CREATE STREAMING TABLE and ALTER STREAMING TABLE also accept the ROW FILTER clause, so streaming tables can be filtered the same way as regular tables." },
+        { "text": "Standard views", "average": true, "why": "Views feel like the natural home for row-level security, but table-level row filters and column masks can't be applied to a view; a view restricts rows through the logic in its own definition, as a dynamic view does." },
+        { "text": "Temporary views", "why": "Temporary views exist only in the session that created them and aren't among the objects that take a ROW FILTER clause; the filter belongs on the governed table they read." },
+        { "text": "Unity Catalog volumes", "why": "Volumes hold files rather than rows, so there is nothing for a row filter to evaluate; access to a volume is controlled with privileges such as READ VOLUME." }
+      ],
+      "in_practice": "Putting the filter on a pipeline's published materialized view or streaming table gives analysts row-level security on the exact object they query, without maintaining a separate secured view on top.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-row-filter",
+      "evidence": "You can add row filters when you: Create a table using CREATE TABLE. Alter a table using ALTER TABLE. Create a materialized view using CREATE MATERIALIZED VIEW. Alter a materialized view using ALTER MATERIALIZED VIEW. Create a streaming table using CREATE STREAMING TABLE. Alter a streaming table using ALTER STREAMING TABLE."
+    },
+    {
+      "family": "filters-masks-replace-table-retains-policies",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer rebuilds `hr.core.salaries` every night with CREATE OR REPLACE TABLE … AS SELECT, always producing the same column names. Last month the table owner set a row filter on the table and a column mask on its `base_pay` column, and the nightly statement mentions neither. What happens to them after tonight's rebuild?",
+      "options": [
+        { "text": "Both stay in place, because replacing a table retains its filter and masks", "correct": true, "why": "Replacing a table keeps its row filter regardless of schema changes, and keeps column masks on columns whose names still exist in the new table, even when the statement doesn't redefine them. This prevents accidental loss of access policies." },
+        { "text": "Both are dropped, so the job must reapply them after every rebuild", "average": true, "why": "Treating a replace as a brand-new table is the common assumption, but Databricks deliberately keeps the existing row filter and same-named column masks so a rebuild can't silently expose data." },
+        { "text": "The row filter stays, but the mask is dropped along with the old column", "why": "Masks are retained when the new table has a column with the same name as the masked one; base_pay keeps its name, so its mask stays too." },
+        { "text": "The rebuild fails until the filter and the mask are dropped first", "why": "Nothing has to be removed first; the replace succeeds and carries the policies over. Only a retained policy that references a removed or changed column can make later queries fail." }
+      ],
+      "in_practice": "Because policies survive replaces, a nightly rebuild never opens a window where salaries are briefly unmasked; what to watch is renaming or dropping a column a policy references, which can break queries until the policy is fixed with ALTER TABLE.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "evidence": "Row filters and column masks are retained when replacing a table. If you run REPLACE TABLE, any existing row filter is retained regardless of schema changes. Column masks are also retained if the new table includes columns with the same names as those that had masks in the original table."
+    },
+    {
+      "family": "filters-masks-assign-needs-execute",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer who is not the owner of `sales.core.orders` holds MANAGE and SELECT on it, plus USE CATALOG on `sales` and USE SCHEMA on `sales.core` and `sales.sec`. Running ALTER TABLE sales.core.orders SET ROW FILTER sales.sec.region_filter ON (region) fails with a permission error. What is the engineer missing?",
+      "options": [
+        { "text": "EXECUTE on the function sales.sec.region_filter", "correct": true, "why": "Assigning a filter needs EXECUTE on the function plus USE SCHEMA and USE CATALOG, and changing filters on an existing table needs ownership or both MANAGE and SELECT. The engineer has everything except EXECUTE." },
+        { "text": "Ownership of the sales.core.orders table", "average": true, "why": "Many assume only the owner can add a filter, but a user with both MANAGE and SELECT on the table can add or remove filters and masks; ownership is just one of the two ways to qualify." },
+        { "text": "MODIFY on the sales.core.orders table", "why": "MODIFY is needed only when the same statement also changes the table's schema, such as adding a new column with a mask; setting a filter on existing columns doesn't." },
+        { "text": "CREATE FUNCTION on the sales.sec schema", "why": "CREATE FUNCTION is needed to create a UDF, not to use one; the filter function already exists, so the engineer needs permission to execute it." }
+      ],
+      "in_practice": "Keeping approved filter and mask functions in one governance schema, with EXECUTE granted only to trusted stewards, controls which logic can be attached to tables without making every steward a table owner.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-row-filter",
+      "evidence": "To assign a function that adds a row filter to a table, you must have the EXECUTE privilege on the function, USE SCHEMA on the schema, and USE CATALOG on the parent catalog. If you are adding or removing a row filter on an existing table, you must be the table owner, or have both the MANAGE and SELECT privileges on the table."
+    },
+    {
+      "family": "filters-masks-dedicated-runtime-read",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly job runs on a dedicated access mode cluster with Databricks Runtime 15.3. Since a column mask was added to `crm.core.contacts`, the job can't read the table, while analysts on a SQL warehouse query it normally. The workspace is enabled for serverless compute. Which change lets the job read the table?",
+      "options": [
+        { "text": "Upgrade the cluster to Databricks Runtime 15.4 LTS or above", "correct": true, "why": "Dedicated access mode can read tables with row filters or column masks only on Databricks Runtime 15.4 LTS or above, with the workspace enabled for serverless compute because the data filtering runs there. Runtime 15.3 or below can't read them." },
+        { "text": "Move the cluster to Databricks Runtime 12.2 LTS", "average": true, "why": "12.2 LTS is the floor for standard access mode, which makes it tempting, but on dedicated access mode masked tables need 15.4 LTS or above; moving down would not help." },
+        { "text": "Enable Photon acceleration on the cluster", "why": "Photon speeds up query execution but doesn't change whether dedicated compute can read masked tables; the limit is the runtime version." },
+        { "text": "Set spark.sql.ansi.enabled to true on the cluster", "why": "ANSI mode decides whether failed casts inside filter and mask UDFs raise errors or become NULL; it doesn't make masked tables readable from an unsupported runtime." }
+      ],
+      "in_practice": "On dedicated compute the filtering runs on serverless, so reading masked tables can add serverless charges; teams with many such jobs often weigh that cost against moving the jobs to standard access mode.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "evidence": "Dedicated access mode (formerly single user access mode) on Databricks Runtime 15.4 LTS or above. You cannot read row filters or column masks using dedicated compute on Databricks Runtime 15.3 or below."
+    },
+    {
+      "family": "filters-masks-drop-function-orphaned",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer decides the row filter on `ops.core.tickets` is no longer needed and runs DROP FUNCTION ops.sec.queue_filter. Afterwards every query on `ops.core.tickets` fails, for analysts and for the table owner alike. The team wants the table readable again with no filter. What should the engineer run?",
+      "options": [
+        { "text": "ALTER TABLE ops.core.tickets DROP ROW FILTER", "correct": true, "why": "The table still references the dropped function, which leaves it inaccessible. ALTER TABLE … DROP ROW FILTER removes the orphaned reference; the safe order is to drop the filter from the table first and only then drop the function." },
+        { "text": "REFRESH TABLE ops.core.tickets to clear the stale filter", "average": true, "why": "Refreshing cached metadata seems plausible for a stale reference, but the filter is part of the table definition, not a cache entry; only ALTER TABLE … DROP ROW FILTER removes it." },
+        { "text": "GRANT SELECT on ops.core.tickets to the analyst groups again", "why": "Dropping a function doesn't revoke table grants; the queries fail because the table points at a filter function that no longer exists." },
+        { "text": "Re-create ops.core.tickets from its data files without a filter", "why": "Rebuilding the table is unnecessary and risky; the orphaned reference can be removed in place with a single ALTER TABLE statement." }
+      ],
+      "in_practice": "Put DROP ROW FILTER before DROP FUNCTION in every cleanup script and bundle teardown; getting the order wrong takes a production table offline for all readers until someone finds the orphaned reference.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "evidence": "You must perform the ALTER TABLE ... DROP ROW FILTER command before you drop the function. If you don't, the table will be in an inaccessible state. If the table becomes inaccessible in this way, alter the table and drop the orphaned row filter reference using ALTER TABLE <table_name> DROP ROW FILTER;"
+    },
+    {
+      "family": "filters-masks-mapping-table-definer-rights",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer sets a row filter on `sales.core.deals` whose UDF returns EXISTS (SELECT 1 FROM sales.sec.rep_regions m WHERE m.rep = SESSION_USER() AND m.region = deal_region). The mapping table must stay hidden, so analysts have SELECT on `deals` only. A security reviewer asks whether the filter will work for those analysts. What should the engineer answer?",
+      "options": [
+        { "text": "Yes: the UDF reads the mapping table with its owner's rights, while SESSION_USER() returns the analyst", "correct": true, "why": "Filter functions run with definer's rights, except functions that check user context, such as SESSION_USER and IS_ACCOUNT_GROUP_MEMBER, which run as the invoker. The lookup uses the function owner's access while the identity check still sees the querying analyst." },
+        { "text": "No: each analyst also needs SELECT on the mapping table, because the UDF runs with their privileges", "average": true, "why": "Assuming the whole UDF runs as the querying user is the common mistake; only the user-context functions run as the invoker, so analysts don't need, and shouldn't get, SELECT on the mapping table." },
+        { "text": "No: a row filter UDF can't query another table, so the mapping must become a CASE expression", "why": "Mapping tables are a documented row filter pattern. Simple CASE expressions perform better, but a filter UDF can look up a mapping table with EXISTS." },
+        { "text": "Yes, but only after the mapping table gets its own row filter matching the deals table", "why": "Filters and masks can't reference tables that also have active row filters or column masks, so filtering the mapping table would break this design rather than enable it." }
+      ],
+      "in_practice": "A rep-to-region mapping table lets sales ops change territories by updating rows instead of groups or functions; keep it small, because every query on deals runs the lookup and a small table can be broadcast.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "evidence": "All filters run with definer's rights except for functions that check user context (for example, the SESSION_USER and IS_ACCOUNT_GROUP_MEMBER functions) which run as the invoker. In this example, the function checks whether the current user is in the valid_users table."
+    },
+    {
+      "family": "filters-masks-secureview-pushdown",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer added a row filter to `sales.core.orders`, a table partitioned by the DATE column `order_date`. An analyst's dashboard query that uses WHERE date_format(order_date, 'yyyy-MM-dd') = '2026-07-29' now scans the whole table, even for users whose filter UDF resolves to TRUE. Which change restores partition pruning for that query?",
+      "options": [
+        { "text": "Rewrite the predicate as WHERE order_date = DATE'2026-07-29'", "correct": true, "why": "A row filter puts a SecureView barrier over the scan, and only side-effect-free predicates such as simple equality and range comparisons are pushed through it. A predicate that calls date_format stays above the barrier, so the engine scans first and filters afterwards." },
+        { "text": "Simplify the filter UDF so it returns TRUE at once for analysts", "average": true, "why": "Simplifying the UDF sounds right, but the barrier exists whenever a filter is on the table, even when the UDF resolves to a constant TRUE; the query's function-based predicate is what can't be pushed down." },
+        { "text": "Run OPTIMIZE on the table so the scan can skip more files", "why": "Compacting files doesn't move the date_format predicate below the SecureView barrier, so the query still reads every partition before filtering." },
+        { "text": "Rewrite the filter UDF in Python and declare it DETERMINISTIC", "why": "Python UDFs are slower than SQL UDFs because the optimizer can't inline them, and the date_format predicate would still be blocked by the barrier." }
+      ],
+      "in_practice": "On a large partitioned table, a pruned scan versus a full scan can mean seconds versus minutes per dashboard tile; publishing simple-predicate query patterns for protected tables is often the cheapest fix.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/performance",
+      "evidence": "Both ABAC and table-level row filters and column masks use a SecureView barrier to prevent predicates with side effects from being pushed across the policy boundary. This applies even when the policy UDF resolves to a constant true. Pushed down (fast): Simple equality comparisons and basic range comparisons. Blocked (slower): Predicates that call functions."
+    },
+    {
+      "family": "abac-on-column-binds-masked-column",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A governance admin writes a column mask policy whose MATCH COLUMNS clause defines two aliases: `card` for columns tagged `pci : pan` and `ctry` for columns tagged `geo : country`. The UDF must mask the card number and use the country to decide how. Which clause makes `card` the column that gets masked?",
+      "options": [
+        { "text": "ON COLUMN card, which binds card as the UDF's first argument", "correct": true, "why": "In a column mask policy, ON COLUMN names the matched alias to mask, and its value is bound automatically as the UDF's first argument; USING COLUMNS then supplies the extra arguments, here USING COLUMNS (ctry)." },
+        { "text": "USING COLUMNS (card, ctry), listing the masked column first", "average": true, "why": "USING COLUMNS looks like the place for every UDF argument, but in a column mask policy it carries only the arguments beyond the masked column; the masked column itself is named with ON COLUMN." },
+        { "text": "WHEN has_tag('pci'), which selects the tagged column to mask", "why": "WHEN is a table condition: it decides which tables in scope the policy applies to, based on table tags, and doesn't pick a column to mask." },
+        { "text": "MATCH COLUMNS with the card condition listed before ctry", "why": "MATCH COLUMNS decides which columns match and gives them aliases; the order of the conditions doesn't choose the masked column, ON COLUMN does." }
+      ],
+      "in_practice": "Separating the column to mask from the columns that inform the mask lets one policy cover every table carrying both tags, so a new card table is protected as soon as a steward tags it.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/core-concepts",
+      "evidence": "The policy references a UDF that takes the column value as input and returns the original value or a masked version. The masked column value is bound automatically as the first argument from the ON COLUMN clause, and additional arguments can be passed through USING COLUMNS."
+    },
+    {
+      "family": "abac-when-clause-inherited-tags",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A governance admin attaches a row filter policy to the `finance` catalog with WHEN has_tag_value('sensitivity', 'high'). A data steward then sets `sensitivity : high` on the schema `finance.payroll` only, and on none of its tables. Which tables does the policy's table condition now match?",
+      "options": [
+        { "text": "Every table in finance.payroll, which inherit the schema's tag", "correct": true, "why": "In a WHEN condition, has_tag and has_tag_value check tags set directly on the table or inherited from its parent catalog or schema, so every table in the tagged schema, existing or new, matches." },
+        { "text": "No tables, until the tag is set on each table directly", "average": true, "why": "Requiring a direct tag is true for MATCH COLUMNS, which checks only tags set on the column itself; table conditions in WHEN also see tags inherited from the schema and catalog." },
+        { "text": "Every table in the catalog, since a schema tag marks its catalog", "why": "Tag inheritance flows down, from catalog to schema to table; a tag on one schema doesn't apply to its parent catalog or to sibling schemas." },
+        { "text": "Only tables created in finance.payroll after the tag was set", "why": "Inherited tags are evaluated at query time for every table under the schema, whether it was created before or after the tag was set." }
+      ],
+      "in_practice": "Tagging one schema instead of hundreds of tables saves stewards time and closes the gap where a new payroll table would sit unprotected until someone remembered to tag it.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/core-concepts",
+      "evidence": "has_tag('tag_key'): Returns true if the resource has the specified tag. In table conditions (WHEN), checks tags set directly on the table or inherited from a parent catalog or schema. In column conditions (MATCH COLUMNS), checks tags set directly on the column only — does not match table tags."
+    },
+    {
+      "family": "abac-policy-udf-in-unity-catalog",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A governance admin wants a column mask policy on the `claims` catalog to reuse masking logic that a data engineer prototyped in a notebook. In what form must that logic exist for the policy to reference it?",
+      "options": [
+        { "text": "A UDF registered in Unity Catalog that the admin has EXECUTE on", "correct": true, "why": "Row filter and column mask policies call a user-defined function in Unity Catalog, named by its fully qualified name, and creating the policy requires EXECUTE on it. A SQL function can also be defined inline when the policy is created." },
+        { "text": "A Python function registered for the session with spark.udf.register", "average": true, "why": "A session-registered function works inside that notebook, but it isn't a Unity Catalog object; a policy is evaluated for every user and compute, so it must reference a governed UDF by name." },
+        { "text": "A notebook path passed to the policy through USING COLUMNS", "why": "USING COLUMNS passes arguments to the UDF, such as matched column aliases or constants; it can't point the policy at notebook code." },
+        { "text": "A dynamic view in the claims catalog that applies the masking", "why": "A dynamic view is a separate way to filter and mask data; a policy's masking action is a UDF, so a view can't be plugged into a policy." }
+      ],
+      "in_practice": "Keeping policy UDFs in one governance schema, with EXECUTE limited to policy authors, means a single reviewed function backs many policies and a fix to it reaches every governed table at once.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policies",
+      "evidence": "For the filtering or masking logic, a user-defined function (UDF) in Unity Catalog that you have EXECUTE on, or a SQL function that you define inline when creating the policy. function_name: The fully qualified name of the UDF that implements the filtering or masking logic."
+    },
+    {
+      "family": "abac-governed-tag-assign-privileges",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data steward on the governance team must tag the `ssn` column of `hr.core.people` with the governed tag `pii : ssn` so that an existing column mask policy covers it. The steward doesn't own the table and already has USE CATALOG and USE SCHEMA, but the tag assignment is rejected. Which privileges does the steward need?",
+      "options": [
+        { "text": "ASSIGN on the pii governed tag and APPLY TAG on the table", "correct": true, "why": "Adding a tag to an object needs ownership or APPLY TAG on it, plus USE SCHEMA and USE CATALOG; a governed tag also requires the ASSIGN permission on that tag. The steward needs both missing pieces." },
+        { "text": "MANAGE on the table, which covers tagging its columns", "average": true, "why": "MANAGE is the go-to privilege for administering a table, which makes it tempting, but governed tags carry their own permissions; without ASSIGN on the pii tag, the steward can't apply it." },
+        { "text": "CREATE on governed tags at the account level", "why": "Account-level CREATE lets someone define new governed tag keys and allowed values; the pii tag already exists, so the steward needs to assign it, not create it." },
+        { "text": "EXECUTE on the UDF that the column mask policy calls", "why": "EXECUTE on the UDF is needed by whoever creates the policy; tagging a column neither runs nor references the masking function." }
+      ],
+      "in_practice": "Tagging decides which policies apply, so it is a security boundary; granting ASSIGN on sensitive tags to a small steward group, and auditing tag changes, keeps a column from quietly slipping out of a mask's reach.",
+      "source": "https://docs.databricks.com/aws/en/database-objects/tags",
+      "evidence": "To add tags to Unity Catalog securable objects, you must own the object or have all of the following privileges: APPLY TAG on the object, USE SCHEMA on the object's parent schema, USE CATALOG on the object's parent catalog. To add a governed tag to Unity Catalog securable objects, you must also have the ASSIGN permission on the governed tag."
+    },
+    {
+      "family": "abac-compute-runtime-requirement",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's nightly job runs on a standard access mode cluster with Databricks Runtime 15.4 LTS. After the governance team attached a column mask policy to the `claims` catalog, the job's reads of `claims.core.members` started failing, while analysts on serverless compute query the table normally. Which change fixes the job?",
+      "options": [
+        { "text": "Run the job on serverless compute or Databricks Runtime 16.4 or above", "correct": true, "why": "Row filter and column mask policies need serverless compute, or standard or dedicated compute on Databricks Runtime 16.4 or above. Earlier runtimes can't access ABAC-secured tables, so their queries fail closed." },
+        { "text": "Switch the cluster to dedicated access mode on the same 15.4 LTS runtime", "average": true, "why": "Dedicated mode on 15.4 LTS can read tables with table-level filters and masks, which makes it tempting, but ABAC-secured tables need Databricks Runtime 16.4 or above on standard or dedicated compute." },
+        { "text": "Re-attach the policy to the members table instead of the catalog", "why": "Moving the policy to the table changes its scope, not its runtime requirement; an ABAC-secured table still can't be read from Databricks Runtime 15.4 LTS." },
+        { "text": "Grant the job's service principal MANAGE on the claims catalog", "why": "MANAGE lets a principal administer the catalog but doesn't exempt it from policies; an older runtime can read the table only if its principal is explicitly exempted in the policy." }
+      ],
+      "in_practice": "If a job truly can't leave an older runtime yet, the documented stopgap is to scope the policy to a specific group and exempt the job's principal, then remove the exemption once the job is upgraded.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/requirements",
+      "evidence": "To use ABAC policies, you must use one of the following compute configurations: Serverless compute. Standard compute on Databricks Runtime 16.4 or above. Dedicated compute on Databricks Runtime 16.4 or above with fine-grained access control filtering enabled. Standard and dedicated compute on Databricks Runtime versions earlier than 16.4 can't access ABAC-secured tables."
+    },
+    {
+      "family": "abac-fallback-restrictive-tag",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team lets dozens of engineers create tables in the `lake` catalog every week, and data stewards tag sensitive columns only after a review. The team's ABAC column mask policies match `pii` column tags, so a new table is fully readable until its review. Which best practice closes this gap?",
+      "options": [
+        { "text": "Give new objects a default restrictive tag and add a policy that restricts it", "correct": true, "why": "The documented fallback for unclassified data is a default restrictive tag, such as classification : unverified, on new objects until a steward reviews them, plus a policy that restricts access to objects carrying that tag." },
+        { "text": "Tag the lake catalog with pii so that every new column inherits it", "average": true, "why": "Tagging the catalog feels like blanket coverage, but column tags don't inherit from parents, so column conditions looking for pii won't match the untagged columns of new tables." },
+        { "text": "Create one column mask policy per new table as soon as it lands", "why": "Per-table policies are the sprawl the best practices warn against, and they still match columns by tags, so an untagged column stays unmasked." },
+        { "text": "Let engineers mark their own columns with ungoverned pii tags", "why": "ABAC policies use governed tags, not ungoverned ones, so free-form tags wouldn't make any policy match, and they would weaken control over who classifies data." }
+      ],
+      "in_practice": "A fail-safe default flips the risk: a new table stays restricted until reviewed, so a late review delays an analyst by a day instead of exposing customer data for a week.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/best-practices",
+      "evidence": "Don't assume that all objects are correctly tagged. Use automation to enforce tagging standards and implement fallback mechanisms for unclassified data: Apply a default restrictive tag (like classification : unverified) to new objects until a data steward reviews them. Create a policy that restricts access to objects with the default tag."
+    },
+    {
+      "family": "abac-pipeline-identity-masked-mv",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer's Lakeflow Spark Declarative Pipeline, running as a service principal, builds the materialized view `claims.gold.member_summary` from `claims.core.members`. A catalog policy masks the `ssn` column for all account users and exempts only the `compliance` group. Compliance officers querying the materialized view see only masked SSNs. What should the engineer change?",
+      "options": [
+        { "text": "Exempt the pipeline's run-as principal from the policy, then refresh the view", "correct": true, "why": "A pipeline evaluates policies as its owner or run-as identity when it refreshes a materialized view. If that identity is masked, the view permanently stores masked data; exempting the identity in the policy's EXCEPT clause avoids this." },
+        { "text": "Grant compliance SELECT on claims.core.members so the view reads it as them", "average": true, "why": "Assuming the view reads its source as the person querying it is the trap; the refresh ran as the pipeline's identity, which was masked, so masked values were stored in the view and no grant can unmask them." },
+        { "text": "Rebuild member_summary as a streaming table in the same pipeline", "why": "Streaming tables are refreshed the same way, under the pipeline's identity, so switching the object type would store masked values too." },
+        { "text": "Untag the ssn column before each refresh and retag it afterwards", "why": "Removing the tag leaves SSNs unprotected in the source while it is off and relies on manual steps; exempting the pipeline identity is the documented fix." }
+      ],
+      "in_practice": "Once the service principal is exempt, the view stores raw SSNs, so tag its ssn column too; the same catalog policy then masks it for everyone outside compliance, and the run-as identity is the only new exemption.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/requirements",
+      "evidence": "When a pipeline refreshes a materialized view or streaming table, it evaluates policies using the pipeline owner's or run-as identity. If that identity is subject to an ABAC policy, the materialized view or streaming table permanently contains masked or filtered data. To avoid this, add the pipeline owner or run-as identity to the EXCEPT clause of ABAC policies."
+    },
+    {
+      "family": "abac-deleted-governed-tag-breaks-scope",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "An account admin deletes the governed tag `legacy_pii`, believing nothing uses it anymore. Soon after, every query against tables in the `crm` catalog fails, including tables that never carried that tag. A column mask policy attached to the `crm` catalog still has has_tag('legacy_pii') in its MATCH COLUMNS clause. What should the governance team do?",
+      "options": [
+        { "text": "Restore the governed tag, or update or drop the policy that references it", "correct": true, "why": "Deleting a governed tag that a policy references makes all queries against the policy's object and its children fail with UC_ABAC_UNKNOWN_TAG_POLICY, even on tables without the tag. Restoring the tag or changing or deleting the policy resolves it." },
+        { "text": "Remove the leftover legacy_pii tags from every column that still has one", "average": true, "why": "Cleaning up leftover tags seems logical, but the failure comes from the policy still referencing a tag that is no longer governed; the policy or the tag definition is what must be fixed." },
+        { "text": "Move the analysts to compute on Databricks Runtime 16.4 or above", "why": "An unsupported runtime causes a different failure and only on older compute; this error comes from a policy that references a deleted governed tag, on every compute." },
+        { "text": "Wait a few minutes for the tag deletion to finish propagating", "why": "Tag changes can take a few minutes to take effect, but this failure persists for as long as the policy references a governed tag that no longer exists." }
+      ],
+      "in_practice": "Before deleting a governed tag, search policy definitions for it, for example in information_schema.abac_policy_definitions; the UI and API don't block the delete, and one stray reference can take a whole catalog offline.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policy-evaluation",
+      "evidence": "If you delete a governed tag that an ABAC policy references, all queries against the object where the policy is attached and its child objects fail with an INVALID_PARAMETER_VALUE.UC_ABAC_UNKNOWN_TAG_POLICY error. This occurs even if the tag was not applied to the queried tables. To resolve the error, either restore the deleted tag, or update or delete the policy that references it."
+    }
+  ]
+}

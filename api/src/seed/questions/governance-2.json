@@ -1,0 +1,276 @@
+{
+  "items": [
+    {
+      "family": "filters-masks-row-filter-null-result",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer writes a SQL UDF and attaches it to a Unity Catalog table with ALTER TABLE … SET ROW FILTER. How does Databricks use the function's result for each row at query time?",
+      "options": [
+        { "text": "The row is returned only when the function returns TRUE; FALSE or NULL excludes it", "correct": true, "why": "A row filter is a scalar SQL UDF that must return BOOLEAN. It is evaluated for each row as the row is fetched, and a FALSE or NULL result filters that row out of the query results." },
+        { "text": "The row is excluded only when the function returns FALSE; a NULL result keeps it", "average": true, "why": "Treating NULL as 'no decision' is a common assumption, but a row filter drops the row when the function returns FALSE or NULL, so an expression that evaluates to NULL hides the row instead of showing it." },
+        { "text": "The function returns the permitted rows as a table that replaces the base table", "why": "A row filter is not a table-valued function. It is a scalar function evaluated row by row that decides whether each record is visible to the querying user." },
+        { "text": "The function returns a WHERE clause string that is appended to each user query", "why": "A row filter is not text substitution into the user's SQL; it is a BOOLEAN-returning SQL UDF that Databricks evaluates against every row it fetches from the table." }
+      ],
+      "in_practice": "Because NULL hides the row, a filter such as region = 'US' quietly drops rows whose region is missing. That fails safe for security, but report owners may see lower counts, so handle NULLs explicitly in the UDF when some groups should see those rows.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-row-filter",
+      "evidence": "func_name: A scalar SQL UDF. The return type of the function must be BOOLEAN. If the function returns FALSE or NULL the row is filtered out."
+    },
+    {
+      "family": "filters-masks-account-group-function",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is writing a SQL UDF to use as a row filter on a Unity Catalog table. Members of `eu_auditors`, a group defined at the account level, must see every row, and all other users only rows outside the EU. Which function should the UDF call to check group membership?",
+      "options": [
+        { "text": "is_account_group_member('eu_auditors')", "correct": true, "why": "is_account_group_member() returns TRUE when the querying user belongs to the named account-level group, and it is the membership check Databricks recommends for access logic over Unity Catalog data." },
+        { "text": "is_member('eu_auditors')", "average": true, "why": "is_member() checks workspace-level groups and exists for compatibility with the Hive metastore. It does not evaluate account-level group membership, so it is the wrong check for a group defined in the account." },
+        { "text": "session_user() = 'eu_auditors'", "why": "session_user() returns the current user's email address, not a group, so comparing it with a group name never matches the group's members." },
+        { "text": "has_tag('eu_auditors')", "why": "has_tag() is an ABAC policy condition that checks governed tags on tables and columns; it says nothing about who is running the query." }
+      ],
+      "in_practice": "Account-level groups are managed once for every workspace attached to the account, so the same membership check behaves consistently wherever the table is queried; workspace-local groups would have to be kept in sync workspace by workspace.",
+      "source": "https://docs.databricks.com/aws/en/views/dynamic",
+      "evidence": "is_account_group_member(): Returns TRUE if the current user is a member of a specific account-level group. ... is_member(): Returns TRUE if the current user is a member of a specific workspace-level group ... it does not evaluate account-level group membership."
+    },
+    {
+      "family": "filters-masks-set-mask-statement",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer has registered a SQL UDF named `hr.util.mask_phone` and must attach it as a column mask to the existing `phone` column of the table `hr.core.employees`. Which statement does this?",
+      "options": [
+        { "text": "ALTER TABLE hr.core.employees ALTER COLUMN phone SET MASK hr.util.mask_phone", "correct": true, "why": "A table-level column mask is bound to one column with ALTER TABLE … ALTER COLUMN … SET MASK. The column becomes the UDF's first argument, and later queries see the function's result instead of the stored value." },
+        { "text": "ALTER TABLE hr.core.employees SET MASK hr.util.mask_phone ON (phone)", "average": true, "why": "This borrows the shape of the row filter syntax, SET ROW FILTER … ON (columns), but a mask is attached per column through ALTER COLUMN, so this statement is invalid." },
+        { "text": "GRANT MASK hr.util.mask_phone ON COLUMN hr.core.employees.phone", "why": "A mask is not a privilege and is not applied with GRANT. GRANT controls access to objects, while a column mask is part of the table definition set with ALTER TABLE." },
+        { "text": "CREATE MASK hr.util.mask_phone ON hr.core.employees (phone)", "why": "Databricks SQL has no CREATE MASK statement. The masking logic lives in an ordinary SQL UDF, which is then attached with ALTER TABLE … ALTER COLUMN … SET MASK." }
+      ],
+      "in_practice": "Because the mask lives on the table, every client that queries it, from notebooks to BI dashboards, gets the same redaction without each consumer having to remember to use a special view.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "evidence": "Apply the column mask to a column in an existing table: ALTER TABLE <table_name> ALTER COLUMN <col_name> SET MASK <mask_func_name> USING COLUMNS <additional_columns>;"
+    },
+    {
+      "family": "filters-masks-mask-using-other-column",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer at a clinic network manages `clinic.records.visits`, which has `notes` and `clinic_id` columns. Every analyst may query all visits, but `notes` must be readable only by members of the account group `clinic_<clinic_id>_staff` for that row's clinic; everyone else sees 'REDACTED'. How should the engineer implement this?",
+      "options": [
+        { "text": "A mask UDF taking notes and clinic_id, applied with SET MASK … USING COLUMNS (clinic_id)", "correct": true, "why": "The first UDF parameter maps to the masked column, and USING COLUMNS passes other columns from the same row, so one mask can build the group name from clinic_id and call is_account_group_member() for each row." },
+        { "text": "A row filter on clinic_id that checks is_account_group_member() for the row's clinic", "average": true, "why": "A row filter hides whole rows, but every analyst must still see all visits with only the notes redacted, so filtering would remove data people are allowed to see." },
+        { "text": "A single-parameter mask UDF on notes that reads clinic_id from the current row itself", "why": "A mask UDF receives only the masked column plus whatever USING COLUMNS supplies; it has no implicit access to the other columns in the row." },
+        { "text": "One column mask per clinic on the notes column, each checking a different group", "why": "Each column can have only one mask, so per-clinic masks cannot be stacked on the same column; the per-row decision belongs inside one function." }
+      ],
+      "in_practice": "One parameterized mask scales from 5 clinics to 500 without new DDL: onboarding a clinic only means creating its account group, while the table definition and the mask function stay unchanged.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/manually-apply",
+      "evidence": "The first parameter of the masking function always maps to the masked column itself. Supply additional parameters using USING COLUMNS with static values or column names from the same table."
+    },
+    {
+      "family": "filters-masks-one-row-filter-per-table",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer maintains `ops.tickets.events`, which already has a row filter that shows each support group only its own queue's tickets. Compliance now also requires that rows with `is_synthetic = true` stay in the table but be visible only to members of `qa_engineers`. What should the engineer do?",
+      "options": [
+        { "text": "Replace the filter with one UDF that combines the queue check and the synthetic-row check with AND", "correct": true, "why": "Only one row filter can apply to a table for a given user, so new row-level rules are added by extending that single filter function, typically by combining the conditions with AND, and setting it as the table's filter." },
+        { "text": "Run a second ALTER TABLE … SET ROW FILTER with a new UDF so both filters apply together", "average": true, "why": "Row filters don't stack. Each table has only one row filter, so a second SET ROW FILTER cannot add an independent filter alongside the existing one." },
+        { "text": "Add a column mask on is_synthetic that returns NULL for users outside qa_engineers", "why": "A column mask changes the values a user sees in one column; it never removes rows, so synthetic records would still appear, just with a NULL flag." },
+        { "text": "Schedule a job that deletes synthetic rows after each QA test cycle finishes", "why": "Deleting data is not access control and breaks the requirement to keep the rows; QA would lose them, and other users could still see them until the job runs." }
+      ],
+      "in_practice": "Keep the combined filter lean: Databricks recommends few AND conjuncts and simple CASE expressions over subqueries, because queries on protected tables give up some optimizations to avoid leaking filtered values.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+      "evidence": "Avoid row filters with too many AND conjuncts. Only one distinct row filter can resolve at runtime for a given user and table, so a common pattern is to combine logic with AND."
+    },
+    {
+      "family": "filters-masks-dynamic-view-joined-share",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer must give a partner analytics group one queryable object that joins `sales.core.orders` with `sales.core.customers`. Members of `auditors` must see full customer emails and everyone else only the email domain, and the partner group must have no access to either base table. Which approach fits?",
+      "options": [
+        { "text": "A dynamic view that joins both tables and uses is_account_group_member() in a CASE on email", "correct": true, "why": "Dynamic views are the tool for exposing a curated, joined or transformed slice to users who can't read the underlying tables: the view applies the group check at query time, and only the view is granted to the partner group." },
+        { "text": "A row filter and column mask on each base table, with SELECT granted on both tables", "average": true, "why": "Table-level filters and masks protect individual tables, but this grants the partner group direct access to both base tables and still leaves them to write the join themselves." },
+        { "text": "A standard view over the join, with a column mask set on the view's email column", "why": "Table-level row filters and column masks cannot be applied to a view, so the mask has nowhere to attach; the redaction logic has to live in the view definition." },
+        { "text": "A nightly job that writes the join to a new table with emails reduced to domains", "why": "A static copy can't vary by viewer, so auditors would lose the full email, and it adds a refresh pipeline plus stale data between runs." }
+      ],
+      "in_practice": "A dynamic view gives one governed definition for a shared slice. The trade-off is that views carry no tags or policy metadata, so auditing dozens of them is harder than auditing table-level filters and masks.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+      "evidence": "Dynamic views wrap one or more base tables in a SQL view that filters rows, masks columns, or reshapes data ... Use dynamic views when you want to expose a curated, transformed, or joined version of your data to users who don't have access to the underlying tables."
+    },
+    {
+      "family": "filters-masks-masked-join-values",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer applied a column mask to `crm.core.contacts.email` that returns a SHA-256 hex string unless the user is in `support_leads`. On the same SQL warehouse, a support lead who joins `contacts.email` to `marketing.events.email` gets thousands of matches, while an analyst running the identical query gets none. What explains the analyst's result?",
+      "options": [
+        { "text": "The mask is applied as rows are fetched, so the join compares hashed values to raw emails", "correct": true, "why": "A column mask is evaluated as soon as each row is read, and joins, predicates and ordering run on the masked result. For the analyst, hashes are compared with plain emails, so nothing matches." },
+        { "text": "Masks change only displayed output, so the analyst must be missing SELECT on the events table", "average": true, "why": "Masks are not a display-layer feature: the masked value is what the rest of the query works with. A missing SELECT grant would also raise a permission error rather than return an empty result." },
+        { "text": "Masked columns can't serve as join keys for non-members, so the join is silently skipped", "why": "Masked columns can still be joined. The join runs normally, but on the masked values, which is why the analyst's hashes find no partners in the events table." },
+        { "text": "ANSI mode is off in the analyst's session, so the hashes are cast to NULL and never match", "why": "The mask takes and returns STRING for a STRING column, so there is no cast for ANSI mode to affect; the empty join comes from comparing hashes with plain emails." }
+      ],
+      "in_practice": "When teams must join on a protected identifier, a deterministic mask such as a hash applied the same way on both sides keeps joins working without exposing raw values; otherwise joins on masked keys silently lose rows for most users.",
+      "source": "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-column-mask",
+      "evidence": "The mask is applied as soon as each row is fetched from the data source. Any expressions, predicates, or ordering are applied after the masking. For example, joining between the masked column against a column from another table uses the masked values for the join comparison."
+    },
+    {
+      "family": "filters-masks-type-mismatch-leak",
+      "objective": "governance.filters-masks",
+      "guide": "7.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data engineer adds a row filter to `support.core.tickets`, whose `queue_code` column is a STRING holding values like 'Q-17'. The UDF is `CREATE FUNCTION queue_filter(code INT) RETURN code IS NULL OR is_account_group_member('queue_admins')`, applied with `SET ROW FILTER queue_filter ON (queue_code)`. Everyone should see unassigned tickets (NULL code) and only `queue_admins` the rest. With spark.sql.ansi.enabled set to false, every user now sees every ticket. What is the cause?",
+      "options": [
+        { "text": "The INT parameter can't hold values like 'Q-17', so they are cast to NULL and pass the filter", "correct": true, "why": "When a column's type differs from the UDF parameter, the value is implicitly cast. With ANSI mode off, uncastable strings silently become NULL, so code IS NULL is TRUE for every row. Declaring the parameter as STRING, and turning ANSI mode on to surface bad casts, fixes it." },
+        { "text": "is_account_group_member() runs with the definer's rights, so it checks the function owner's groups", "average": true, "why": "Filters run with definer's rights except for functions that check user context, such as is_account_group_member() and session_user(), which run as the invoking user, so the group check is evaluated for each querying user." },
+        { "text": "Row filters apply only to queries that reference the filtered column, so SELECT * bypasses it", "why": "A row filter is applied to every row fetched from the table, regardless of which columns the query selects or filters on." },
+        { "text": "SET ROW FILTER on an existing table applies only to rows inserted after the filter was set", "why": "A row filter is evaluated at query time against each row as it is fetched, so it covers rows that existed before the filter was set as well as new ones." }
+      ],
+      "in_practice": "This failure leaks data without raising any error, so treat filter UDF signatures like schema contracts: match parameter types to column types and keep ANSI mode on, so a bad cast fails loudly in testing instead of exposing rows in production.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/filters-and-masks/",
+      "evidence": "With ANSI mode disabled (spark.sql.ansi.enabled = false), uncastable values are silently converted to NULL, no error is raised, and the UDF receives NULL instead of the actual column value. This can produce incorrect results, such as a row filter that returns all rows instead of filtering them."
+    },
+    {
+      "family": "abac-policy-attach-and-match",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A governance admin is new to attribute-based access control (ABAC) in Unity Catalog. How does a row filter or column mask policy decide which tables and columns it protects?",
+      "options": [
+        { "text": "It is attached to a catalog, schema or table and matches objects in that scope by governed tags", "correct": true, "why": "ABAC policies are attached at a level of the Unity Catalog hierarchy and evaluated dynamically: any table or column in that scope whose governed tags meet the policy's conditions is covered automatically." },
+        { "text": "It is attached to each column individually and matches the column by its name", "average": true, "why": "Binding a function to one named column is how table-level masks work. ABAC policies instead match tables and columns through governed tags, so one policy can cover many tables." },
+        { "text": "It is attached to a group and follows that group's members to any table they query", "why": "Principals are named in the policy's TO and EXCEPT clauses, but the policy itself is attached to a securable such as a catalog or schema, which sets the tables it can reach." },
+        { "text": "It is attached to a workspace and applies to tables created from that workspace", "why": "Workspaces are not policy scopes. Policies live on Unity Catalog securables, and governed tags are defined at the account level so they apply across workspaces." }
+      ],
+      "in_practice": "Because coverage follows tags, a policy written once on a catalog keeps protecting new tables as stewards tag their columns, instead of relying on someone to configure each new table by hand.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/",
+      "evidence": "Policies are attached at a level in the Unity Catalog hierarchy, such as a metastore (Beta), catalog, schema, or table, and are evaluated dynamically. When a securable object has the attributes targeted by a policy, that policy takes effect automatically"
+    },
+    {
+      "family": "abac-except-clause-exemption",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A governance admin is writing a column mask policy on the `claims` catalog that masks every column tagged `pii : phone` for all account users. Members of the `fraud_investigators` group must keep seeing real phone numbers. Which clause should the admin add to the policy for that group?",
+      "options": [
+        { "text": "EXCEPT `fraud_investigators`", "correct": true, "why": "The EXCEPT clause lists principals exempt from the policy. Exempt principals are not subject to filtering or masking and see the full, unmodified data." },
+        { "text": "TO `fraud_investigators`", "average": true, "why": "The TO clause names who the policy applies to, so adding the group there would mask phone numbers for the investigators instead of exempting them." },
+        { "text": "WHEN has_tag_value('team', 'fraud_investigators')", "why": "WHEN is a table condition evaluated against tags on the data, not on users, so it controls which tables the policy covers rather than who is exempt." },
+        { "text": "USING COLUMNS ('fraud_investigators')", "why": "USING COLUMNS passes extra arguments to the masking UDF; a group name passed there does nothing unless the UDF itself checks membership, which is the logic EXCEPT spares you." }
+      ],
+      "in_practice": "Keeping exemptions in TO and EXCEPT rather than in UDF logic keeps one masking function reusable across policies, and auditors can read who is exempt straight from DESCRIBE POLICY.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policies",
+      "evidence": "TO principal [, ...]: The users, groups, or service principals the policy applies to. EXCEPT principal [, ...]: Principals exempt from the policy. Exempt principals are not subject to filtering or masking."
+    },
+    {
+      "family": "abac-show-effective-policies",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A table owner wants to list every ABAC policy that affects `retail.sales.orders`, including policies a governance team attached to the `retail` catalog and the `retail.sales` schema. Which command returns them?",
+      "options": [
+        { "text": "SHOW EFFECTIVE POLICIES ON TABLE retail.sales.orders", "correct": true, "why": "SHOW EFFECTIVE POLICIES also includes policies from parent scopes, such as catalog-level policies that affect the table, and viewing them for a table doesn't require permissions on the parent catalog or schema." },
+        { "text": "SHOW POLICIES ON TABLE retail.sales.orders", "average": true, "why": "SHOW POLICIES lists only the policies defined on the object itself, so the catalog and schema policies that still govern the table would be missing." },
+        { "text": "SELECT * FROM retail.information_schema.row_filters", "why": "INFORMATION_SCHEMA.ROW_FILTERS and COLUMN_MASKS are for auditing table-level filters and masks; ABAC policies are inspected with SHOW POLICIES, DESCRIBE POLICY or the ABAC policy definitions view." },
+        { "text": "DESCRIBE POLICY ON TABLE retail.sales.orders", "why": "DESCRIBE POLICY shows the details of one named policy, so it needs the policy's name and does not list every policy that reaches the table." }
+      ],
+      "in_practice": "Since ABAC rules live above the table, they don't appear in the table definition; SHOW EFFECTIVE POLICIES is the fast answer when a user asks why a column is masked, without giving the owner access to other tables' policies.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/policies",
+      "evidence": "Use SHOW POLICIES to list the policies defined on a securable object. Use SHOW EFFECTIVE POLICIES to also include policies from parent scopes, such as catalog-level policies that affect a table."
+    },
+    {
+      "family": "abac-catalog-policy-vs-per-table",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team governs the `claims` catalog: about 300 tables across 15 schemas, with new tables added weekly by several teams. Data stewards tag sensitive columns `pii : ssn`. SSNs must be masked the same way for analysts everywhere, and individual table owners must be unable to remove the masking. Which approach meets these requirements?",
+      "options": [
+        { "text": "One column mask policy on the claims catalog that matches columns tagged pii : ssn", "correct": true, "why": "A catalog-level policy evaluates every table in the catalog, covers new tables as soon as their columns are tagged, and cannot be removed, modified or bypassed by individual table owners." },
+        { "text": "A column mask on each SSN column set with ALTER TABLE … ALTER COLUMN … SET MASK", "average": true, "why": "Table-level masks work, but each table must be configured individually, new tables stay exposed until someone adds them, and each table's owner can modify or remove the mask." },
+        { "text": "A dynamic view over every table that redacts SSNs with is_account_group_member()", "why": "Views add about 300 objects to maintain, leave the base tables readable unless grants are reworked, and lack tag and policy metadata, which makes them harder to audit at this scale." },
+        { "text": "A GRANT policy that grants SELECT only on columns that lack the pii : ssn tag", "why": "GRANT policies add privileges on supported securables such as models and services; they don't control column visibility, and masking values is the job of a column mask policy." }
+      ],
+      "in_practice": "At hundreds of tables, the policy turns weekly per-table setup into a tagging step: the governance team owns one definition while stewards classify columns, which is the separation of duties ABAC is designed for.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/abac-vs-rls-cm",
+      "evidence": "ABAC policies attach at the catalog, schema, or table level and match tables and columns dynamically based on governed tags. A policy defined at the catalog level applies to all tables in that catalog, and individual table owners can't remove, modify, or bypass it."
+    },
+    {
+      "family": "abac-policy-needs-select-grant",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A governance admin creates a row filter policy on the `sales` catalog so the `emea_analysts` group sees only EMEA rows in any table with a column tagged `region`. The group has never been granted any privilege on the catalog, and the analysts' first query fails with a permission error. What should the admin do?",
+      "options": [
+        { "text": "Grant USE CATALOG, USE SCHEMA and SELECT to emea_analysts through regular object grants", "correct": true, "why": "Row filter and column mask policies only restrict data on tables a user can already read; they don't grant access. Base table access still has to be granted separately with object-level privileges." },
+        { "text": "Grant EXECUTE on the filter UDF to emea_analysts so the policy can run for them", "average": true, "why": "EXECUTE on the UDF is what the admin needs to create the policy. It gives nobody access to the tables, so the analysts would still be blocked." },
+        { "text": "Recreate the policy with emea_analysts listed in its EXCEPT clause instead of TO", "why": "Exempting the group would remove the EMEA filter for them, the opposite of the goal, and it still wouldn't give them read access to the tables." },
+        { "text": "Move the policy from the catalog to each table so it grants access table by table", "why": "Changing the scope only changes which tables the policy evaluates. No row filter policy grants access at any scope." }
+      ],
+      "in_practice": "Keeping access (grants) separate from restriction (policies) means a policy change can never open a table to a new group by accident; onboarding a team remains a GRANT that is reviewed like any other access request.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/abac-vs-rls-cm",
+      "evidence": "Neither approach grants access to data on its own — both add restrictions on top of existing object-level privileges. You must grant base table access separately through object-level permissions (GRANT)."
+    },
+    {
+      "family": "abac-using-columns-needs-tagged-column",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A governance admin is building a column mask policy on the `loyalty` schema that masks columns tagged `pii : phone`. The masking UDF also needs each row's `marketing_opt_in` BOOLEAN value, and that column has no tags. How should the admin pass `marketing_opt_in` to the UDF?",
+      "options": [
+        { "text": "Tag marketing_opt_in, match it with an alias in MATCH COLUMNS, and pass the alias in USING COLUMNS", "correct": true, "why": "In an ABAC policy, USING COLUMNS takes aliases of columns matched through MATCH COLUMNS, or constants, so a context column must carry a governed tag even though it is never masked." },
+        { "text": "List marketing_opt_in by column name in USING COLUMNS, as a table-level column mask does", "average": true, "why": "Table-level masks accept column names because they are bound to one table, but a policy spans many tables and can only reference columns it matched by tag." },
+        { "text": "Add WHEN has_tag('marketing_opt_in') so the policy reads the opt-in value for each row", "why": "WHEN is a boolean condition on table tags that decides which tables the policy applies to; it never passes column values to the UDF." },
+        { "text": "Make marketing_opt_in the ON COLUMN target and pass the phone column in USING COLUMNS", "why": "ON COLUMN names the column being masked, so this would mask the opt-in flag instead of the phone numbers; the phone column must remain the masked target." }
+      ],
+      "in_practice": "Tagging context columns such as consent flags lets one policy cover every table that has them, but tables missing either tagged column aren't matched and return data unmasked, so monitor tagging coverage.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/tutorial-sql",
+      "evidence": "This is required because USING COLUMNS can only reference columns that are matched via MATCH COLUMNS. Even though has_consent is not being masked, it must be tagged so the policy can pass its value to the UDF."
+    },
+    {
+      "family": "abac-column-tags-not-inherited",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A data steward on the governance team applies the governed tag `pii` to the table `crm.people.contacts`, expecting an existing column mask policy to cover its email and phone columns. The policy is attached to the `crm` catalog, applies to all account users, has no WHEN condition, and uses `MATCH COLUMNS has_tag('pii') AS c ON COLUMN c`. Analysts still see raw emails and phone numbers. What is the most likely cause?",
+      "options": [
+        { "text": "MATCH COLUMNS checks only tags set on columns, and table tags don't propagate to columns", "correct": true, "why": "In MATCH COLUMNS, has_tag() looks only at tags applied directly to the column. Tags on the table, schema or catalog don't flow down to columns, so the steward must tag the email and phone columns themselves." },
+        { "text": "Catalog policies cover only tables created after the policy, so it must be recreated", "average": true, "why": "Policies are evaluated dynamically against every table in scope, existing or new, so recreating the policy changes nothing while the columns still lack the tag." },
+        { "text": "The policy also needs WHEN has_tag('pii') so it masks every column of tagged tables", "why": "WHEN only selects which tables a policy applies to. A column mask policy still masks the column named in ON COLUMN, which must come from a MATCH COLUMNS alias." },
+        { "text": "Catalog-level policies apply only inside schemas that also carry the pii tag", "why": "With no WHEN condition, the table condition defaults to TRUE and the policy evaluates every table in the catalog; schema tags matter only when a condition checks for them." }
+      ],
+      "in_practice": "A missing column tag fails open: the data is simply returned unmasked. Teams pair column-level tagging with automated classification and a restrictive fallback policy for unreviewed objects so new columns aren't exposed in the meantime.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/core-concepts",
+      "evidence": "Tags don't propagate from tables to columns. Using has_tag() in a MATCH COLUMNS clause only matches column-level tags, not tags on the parent table or its ancestors."
+    },
+    {
+      "family": "abac-conflicting-row-filters",
+      "objective": "governance.abac",
+      "guide": "7.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "Months ago, the owner of `fin.ledger.entries` set a table-level row filter that uses `fin.util.ledger_rows`. The governance team now attaches a catalog-level row filter policy for all account users that uses `fin.util.region_rows`, a function with identical logic. Analysts querying the table now get an error instead of results. What explains this, and what resolves it?",
+      "options": [
+        { "text": "Two different filter functions resolve for the same user, so access is blocked; keep only one", "correct": true, "why": "Only one distinct row filter can apply per table and user. Databricks compares the functions, not their output, so two different functions conflict even with identical logic; dropping the table-level filter, or using one shared function, resolves it." },
+        { "text": "The two filters are combined with AND, so the error must come from a type mismatch in one", "average": true, "why": "ABAC and table-level filters are not ANDed together. When they resolve to different functions for the same user, Databricks blocks access, so no type fix would help." },
+        { "text": "The table-level filter takes precedence, so the policy needs a narrower WHEN condition", "why": "Neither filter wins. A WHEN condition that still matches this table leaves two different functions applying to the same user, which is the conflict itself." },
+        { "text": "The catalog policy replaced the table filter, so analysts now need EXECUTE on region_rows", "why": "A policy doesn't silently replace a table-level filter. Both stay in place, and because they use different functions for the same user, Databricks returns an error." }
+      ],
+      "in_practice": "Before rolling out catalog-wide policies, inventory existing table-level filters and masks through INFORMATION_SCHEMA.ROW_FILTERS and COLUMN_MASKS, and remove or align them first so dashboards don't start failing at query time.",
+      "source": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/abac/abac-vs-rls-cm",
+      "evidence": "Databricks evaluates conflict by comparing the functions applied, not the data output. If both an ABAC policy and a table-level filter or mask apply the same row filter or column mask function for the same user, Databricks allows execution. If they apply different functions, Databricks blocks access and returns an error"
+    }
+  ]
+}

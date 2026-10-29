@@ -1,0 +1,15 @@
+id,route,title,journey,purpose
+"S01","choose-exam","Choose a certification","Onboarding","Choose a supported exam; preview planned catalog items"
+"S02","daily-goal","Set a daily goal","Onboarding","Pick 5, 10 or 15 minutes; exam date is optional"
+"S03","learn","Daily learning path","Daily habit","One current five-question lesson and unit checkpoint"
+"S04","question","Lesson question","Learning","Choose an answer; see feedback before continuing"
+"S05","feedback","Answer and explanation","Learning","Understand the correction and open an optional explanation"
+"S06","complete","Lesson completion","Daily habit","Activity XP and streak; review mistakes"
+"S07","practice","Practice modes","Exam practice","Quick 5, weakest subject, missed, timed, custom and mock"
+"S08","review","Review queue","Memory","Due review and missed concepts; show a clear first action"
+"S09","mock-setup","Mock exam setup","Exam practice","See format, timing and pause/background behavior"
+"S10","mock-results","Mock exam results","Exam practice","Practice score and next remedial actions"
+"S11","progress","Learning progress","Progress","Objective coverage and first-seen performance; no pass probability"
+"S12","friends","Private study circle","Social / phase 2","Optional weekly study-day goal and invite"
+"S13","premium","Premium preview and plans","Monetization","14-day nonrenewing preview; free tier remains available"
+

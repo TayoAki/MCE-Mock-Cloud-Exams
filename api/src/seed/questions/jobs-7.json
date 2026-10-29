@@ -1,0 +1,878 @@
+{
+  "items": [
+    {
+      "family": "triggers-file-arrival-required-permissions",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 1,
+      "type": "multiple",
+      "stem": "A data engineer is adding a file arrival trigger to a job so that it watches /Volumes/finance/inbound/statements/ for new files. Which two permissions does the engineer need to set up this trigger? (Choose two.)",
+      "options": [
+        {
+          "text": "READ permission on the volume being monitored",
+          "correct": true,
+          "why": "File arrival triggers require READ permission on the storage location they monitor, whether that location is a Unity Catalog volume or an external location."
+        },
+        {
+          "text": "CAN MANAGE permission on the job",
+          "correct": true,
+          "why": "Adding a trigger changes the job's configuration, and file arrival triggers require CAN MANAGE permission on the job."
+        },
+        {
+          "text": "CAN MANAGE RUN permission on the job",
+          "average": true,
+          "why": "CAN MANAGE RUN lets a user start and cancel runs, so it feels like enough, but configuring a file arrival trigger requires CAN MANAGE on the job."
+        },
+        {
+          "text": "WRITE VOLUME permission on the volume being monitored",
+          "why": "The trigger only needs to read the location to detect new files; write access to the volume isn't part of the requirements."
+        },
+        {
+          "text": "MANAGE privilege on the external location behind the volume",
+          "why": "MANAGE on an external location, or owning it, is what enabling file events requires. Adding a file arrival trigger doesn't need it."
+        }
+      ],
+      "in_practice": "Granting READ on the landing location plus CAN MANAGE on the job lets a pipeline owner wire up triggers without broader storage rights, so write access to a vendor drop zone can stay with the vendor's loader alone.",
+      "source": "https://docs.databricks.com/aws/en/jobs/file-arrival-triggers",
+      "evidence": "You must have READ permission on the storage location and CAN MANAGE permissions on the job."
+    },
+    {
+      "family": "triggers-file-arrival-no-wildcard-paths",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A vendor writes .csv data files and .log status files into /Volumes/ops/vendor/inbound/. A data engineer configuring a file arrival trigger enters /Volumes/ops/vendor/inbound/*.csv as the storage location, so that only CSV files start runs. How does Lakeflow Jobs treat this path?",
+      "options": [
+        {
+          "text": "It isn't a valid trigger path, because trigger paths can't contain wildcards",
+          "correct": true,
+          "why": "A file arrival trigger path can't contain wildcards such as * or ?. The trigger has to point at a plain volume or external location path, such as the inbound folder itself."
+        },
+        {
+          "text": "It's a valid path, and only new .csv files start runs",
+          "average": true,
+          "why": "Glob-style filtering is familiar from file readers, so this looks reasonable, but the trigger's storage location can't contain wildcards at all."
+        },
+        {
+          "text": "It's a valid path, but the pattern applies only to the top folder",
+          "why": "No wildcard form is accepted at any level. The trigger monitors a plain path and checks all of its subdirectories for new files."
+        },
+        {
+          "text": "It's valid for external locations, but not for volumes",
+          "why": "The no-wildcards rule applies to every file arrival trigger path, whether it points at a volume or at an external location."
+        }
+      ],
+      "in_practice": "Teams that need file-type filtering point the trigger at the landing folder and filter in the ingestion code, or ask the vendor to write status files outside the monitored path so they don't start runs.",
+      "source": "https://docs.databricks.com/aws/en/jobs/file-arrival-triggers",
+      "evidence": "The path used for a file arrival trigger cannot contain wildcards, for example, * or ?."
+    },
+    {
+      "family": "triggers-file-events-existing-triggers-benefit",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A workspace has a dozen jobs whose file arrival triggers monitor subpaths of one Unity Catalog external location. An admin has just enabled file events on that external location. What must the data engineers do to the existing triggers so that they use file events?",
+      "options": [
+        {
+          "text": "Nothing; triggers on that location start using file events within minutes",
+          "correct": true,
+          "why": "Within minutes of file events being enabled on an external location, existing file arrival triggers that monitor paths under it start benefiting from them, and new triggers benefit within seconds. No trigger changes are needed."
+        },
+        {
+          "text": "Delete and recreate each trigger so it registers with file events",
+          "average": true,
+          "why": "Recreating triggers seems necessary for them to notice a new storage setting, but existing triggers on paths covered by the location switch over on their own."
+        },
+        {
+          "text": "Edit each trigger and switch its detection setting to file events",
+          "why": "File events are a property of the external location, and jobs that use file arrival triggers benefit from them automatically without any extra action."
+        },
+        {
+          "text": "Set cloudFiles.useManagedFileEvents to true in each job's notebook",
+          "why": "That option controls how Auto Loader discovers files inside the job's code; it doesn't change how the trigger detects new files."
+        }
+      ],
+      "in_practice": "Turning on file events once at the external location lifts the 10,000-file and 50-job limits that apply without them for every trigger on that location, with no change requests for individual job owners.",
+      "source": "https://docs.databricks.com/aws/en/jobs/file-arrival-triggers",
+      "evidence": "Within minutes of enabling file events on an external location, existing file arrival triggers that monitor paths covered by that external location start benefiting from file events enablement, and new triggers benefit within seconds."
+    },
+    {
+      "family": "triggers-trigger-time-scheduled-minute",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A job runs on an hourly cron schedule, and each run writes output to a folder named for its scheduled hour in UTC. Runs often start a few seconds after the hour, so a data engineer wants a parameter whose time is already rounded down to the minute. Which dynamic value reference fits?",
+      "options": [
+        {
+          "text": "{{job.trigger.time.iso_datetime}}",
+          "correct": true,
+          "why": "job.trigger.time is based on the time the run was triggered, in UTC, and for jobs with a cron schedule it is rounded down to the closest minute, so each run gets its scheduled minute."
+        },
+        {
+          "text": "{{job.start_time.iso_datetime}}",
+          "average": true,
+          "why": "The start time is the obvious pick, but it reflects when the run actually started, so it carries the extra seconds the engineer wants to avoid."
+        },
+        {
+          "text": "{{backfill.iso_datetime}}",
+          "why": "Backfill references are available only for runs created by a backfill, not for the job's regular scheduled runs."
+        },
+        {
+          "text": "{{job.trigger.type}}",
+          "why": "This reference returns which kind of trigger started the run, such as a schedule or a file arrival, not a time value."
+        }
+      ],
+      "in_practice": "Naming outputs after the scheduled minute rather than the wall-clock start keeps a run that starts late writing to the slot it belongs to, which keeps downstream partition lookups and overwrites predictable.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "{{job.trigger.time.<argument>}} A value based on the time (in UTC timezone) that the job run was triggered, rounded down to the closest minute for jobs with a cron schedule."
+    },
+    {
+      "family": "triggers-mv-schedule-cron-sub-hourly",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer must refresh the standalone materialized view main.ops.queue_depth every 15 minutes, with the schedule defined in the view's SQL definition. Which clause does this?",
+      "options": [
+        {
+          "text": "SCHEDULE CRON '0 */15 * * * ?' AT TIME ZONE 'UTC'",
+          "correct": true,
+          "why": "SCHEDULE EVERY supports hour, day and week intervals, so sub-hourly refreshes use SCHEDULE CRON with a Quartz expression; this one fires at each quarter hour in UTC."
+        },
+        {
+          "text": "SCHEDULE EVERY 15 MINUTES",
+          "average": true,
+          "why": "This reads naturally, but the EVERY form accepts only hour, day and week intervals. Sub-hourly schedules need SCHEDULE CRON."
+        },
+        {
+          "text": "REFRESH EVERY INTERVAL 15 MINUTES",
+          "why": "There is no REFRESH EVERY clause. Time-based refreshes in the definition use SCHEDULE EVERY or SCHEDULE CRON."
+        },
+        {
+          "text": "SCHEDULE EVERY 1 HOUR WITH 4 REFRESHES",
+          "why": "No such modifier exists; an hourly EVERY schedule refreshes once per hour, and quarter-hour refreshes need a cron expression."
+        }
+      ],
+      "in_practice": "Defining the cadence in the view's DDL keeps the schedule versioned with the query. Databricks creates the job that runs it, so there's no separate job definition to keep in sync.",
+      "source": "https://docs.databricks.com/aws/en/sql/mv-st/schedule-refreshes",
+      "evidence": "This example schedules a refresh every hour. The EVERY clause supports hour, day, and week intervals. For sub-hourly intervals, use SCHEDULE CRON instead."
+    },
+    {
+      "family": "triggers-table-update-merges-deletes",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer's job has a table update trigger on main.crm.customers. The upstream team mostly appends rows, but it also runs MERGE for corrections and DELETE for privacy requests. Which of these commits can start a run of the job?",
+      "options": [
+        {
+          "text": "Appends, MERGE corrections and DELETE removals",
+          "correct": true,
+          "why": "Table update triggers monitor tables for data changes such as updates, merges and deletes, so every one of these commits counts as an update."
+        },
+        {
+          "text": "Only appends that add new rows",
+          "average": true,
+          "why": "Thinking of the trigger as a new-rows detector is common, but it reacts to data changes in general, including updates, merges and deletes."
+        },
+        {
+          "text": "Appends and MERGE corrections, but not deletes",
+          "why": "Deletes are data changes too, and they are among the changes a table update trigger monitors."
+        },
+        {
+          "text": "Only commits made by a Lakeflow job or pipeline",
+          "why": "The trigger watches the table itself, so it works without knowing which process updates it."
+        }
+      ],
+      "in_practice": "Because deletes also start runs, privacy removals reach downstream marts on the next run instead of waiting for a weekly rebuild, which shortens the time deleted personal data lingers in copies.",
+      "source": "https://docs.databricks.com/aws/en/jobs/trigger-table-update",
+      "evidence": "A table update trigger can be configured to monitor one or more tables for data changes such as updates, merges, and deletes."
+    },
+    {
+      "family": "triggers-api-triggers-array-replaced",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A platform team manages job triggers through the Jobs API, with the Multiple Triggers Beta enabled. A job's triggers array holds a table update trigger and a 06:00 scheduled trigger. A data engineer's script must add a file arrival trigger with a jobs/update request and keep the other two. How should the script build the request?",
+      "options": [
+        {
+          "text": "Send a triggers array that holds all three triggers",
+          "correct": true,
+          "why": "Updating triggers replaces the entire array, so the request must list the two existing triggers alongside the new file arrival trigger."
+        },
+        {
+          "text": "Send a triggers array that holds only the new trigger",
+          "average": true,
+          "why": "jobs/update is a partial update, so sending just the addition seems safe, but the triggers array is replaced as a whole and the two existing triggers would be dropped."
+        },
+        {
+          "text": "Send the new trigger in the legacy trigger field as well",
+          "why": "The legacy schedule, trigger and continuous fields must not be set in the same request as the triggers array."
+        },
+        {
+          "text": "Send jobs/reset with only the new trigger in its settings",
+          "why": "jobs/reset overwrites all of the job's settings, so it would drop the other two triggers along with every other setting it omits."
+        }
+      ],
+      "in_practice": "Read-modify-write is the safe pattern for trigger arrays: fetch the job's settings, append to triggers and send the full array back, so automation never silently removes a backup schedule.",
+      "source": "https://docs.databricks.com/aws/en/jobs/triggers",
+      "evidence": "To configure multiple triggers with Jobs API 2.1 or later, use the triggers array in JobSettings. Don't set triggers in the same request as the legacy schedule, trigger, or continuous fields. If you update triggers, it replaces the entire array."
+    },
+    {
+      "family": "triggers-ai-recommendation-bundle-job",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer has CAN MANAGE on two jobs that both read Unity Catalog tables, have run nightly for months and have no triggers. AI assistive features are on in the workspace. The job built in the Jobs UI shows a recommended trigger in Schedules & Triggers, but the job that CI deploys with databricks bundle deploy shows none. What explains the difference?",
+      "options": [
+        {
+          "text": "Jobs deployed with Declarative Automation Bundles don't get recommendations",
+          "correct": true,
+          "why": "A recommendation appears only when AI assistive features are on, the user has CAN MANAGE or IS OWNER, the job's code or lineage gives enough evidence, and the job isn't deployed with Declarative Automation Bundles."
+        },
+        {
+          "text": "Recommendations need run history, which the bundle job lacks",
+          "average": true,
+          "why": "Run history is one input to recommendations, but both jobs have months of runs. The documented blocker here is that the job is deployed with bundles."
+        },
+        {
+          "text": "Recommendations show only to the user who created the job",
+          "why": "Recommendations show to anyone with CAN MANAGE or IS OWNER on the job, which the engineer has on both jobs."
+        },
+        {
+          "text": "An admin must enable trigger recommendations separately",
+          "why": "Trigger recommendations can't be turned off separately; they follow the workspace's AI assistive features setting, which is already on."
+        }
+      ],
+      "in_practice": "For bundle-managed jobs, the trigger belongs in the bundle's job definition anyway, so teams add it to the YAML and redeploy instead of applying a change in the UI that the next deployment would have to reconcile.",
+      "source": "https://docs.databricks.com/aws/en/jobs/triggers",
+      "evidence": "A recommendation appears only if: Databricks AI assistive features are enabled for the workspace. You have the CAN MANAGE or IS OWNER permission on the job. The job isn't deployed with Declarative Automation Bundles."
+    },
+    {
+      "family": "triggers-file-arrival-auto-loader-new-files",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's job has a file arrival trigger on /Volumes/claims/raw/inbound/, a volume that already holds thousands of older files. By the time each run begins, several more may have arrived, and the notebook must load every one of them into a bronze table exactly once. How should the notebook find the files to load?",
+      "options": [
+        {
+          "text": "Read the path with Auto Loader, a checkpoint and Trigger.AvailableNow",
+          "correct": true,
+          "why": "The trigger only starts the run. Auto Loader incrementally processes new files with exactly-once guarantees, its checkpoint skips files earlier runs loaded, and AvailableNow stops the stream once the backlog is done."
+        },
+        {
+          "text": "Read the folder that {{job.trigger.file_arrival.location}} returns",
+          "average": true,
+          "why": "That reference returns the trigger's configured storage location, not the files that just arrived, so reading it would reload every earlier file in the folder."
+        },
+        {
+          "text": "Use Auto Loader with foreachBatch to load each file by its path",
+          "why": "foreachBatch suits custom per-file logic, but it provides only at-least-once guarantees, which doesn't meet the exactly-once requirement on its own."
+        },
+        {
+          "text": "List the folder and keep files modified after the last run began",
+          "why": "Timestamp filtering is fragile: files written during a run or with skewed modification times can be skipped or loaded twice, and the job has to track run times itself."
+        }
+      ],
+      "in_practice": "Pairing the trigger with Auto Loader splits the work cleanly: the trigger decides when to run and the checkpoint decides what to read, so retries and bursts of files don't create duplicate bronze rows.",
+      "source": "https://docs.databricks.com/aws/en/jobs/file-arrival-triggers",
+      "evidence": "To process files that triggered file arrival triggers, you can use Auto Loader. Auto Loader incrementally and efficiently processes new files with exactly-once guarantees."
+    },
+    {
+      "family": "triggers-table-update-updated-tables-list",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's job has a table update trigger on main.crm.accounts, main.crm.contacts and main.crm.opportunities, set to run when Any table is updated. Each run should rebuild only the downstream marts whose source tables changed since the previous run. Which value should the job pass to its notebook?",
+      "options": [
+        {
+          "text": "{{job.trigger.table_update.updated_tables}}",
+          "correct": true,
+          "why": "This reference resolves to a JSON list of the tables updated since the last job run, in catalog.schema.table format, so the notebook can loop over just those."
+        },
+        {
+          "text": "{{job.trigger.table_update.version}}",
+          "average": true,
+          "why": "The form without a table name applies only when one table is monitored, and it returns a single commit version rather than which tables changed."
+        },
+        {
+          "text": "{{job.trigger.type}}",
+          "why": "This identifies the kind of trigger that started the run, not which of the monitored tables were updated."
+        },
+        {
+          "text": "{{job.trigger.time.iso_datetime}}",
+          "why": "This returns when the run was triggered, which says nothing about which of the three tables changed."
+        }
+      ],
+      "in_practice": "When three sources update at different times of day, rebuilding only the marts whose sources changed can turn each run from a full rebuild into a single-table refresh, which keeps an Any trigger cheap to run often.",
+      "source": "https://docs.databricks.com/aws/en/jobs/trigger-table-update",
+      "evidence": "{{job.trigger.table_update.updated_tables}} - A JSON list of tables updated since the last job run."
+    },
+    {
+      "family": "triggers-table-update-view-base-table-select",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A job runs as the service principal sp-reporting and has a table update trigger on main.sales.daily_sales_v, a Unity Catalog view that joins main.sales.orders and main.sales.returns. Following least privilege, the platform team granted sp-reporting SELECT on the view plus USE CATALOG on main and USE SCHEMA on main.sales. Orders keep changing, but the trigger fails to evaluate and no runs start. Which grant fixes the trigger?",
+      "options": [
+        {
+          "text": "SELECT on main.sales.orders and main.sales.returns",
+          "correct": true,
+          "why": "For a monitored view, the Run as principal needs SELECT on the view's underlying tables, because the trigger reads their metadata and change history to detect updates. SELECT on the view alone isn't enough."
+        },
+        {
+          "text": "READ FILES on the external location storing the tables",
+          "average": true,
+          "why": "Reading change history sounds like storage access, but the trigger's requirements are Unity Catalog SELECT privileges; for a view, that means SELECT on its underlying tables."
+        },
+        {
+          "text": "MODIFY on main.sales.daily_sales_v",
+          "why": "MODIFY governs changing data, and the trigger only reads. The missing privilege is SELECT on the tables beneath the view."
+        },
+        {
+          "text": "CAN MANAGE on the job for the platform team",
+          "why": "Job permissions control who can edit or run the job. The trigger is evaluated as the Run as principal, whose table privileges are what's missing."
+        }
+      ],
+      "in_practice": "Least-privilege reviews need to cover triggers: a view-level grant that's enough for the job's queries isn't enough for a table update trigger on that view, which reads the change history of the base tables.",
+      "source": "https://docs.databricks.com/aws/en/jobs/trigger-table-update",
+      "evidence": "The principal configured in the job's Run as field must have SELECT permissions on every object the trigger monitors, because the trigger reads each object's metadata and change history to detect updates. Unity Catalog views: SELECT on the view's underlying tables."
+    },
+    {
+      "family": "triggers-file-arrival-modified-file-aged-out",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A file arrival trigger monitors s3://acme-partners/landing/, a subpath of a Unity Catalog external location with file events enabled. The folder keeps every partner file indefinitely. Last week a partner modified a file in place that it had first delivered eight months earlier, and the job started a run that reloaded the file as though it were new. A data engineer is asked why the modification started a run. What explains this?",
+      "options": [
+        {
+          "text": "The file's metadata was past the retention period, so it counted as a new file",
+          "correct": true,
+          "why": "File events keep metadata for a rolling retention period. If an existing file is modified after its metadata falls outside that period, the change is treated as a new file arrival and triggers a run."
+        },
+        {
+          "text": "Any change to an existing file starts a run once file events are enabled",
+          "average": true,
+          "why": "File events don't turn every edit into a trigger. Only new files start runs, and a modification counts as new only when the file's metadata is outside the retention period."
+        },
+        {
+          "text": "The folder exceeded the 10,000-file limit, so the trigger rescanned it",
+          "why": "The 10,000-file limit applies only to locations without file events, so it plays no part on this external location."
+        },
+        {
+          "text": "The Wait after last change timer reset and replayed earlier files",
+          "why": "Wait after last change only delays a run until arrivals stop. It doesn't replay or reclassify files that arrived earlier."
+        }
+      ],
+      "in_practice": "Treating the landing zone as write-once and loading it with Auto Loader, which tracks ingestion progress, keeps a late edit from becoming a duplicate load; partners then send corrections as new, versioned files.",
+      "source": "https://docs.databricks.com/aws/en/jobs/file-arrival-triggers",
+      "evidence": "If an existing file is modified and its metadata falls outside the rolling retention period, that modification is treated as a new file arrival, triggering a job run. You can prevent this by ingesting only immutable files, or you can use file arrival triggers with Auto Loader to track ingestion progress."
+    },
+    {
+      "family": "triggers-file-events-extraneous-churn",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "A file arrival trigger monitors s3://acme-lake/landing/vendor_x/, a subpath of the external location s3://acme-lake/, which has file events enabled. vendor_x receives a few files a day. Another team then starts a process that writes thousands of small temporary files a minute under s3://acme-lake/tmp/. Soon the trigger starts timing out and enters an error state. A data engineer is asked for the cause. What explains this?",
+      "options": [
+        {
+          "text": "Changes elsewhere in the location add metadata the trigger must process",
+          "correct": true,
+          "why": "Changes outside a trigger's subpath, such as elsewhere in the same external location, increase the metadata the trigger has to process. In high-change environments that can push it past its processing time limit and into an error state."
+        },
+        {
+          "text": "vendor_x passed the 10,000-file limit for a trigger path",
+          "average": true,
+          "why": "The 10,000-file limit applies only to locations without file events, and vendor_x holds few files. The trouble is unrelated churn elsewhere in the location."
+        },
+        {
+          "text": "The trigger also watches tmp/ because it checks subdirectories",
+          "why": "The trigger checks subdirectories of its configured path, and tmp/ isn't under vendor_x/; it sits elsewhere in the same external location."
+        },
+        {
+          "text": "File events allow only 50 jobs with triggers per location",
+          "why": "The 50-job limit applies to locations that don't have file events enabled, so it doesn't apply to this one."
+        }
+      ],
+      "in_practice": "Keeping high-churn scratch output out of the external location that hosts landing zones, or giving landing data its own location, keeps trigger evaluation fast as other teams' workloads grow.",
+      "source": "https://docs.databricks.com/aws/en/jobs/file-arrival-triggers",
+      "evidence": "Triggers can error on time out when there are too many extraneous file updates. When a file arrival trigger is set on a subpath of a Unity Catalog external location or volume, changes outside that subpath, such as at the external location's root, can increase the metadata the trigger needs to process."
+    },
+    {
+      "family": "triggers-continuous-no-task-dependencies",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer plans to give a job a continuous trigger so that it stays always on. The job has a bronze ingestion task and a silver task that depends on it. Which documented constraint affects this plan?",
+      "options": [
+        {
+          "text": "Continuous jobs can't use task dependencies",
+          "correct": true,
+          "why": "Task dependencies aren't supported in a continuous job, so a bronze-then-silver chain can't be expressed as dependent tasks; the streams have to run independently or inside a pipeline that manages the flow between tables."
+        },
+        {
+          "text": "Continuous jobs need a retry policy on each task",
+          "average": true,
+          "why": "Unlimited retries were the legacy setup for streams, but continuous jobs can't use retry policies; they retry the whole job with exponential backoff instead."
+        },
+        {
+          "text": "Continuous jobs can contain only a single task",
+          "why": "Continuous jobs can contain several tasks, and the docs describe how failures in multi-task continuous jobs are handled. The restriction is on dependencies between tasks."
+        },
+        {
+          "text": "Continuous jobs allow at most two concurrent runs",
+          "why": "There can be only one running instance of a continuous job, so concurrency isn't something to tune here."
+        }
+      ],
+      "in_practice": "Streaming medallion flows usually move into a Lakeflow Spark Declarative Pipelines pipeline run by a continuous job, so table-to-table dependencies live in the pipeline graph rather than in job task dependencies.",
+      "source": "https://docs.databricks.com/aws/en/jobs/continuous",
+      "evidence": "There can be only one running instance of a continuous job. A delay exists between a run finishing and a new run starting. This delay should be less than 60 seconds. You cannot use task dependencies with a continuous job."
+    },
+    {
+      "family": "triggers-pause-data-trigger-keep-schedule",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A job has two triggers under the Multiple Triggers Beta: a table update trigger on main.ops.shipments and a scheduled trigger at 06:00. Next week the upstream team will backfill shipments with dozens of commits a day, and during that week the job should run only at 06:00. What should the data engineer do?",
+      "options": [
+        {
+          "text": "Pause the table update trigger and leave the schedule active",
+          "correct": true,
+          "why": "Each trigger on a job can be paused and resumed independently, so the data-driven trigger stops starting runs during the backfill while the time-based trigger keeps the 06:00 run."
+        },
+        {
+          "text": "Delete the table update trigger and re-add it after the backfill",
+          "average": true,
+          "why": "Deleting works but throws away the trigger's configuration, which then has to be rebuilt; pausing keeps it intact, and Resume restores it."
+        },
+        {
+          "text": "Pause both triggers and start a manual run at 06:00 each day",
+          "why": "This swaps automation for a daily manual step. Since triggers pause independently, only the table update trigger needs pausing."
+        },
+        {
+          "text": "Set the trigger's Minimum time between triggers to 86400",
+          "why": "A one-day cooldown still lets the table update trigger start a run at an unpredictable time once it expires, so runs aren't held to 06:00."
+        }
+      ],
+      "in_practice": "Pausing only the data-driven trigger during an upstream backfill avoids dozens of redundant runs a day, while the time-based trigger keeps the daily deliverable on schedule.",
+      "source": "https://docs.databricks.com/aws/en/jobs/triggers",
+      "evidence": "Each trigger can be paused and resumed independently."
+    },
+    {
+      "family": "triggers-file-arrival-one-minute-checks",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineer is deciding whether a file arrival trigger can meet a requirement to start processing within 10 seconds of a file landing in a volume. How often does a file arrival trigger check for new files?",
+      "options": [
+        {
+          "text": "About once a minute, on a best-effort basis",
+          "correct": true,
+          "why": "File arrival triggers make a best effort to check for new files every minute, and cloud storage performance can affect that, so a 10-second start requirement is out of reach."
+        },
+        {
+          "text": "Instantly, through cloud notifications, when file events are on",
+          "average": true,
+          "why": "File events make the trigger more efficient and scalable by tracking file metadata from cloud notifications, but the documented cadence is still a best-effort check about every minute."
+        },
+        {
+          "text": "Every 10 seconds, matching the scheduler's minimum interval",
+          "why": "The 10-second minimum applies to runs started by a job's schedule. File arrival triggers check for new files about every minute."
+        },
+        {
+          "text": "Every 15 minutes, unless Minimum time between triggers is lowered",
+          "why": "Minimum time between triggers is an optional cooldown between runs; it adds delay rather than setting how often the trigger checks for files."
+        }
+      ],
+      "in_practice": "A file arrival trigger suits latency targets measured in minutes, where it avoids paying for idle compute. For a 10-second target, teams run an always-on stream instead, such as a continuous job running Auto Loader.",
+      "source": "https://docs.databricks.com/aws/en/jobs/file-arrival-triggers",
+      "evidence": "File arrival triggers make a best effort to check for new files every minute, although this can be affected by the performance of the underlying cloud storage."
+    },
+    {
+      "family": "triggers-none-external-orchestrator",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A company's Apache Airflow DAG coordinates steps across several platforms. It must start a Databricks job only after an on-premises export succeeds, then wait for that job's result before loading a downstream system. Which trigger configuration should the Databricks job have?",
+      "options": [
+        {
+          "text": "No trigger, with Airflow starting each run through the Jobs API",
+          "correct": true,
+          "why": "A job with no trigger runs only when someone starts it manually or another orchestration tool starts it programmatically, so Airflow alone decides when it runs and can wait on each run's result."
+        },
+        {
+          "text": "A file arrival trigger on the folder the export writes to",
+          "average": true,
+          "why": "A file arrival trigger would start runs on its own whenever files land, outside the DAG, so Airflow couldn't sequence the run or wait for its result."
+        },
+        {
+          "text": "A scheduled trigger set after the export's usual finish time",
+          "why": "A clock-based trigger guesses at the export's timing and runs independently of Airflow, so a late export leads to a run over incomplete data."
+        },
+        {
+          "text": "A scheduled trigger, with Airflow-started runs as a backup",
+          "why": "A schedule plus Airflow-started runs gives the job two independent starters, which can run it twice and break the DAG's ordering."
+        }
+      ],
+      "in_practice": "When one orchestrator owns cross-platform dependencies, giving it sole control over when Databricks jobs start avoids duplicate runs and keeps one place to follow each end-to-end run.",
+      "source": "https://docs.databricks.com/aws/en/jobs/triggers",
+      "evidence": "You can also trigger job runs manually or through external orchestration tools. ... None (manual) Runs are triggered manually with the Run now button or programmatically using other orchestration tools."
+    },
+    {
+      "family": "triggers-continuous-not-combinable",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineering team runs an always-on Structured Streaming job with a continuous trigger, and the Multiple Triggers Beta is enabled in the workspace. The team also needs a weekly maintenance notebook to run every Sunday at 02:00 and is considering adding a scheduled trigger to the same job. Which approach works?",
+      "options": [
+        {
+          "text": "Run the maintenance notebook in a separate job with its own schedule",
+          "correct": true,
+          "why": "A continuous trigger can't be combined with any other trigger, because the job already runs continuously. A separate scheduled job runs the weekly work without touching the stream."
+        },
+        {
+          "text": "Add a scheduled trigger next to the continuous trigger on this job",
+          "average": true,
+          "why": "Multiple triggers make this look possible, and many trigger types can be mixed, but a continuous trigger can't share a job with any other trigger."
+        },
+        {
+          "text": "Replace the continuous trigger with a one-minute schedule plus a weekly one",
+          "why": "This gives up the always-on behavior and automatic restarts the stream relies on, just so it can share a job with weekly work."
+        },
+        {
+          "text": "Add the notebook as a task that depends on the streaming task",
+          "why": "Continuous jobs can't use task dependencies, and an always-on streaming task never finishes for a dependent task to start."
+        }
+      ],
+      "in_practice": "Keeping streams and scheduled maintenance in separate jobs also isolates failures: a maintenance error doesn't restart the stream, and each job keeps its own alerts and run history.",
+      "source": "https://docs.databricks.com/aws/en/jobs/triggers",
+      "evidence": "A continuous trigger cannot be combined with any other trigger because the job already runs continuously."
+    },
+    {
+      "family": "triggers-table-update-ten-table-limit",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer's job must run whenever any of 12 bronze tables in main.ingest is updated. Different upstream jobs refresh these tables at unpredictable times. The workspace has the Multiple Triggers Beta enabled. Which trigger setup meets this requirement?",
+      "options": [
+        {
+          "text": "Two table update triggers, each set to Any and covering six of the tables",
+          "correct": true,
+          "why": "A table update trigger can monitor at most 10 tables, so 12 tables need two triggers. With multiple triggers, any active trigger that evaluates to true starts a run."
+        },
+        {
+          "text": "One table update trigger on a view that unions the 12 tables",
+          "average": true,
+          "why": "A view looks like a single object, but its source tables count toward the limit of 10 tables per trigger, so a view over 12 tables can't be used."
+        },
+        {
+          "text": "One table update trigger listing all 12 tables, set to Any",
+          "why": "A single table update trigger can select at most 10 tables, so it can't list all 12."
+        },
+        {
+          "text": "A scheduled trigger that runs every 10 minutes",
+          "why": "A schedule runs whether or not any table changed and adds up to 10 minutes of delay, when the requirement is to react to updates."
+        }
+      ],
+      "in_practice": "Grouping sources into triggers by owner or domain keeps each trigger under the 10-table limit and lets a team pause one group, say during an upstream backfill, without touching the rest.",
+      "source": "https://docs.databricks.com/aws/en/jobs/trigger-table-update",
+      "evidence": "You can select up to 10 managed or Delta tables per trigger. ... Source tables for a view are counted towards the limit of 10 tables per trigger."
+    },
+    {
+      "family": "triggers-mv-trigger-on-update-at-most-every",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer maintains the standalone materialized view main.gold.fleet_status, which reads main.silver.vehicle_pings. A streaming pipeline commits to that table about once a minute during the day and not at all overnight. Dashboard users accept data up to 15 minutes old, and the team wants no refreshes when nothing has changed. Which clause should the view's definition use?",
+      "options": [
+        {
+          "text": "TRIGGER ON UPDATE AT MOST EVERY INTERVAL 15 MINUTES",
+          "correct": true,
+          "why": "TRIGGER ON UPDATE refreshes only when the source changes, and AT MOST EVERY caps how often, so busy hours get a refresh about every 15 minutes and quiet nights get none."
+        },
+        {
+          "text": "SCHEDULE CRON '0 */15 * * * ?' AT TIME ZONE 'UTC'",
+          "average": true,
+          "why": "A 15-minute schedule meets the freshness target, but it keeps refreshing all night when nothing has changed, which is the waste the team wants to avoid."
+        },
+        {
+          "text": "TRIGGER ON UPDATE",
+          "why": "Without AT MOST EVERY, the view can refresh as often as once a minute while the source keeps changing, far more often than a 15-minute target needs."
+        },
+        {
+          "text": "SCHEDULE EVERY 1 HOUR",
+          "why": "An hourly refresh misses the 15-minute freshness target and still runs overnight when nothing has changed."
+        }
+      ],
+      "in_practice": "On a source that commits every minute, the throttle cuts refreshes from up to 60 an hour to about 4, and quiet periods cost nothing, which is often most of the savings for business-hours data.",
+      "source": "https://docs.databricks.com/aws/en/sql/mv-st/schedule-refreshes",
+      "evidence": "If upstream data refreshes frequently, use AT MOST EVERY to cap how often the view refreshes and limit compute costs. This is useful when source tables update frequently but downstream consumers don't need real-time data."
+    },
+    {
+      "family": "triggers-standalone-st-continuous-needs-pipeline",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "An analytics engineering team created the standalone streaming table main.ops.sensor_events in Databricks SQL. A new operations use case needs its data less than a minute old, around the clock. A teammate proposes adding a SQL task that runs REFRESH STREAMING TABLE main.ops.sensor_events to a job with a continuous trigger. Which approach meets the requirement?",
+      "options": [
+        {
+          "text": "Define the table in a Lakeflow pipeline and run it with a continuous job",
+          "correct": true,
+          "why": "Continuous execution through a job applies only to Lakeflow pipelines. Moving the table into a pipeline run by a continuous job keeps it processing data as it arrives."
+        },
+        {
+          "text": "Use the proposed SQL task with REFRESH in a continuous job",
+          "average": true,
+          "why": "A job doesn't make a standalone streaming table continuous: each job run performs a single triggered refresh, and standalone tables always refresh in triggered mode."
+        },
+        {
+          "text": "Add TRIGGER ON UPDATE AT MOST EVERY INTERVAL 10 SECONDS",
+          "why": "The AT MOST EVERY interval can't be less than 1 minute, and trigger-on-update refreshes are still triggered refreshes rather than continuous processing."
+        },
+        {
+          "text": "Issue the refresh from a larger SQL warehouse",
+          "why": "The warehouse doesn't change the execution mode; refreshes of standalone tables always run in triggered mode on the serverless compute that executes them."
+        }
+      ],
+      "in_practice": "Standalone tables suit SQL teams with minute-to-hour freshness needs. When a use case needs sub-minute data around the clock, moving the table into a pipeline under a continuous job is the documented path, at the cost of always-on compute.",
+      "source": "https://docs.databricks.com/aws/en/sql/mv-st/schedule-refreshes",
+      "evidence": "For standalone materialized views and streaming tables, orchestrating a refresh through a job doesn't run them continuously. Each job run performs a single triggered refresh. Continuous execution through a job applies only to Lakeflow pipelines."
+    },
+    {
+      "family": "triggers-opensharing-mv-refresh-via-job",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A retailer receives a supplier's inventory data as an OpenSharing table, shared.supplier.inventory, which the supplier updates at irregular times. A data engineer's standalone materialized view main.gold.stock_cover reads it and should refresh soon after each supplier update, not on a fixed clock. Which approach meets this requirement?",
+      "options": [
+        {
+          "text": "A job with a table update trigger on the shared table that refreshes the view",
+          "correct": true,
+          "why": "Table update triggers can monitor tables shared with the workspace through OpenSharing and start a run when the provider updates them; a SQL task in that job then runs the view's REFRESH."
+        },
+        {
+          "text": "Redefine the view with TRIGGER ON UPDATE so it watches the shared table",
+          "average": true,
+          "why": "TRIGGER ON UPDATE is the usual choice for event-driven view refreshes, but OpenSharing shared tables aren't supported as its upstream sources."
+        },
+        {
+          "text": "Redefine the view with SCHEDULE CRON to refresh every 15 minutes",
+          "why": "A clock-based refresh runs whether or not the supplier changed anything and still lags updates by up to 15 minutes, which the requirement rules out."
+        },
+        {
+          "text": "A job with a file arrival trigger on the supplier's storage path",
+          "why": "File arrival triggers watch Unity Catalog volumes and external locations that the workspace governs; a share exposes tables, not the provider's storage paths."
+        }
+      ],
+      "in_practice": "Triggering on the shared table lets a recipient react to supplier updates as it would to its own tables, with no polling job and no need to agree delivery times with the supplier.",
+      "source": "https://docs.databricks.com/aws/en/jobs/trigger-table-update",
+      "evidence": "...or whenever a provider updates a shared table. You can trigger on the following shared objects: OpenSharing tables, OpenSharing views, OpenSharing metric views, OpenSharing materialized views, OpenSharing streaming tables"
+    },
+    {
+      "family": "triggers-five-trigger-cap-parent-folder",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "Seven regional store systems upload sales files at different times of day into /Volumes/retail/landing/sales/<region>/, and nothing else is written under /Volumes/retail/landing/sales/. A data engineer wants a single job to start whenever any region's files land. Using the Multiple Triggers Beta, the engineer adds one file arrival trigger per region folder, but the sixth can't be added. Which configuration meets the requirement?",
+      "options": [
+        {
+          "text": "One file arrival trigger on /Volumes/retail/landing/sales/",
+          "correct": true,
+          "why": "During the Beta a job can have up to five triggers, and a file arrival trigger checks every subdirectory of its path, so one trigger on the parent folder covers all seven regions."
+        },
+        {
+          "text": "Two jobs, one with five region triggers and one with two",
+          "average": true,
+          "why": "Splitting gets around the five-trigger cap only by breaking the single-job requirement, and one trigger on the parent folder already covers every region."
+        },
+        {
+          "text": "One file arrival trigger on /Volumes/retail/landing/sales/*/",
+          "why": "Trigger paths can't contain wildcards, and none is needed because the trigger already checks every subdirectory."
+        },
+        {
+          "text": "A scheduled trigger every minute that checks all seven folders",
+          "why": "A one-minute schedule runs all day even when no files arrive, paying for runs that find nothing, while a file arrival trigger runs only when files land."
+        }
+      ],
+      "in_practice": "Landing zones laid out as one parent folder with a subfolder per source let a single trigger cover new sources automatically: adding an eighth region needs no trigger change at all.",
+      "source": "https://docs.databricks.com/aws/en/jobs/triggers",
+      "evidence": "During the Multiple Triggers Beta, a job can have up to five triggers."
+    },
+    {
+      "family": "triggers-table-update-cooldown-plus-wait-timing",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 3,
+      "type": "single",
+      "keep_order": true,
+      "stem": "A data engineer configures a table update trigger with Minimum time between triggers set to 600 seconds and Wait after last change set to 120 seconds. The job's previous run completes at time 0. The monitored table is then updated at 90 seconds and again at 550 seconds, with no further updates. When can the next run start, at the earliest?",
+      "options": [
+        {
+          "text": "At 210 seconds",
+          "why": "This applies the wait to the first update only, ignoring both the later update at 550 seconds and the 600-second minimum after the previous run."
+        },
+        {
+          "text": "At 600 seconds",
+          "why": "The minimum time has passed at 600 seconds, but the update at 550 seconds restarted the 120-second wait, so the trigger holds until 670 seconds."
+        },
+        {
+          "text": "At 670 seconds",
+          "correct": true,
+          "why": "With both options set, the trigger waits out the minimum time and also needs the wait window to pass with no updates. The 550-second update pushes that window to 670 seconds, later than the 600-second minimum."
+        },
+        {
+          "text": "At 720 seconds",
+          "average": true,
+          "why": "Adding the full 120-second wait after the 600-second minimum misreads the rule: the wait counts from the last update at 550 seconds, not from the end of the minimum time."
+        }
+      ],
+      "in_practice": "Combining both options suits sources that commit in bursts: the minimum caps runs at one per window, and the wait keeps a run from starting partway through a burst of commits.",
+      "source": "https://docs.databricks.com/aws/en/jobs/trigger-table-update",
+      "evidence": "If both options are used, then the trigger waits the minimum time between triggers, and then waits the set amount of time after the last change. ... if one update comes in at 5 seconds, and then another at 115 seconds, then the wait after last change means that a run does not get triggered until after 175 seconds."
+    },
+    {
+      "family": "triggers-table-update-any-wait-partial-batches",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 3,
+      "type": "single",
+      "stem": "An upstream job runs at varying times each night and refreshes some or all of four dimension tables in main.ref, depending on which source systems sent changes; its commits always land within about five minutes. A data engineer's downstream job must run once per night after that night's updates finish, even on nights when only some tables change. Which table update trigger configuration meets this requirement?",
+      "options": [
+        {
+          "text": "Any table is updated, with Wait after last change set to 600 seconds",
+          "correct": true,
+          "why": "Any lets whichever tables changed start the trigger, and Wait after last change holds the run until 600 seconds pass with no further commits, so one run follows each night's burst."
+        },
+        {
+          "text": "All tables are updated, with no advanced options set",
+          "average": true,
+          "why": "All suits tables that always refresh together. On nights when only some tables change, it keeps waiting until every monitored table has been updated, which could be days later."
+        },
+        {
+          "text": "Any table is updated, with Minimum time between triggers set to 600 seconds",
+          "why": "A minimum time only spaces runs after a previous run completes; the night's first commit can still start a run before the other tables finish updating."
+        },
+        {
+          "text": "A scheduled trigger at the upstream job's usual finish time",
+          "why": "The upstream job runs at varying times, so a fixed clock time either reads partial updates when it runs late or adds needless delay."
+        }
+      ],
+      "in_practice": "Debouncing on Any handles variable fan-in: the job runs once after each burst whether one table or all four changed, without hard-coding which sources must update together.",
+      "source": "https://docs.databricks.com/aws/en/jobs/trigger-table-update",
+      "evidence": "Wait after last change in seconds: The time to wait to trigger a run after a table update. Additional table updates during this period reset the timer. This setting can be used when table updates come in batches, and the whole batch needs to be processed after all tables are updated."
+    },
+    {
+      "family": "triggers-trigger-type-table-value",
+      "objective": "jobs.triggers",
+      "guide": "4.3",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A job has a table update trigger on main.sales.orders, and operators sometimes start it with Run now. Its notebook task receives {{job.trigger.type}} as a parameter and runs incremental logic only for runs that the table update trigger started. Which value should the notebook compare the parameter with?",
+      "options": [
+        {
+          "text": "table",
+          "correct": true,
+          "why": "{{job.trigger.type}} resolves to one of periodic, one_time, run_job_task, file_arrival, continuous, table or model, and a run started by a table update trigger reports table."
+        },
+        {
+          "text": "table_update",
+          "average": true,
+          "why": "table_update is the namespace of the trigger's other references, such as {{job.trigger.table_update.updated_tables}}, but it isn't one of the values {{job.trigger.type}} returns."
+        },
+        {
+          "text": "one_time",
+          "why": "one_time marks a run started once on demand, as the operators' Run now runs are, so comparing with it would select exactly the runs the incremental logic should skip."
+        },
+        {
+          "text": "run_job_task",
+          "why": "run_job_task marks a run that a Run Job task in another job started, which isn't how this job's trigger starts runs."
+        }
+      ],
+      "in_practice": "Reading the trigger type lets one job serve both paths: trigger-started runs process only the new commits, while manual runs can do a full rebuild, without keeping two copies of the job in sync.",
+      "source": "https://docs.databricks.com/aws/en/jobs/dynamic-value-references",
+      "evidence": "{{job.trigger.type}} The trigger type of the job run. The possible values are periodic, one_time, run_job_task, file_arrival, continuous, table, and model."
+    },
+    {
+      "family": "triggers-model-update-new-version",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 1,
+      "type": "single",
+      "stem": "A data engineering team's batch scoring job must run each time a new version of the Unity Catalog model main.ml.churn_model becomes ready. Data scientists register versions at irregular times, from several a day to none for weeks. Which trigger fits this requirement?",
+      "options": [
+        {
+          "text": "A model update trigger (Beta) with the Model version is ready condition",
+          "correct": true,
+          "why": "A model update trigger watches a Unity Catalog model scope and starts a run when a matching event occurs; the Model version is ready condition fires when a new version of the model becomes ready."
+        },
+        {
+          "text": "A scheduled trigger that runs the job every hour",
+          "average": true,
+          "why": "An hourly schedule follows the clock rather than the model: it starts runs during weeks with no new version and still lags each new one. Model update triggers replace cron schedules for tracking model updates."
+        },
+        {
+          "text": "A table update trigger on the model's training data table",
+          "why": "A table update trigger reacts to commits on tables, and new training data doesn't mean a new model version is ready, so runs would start at the wrong times."
+        },
+        {
+          "text": "A continuous trigger with a task that polls for new versions",
+          "why": "A continuous job stays always on, so polling keeps compute busy between rare registrations; a model update trigger detects new versions without persistent compute."
+        }
+      ],
+      "in_practice": "Event-driven scoring starts within minutes of a new version and costs nothing in the weeks without one, where an hourly schedule would launch about 720 mostly idle runs a month.",
+      "source": "https://docs.databricks.com/aws/en/jobs/model-update-triggers",
+      "evidence": "Use model update triggers to automatically run a job when a model change occurs in Unity Catalog. This feature replaces the need for cron schedules or persistent clusters to track model updates. ... Model version is ready: A new model version becomes ready in the scope."
+    },
+    {
+      "family": "triggers-synced-table-triggered-mode-table-update",
+      "objective": "jobs.triggers",
+      "guide": "4.4",
+      "difficulty": 2,
+      "type": "single",
+      "stem": "A data engineer syncs main.gold.customer_profile to Lakebase Postgres through a synced table in Triggered mode, with change data feed enabled on the source. An upstream pipeline updates the source at irregular times, a few times a day, and the app team wants each change in Postgres soon after it lands, without the always-on cost of Continuous mode. How should the engineer automate the syncs?",
+      "options": [
+        {
+          "text": "A Database Table Sync pipeline task in a job with a table update trigger on the source",
+          "correct": true,
+          "why": "Triggered syncs run only when triggered. A table update trigger on the source starts the job when the table changes, and Triggered mode applies only the new changes, giving near-real-time freshness without Continuous mode's always-on cost."
+        },
+        {
+          "text": "A Database Table Sync pipeline task in a job scheduled every 5 minutes",
+          "average": true,
+          "why": "A 5-minute schedule follows the clock rather than the data, so it runs about 288 times a day for a few changes and still lags each one; the docs pair scheduled syncs with Snapshot mode."
+        },
+        {
+          "text": "Snapshot mode for the synced table, with a nightly scheduled job",
+          "why": "Snapshot copies the whole table on each sync and suits sources where more than about 10% of rows change per cycle; a nightly run would also leave the app hours behind each update."
+        },
+        {
+          "text": "A file arrival trigger on the storage location of the source table",
+          "why": "File arrival triggers watch volumes and external locations for new files, and their paths can't contain tables; changes to a table are detected with a table update trigger."
+        }
+      ],
+      "in_practice": "For a source that changes three or four times a day, a table update trigger means three or four incremental syncs that each apply only the changed rows, instead of hundreds of empty scheduled runs or an always-on stream.",
+      "source": "https://docs.databricks.com/aws/en/oltp/projects/sync-tables",
+      "evidence": "Trigger on source table updates: Best for Triggered mode. ... Fires the job when the source Unity Catalog table is updated. With Triggered mode, only new changes are applied incrementally, giving near-real-time freshness without the always-on cost of Continuous mode."
+    }
+  ]
+}
